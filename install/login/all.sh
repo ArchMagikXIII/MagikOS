@@ -1,1 +1,1 @@
-run_logged "$OMARCHY_INSTALL/login/sddm.sh"
+run_logged "$MAGIKOS_INSTALL/login/sddm.sh"

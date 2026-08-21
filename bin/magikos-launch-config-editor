@@ -1,0 +1,15 @@
+#!/bin/bash
+
+# magikos:summary=Open a config file in the user's editor and surface a toast
+# magikos:args=<path>
+# magikos:examples=magikos launch config-editor ~/.config/hypr/hyprland.lua
+
+path="${1-}"
+
+if [[ -z $path ]]; then
+  echo "Usage: magikos-launch-config-editor <path>" >&2
+  exit 1
+fi
+
+magikos-notification-send -u low "Editing config file" "$path"
+exec magikos-launch-editor "$path"

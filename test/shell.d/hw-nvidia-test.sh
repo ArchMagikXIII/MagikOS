@@ -26,7 +26,7 @@ write_pci_devices() {
 }
 
 hw_nvidia() {
-  OMARCHY_PCI_DEVICES_PATH="$tmp_dir/devices" "$ROOT/bin/omarchy-hw-$1"
+  MAGIKOS_PCI_DEVICES_PATH="$tmp_dir/devices" "$ROOT/bin/magikos-hw-$1"
 }
 
 assert_detects() {
@@ -48,7 +48,7 @@ assert_detects() {
     hw_nvidia "$detector" && actual=yes
 
     [[ $actual == "$expected" ]] ||
-      fail "$description" "omarchy-hw-$detector: expected $expected, got $actual"
+      fail "$description" "magikos-hw-$detector: expected $expected, got $actual"
   done
 
   pass "$description"

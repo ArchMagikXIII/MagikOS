@@ -5,7 +5,7 @@ source "$(dirname "$0")/base-test.sh"
 test_home=$(mktemp -d)
 test_bin=$(mktemp -d)
 log_file=$(mktemp)
-hook_path="$test_home/.config/omarchy/hooks/post-update.d/install-voxtype.hook"
+hook_path="$test_home/.config/magikos/hooks/post-update.d/install-voxtype.hook"
 
 cleanup() {
   rm -rf "$test_home" "$test_bin"
@@ -15,7 +15,7 @@ trap cleanup EXIT
 
 mkdir -p "$(dirname "$hook_path")"
 
-cat >"$test_bin/omarchy-notification-send" <<'EOF'
+cat >"$test_bin/magikos-notification-send" <<'EOF'
 #!/bin/bash
 echo notification >>"$TEST_LOG"
 while (($# > 0)); do
@@ -23,7 +23,7 @@ while (($# > 0)); do
   shift
 done
 EOF
-chmod +x "$test_bin/omarchy-notification-send"
+chmod +x "$test_bin/magikos-notification-send"
 
 # The shell runs the click command, so the invitation must not need a unit of its
 # own to keep a blocked sender alive until the toast is answered.
@@ -40,10 +40,10 @@ run_invitation_hook() {
 
 run_invitation_hook
 
-[[ -f $test_home/.local/state/omarchy/done/voxtype-install-invitation ]] || fail "Voxtype invitation records completion"
+[[ -f $test_home/.local/state/magikos/done/voxtype-install-invitation ]] || fail "Voxtype invitation records completion"
 [[ -f $hook_path ]] || fail "Voxtype invitation keeps its hook installed"
 [[ $(grep -c '^notification$' "$log_file") -eq 1 ]] || fail "Voxtype invitation sends one notification"
-grep -qx 'exec:omarchy-launch-floating-terminal-with-presentation omarchy-voxtype-install' "$log_file" ||
+grep -qx 'exec:magikos-launch-floating-terminal-with-presentation magikos-voxtype-install' "$log_file" ||
   fail "Voxtype invitation attaches the installer to the notification"
 grep -q '^systemd-run:' "$log_file" && fail "Voxtype invitation needs no unit to hold an unanswered toast"
 

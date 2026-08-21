@@ -1,0 +1,8 @@
+#!/bin/bash
+
+# magikos:summary=Open Voxtype configuration
+
+set -e
+
+magikos-launch-floating-terminal-with-presentation "voxtype configure"
+magikos-restart-shell

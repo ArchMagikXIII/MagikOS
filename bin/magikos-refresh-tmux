@@ -1,0 +1,6 @@
+#!/bin/bash
+
+# magikos:summary=Overwrite the user tmux config with the Magikos default and reload tmux.
+
+magikos-refresh-config tmux/tmux.conf
+magikos-restart-tmux

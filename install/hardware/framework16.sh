@@ -1,3 +1,3 @@
-if omarchy-hw-framework16; then
-  omarchy-pkg-add qmk-hid
+if magikos-hw-framework16; then
+  magikos-pkg-add qmk-hid
 fi

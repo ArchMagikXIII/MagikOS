@@ -1,0 +1,133 @@
+#!/bin/bash
+
+# magikos:summary=Show or adjust brightness on the focused display.
+# magikos:args=[--no-osd] [--monitor name] [+N%|N%-|N%|off|on]
+# magikos:examples=magikos brightness display | magikos brightness display +5% | magikos brightness display --monitor DP-1 50% | magikos brightness display off | magikos brightness display on
+
+no_osd=0
+monitor=""
+
+while (( $# > 0 )); do
+  case "$1" in
+  --no-osd)
+    no_osd=1
+    shift
+    ;;
+  --monitor)
+    (( $# >= 2 )) || exit 1
+    monitor="$2"
+    shift 2
+    ;;
+  *)
+    break
+    ;;
+  esac
+done
+
+# Get the brightness of the passed display
+backlight_brightness() {
+  brightnessctl -d "$1" -m 2>/dev/null | awk -F, '{ gsub("%", "", $4); print $4; found=1 } END{ exit !found }'
+}
+
+if [[ -z $monitor ]]; then
+  if [[ -n $SWAYSOCK ]]; then
+    monitor="$(swaymsg -t get_outputs -r 2>/dev/null | jq -r '.[] | select(.focused == true) | .name' 2>/dev/null || true)"
+  else
+    monitor="$(magikos-hyprland-monitor-focused 2>/dev/null || true)"
+  fi
+fi
+
+monitor_is_internal() {
+  [[ $monitor =~ ^(eDP|LVDS|DSI)- ]]
+}
+
+use_apple_display() {
+  [[ -z $SWAYSOCK ]] && magikos-hyprland-monitor-focused-apple "$monitor"
+}
+
+use_ddc_display() {
+  [[ -n $monitor ]] && ! monitor_is_internal
+}
+
+if (( $# == 0 )); then
+  if use_apple_display; then
+    magikos-brightness-display-apple
+    exit
+  elif use_ddc_display; then
+    magikos-brightness-display-ddc "$monitor"
+    exit
+  fi
+
+  device="$(magikos-hw-display)" || exit 1
+  backlight_brightness "$device"
+  exit
+fi
+
+step="$1"
+
+if [[ $step == "off" ]]; then
+  if [[ -n $SWAYSOCK ]]; then
+    swaymsg output "$monitor" dpms off >/dev/null 2>&1
+  else
+    hyprctl dispatch 'hl.dsp.dpms({ action = "disable" })' >/dev/null 2>&1
+  fi
+  exit 0
+elif [[ $step == "on" ]]; then
+  if [[ -n $SWAYSOCK ]]; then
+    swaymsg output "$monitor" dpms on >/dev/null 2>&1
+  else
+    hyprctl monitors -j 2>/dev/null | jq -e '[.[] | select(.disabled == false)] | length > 0 and all(.dpmsStatus)' >/dev/null 2>&1 && exit 0
+    hyprctl dispatch 'hl.dsp.dpms({ action = "enable" })' >/dev/null 2>&1
+  fi
+  exit 0
+fi
+
+# Drop overlapping brightness key events so concurrent invocations do not race.
+# Hardware key repeat present on some devices can otherwise glitch OSD rendering.
+exec {lock_fd}>"${XDG_RUNTIME_DIR:-/tmp}/magikos-brightness-display.lock"
+flock -n "$lock_fd" || exit 0
+
+if use_apple_display; then
+  if (( no_osd )); then
+    magikos-brightness-display-apple --no-osd "$step"
+  else
+    magikos-brightness-display-apple "$step"
+  fi
+elif use_ddc_display; then
+  brightness="$(magikos-brightness-display-ddc "$monitor" "$step")" || exit 1
+  (( no_osd )) || magikos-osd -i brightness -p "$brightness"
+else
+  # Current device highlighted
+  device="$(magikos-hw-display)" || exit 1
+
+  # Current brightness percentage
+  current=$(backlight_brightness "$device") || exit 1
+
+  # Apply non-uniform step size: 1% steps if at or below 5%, otherwise set an
+  # absolute target percentage to avoid raw backlight rounding causing uneven OSD steps.
+  if [[ $step == "+5%" ]]; then
+    if (( current < 5 )); then
+      (( target = current + 1 ))
+    else
+      (( target = current + 5 ))
+    fi
+
+    (( target > 100 )) && target=100
+    step="$target%"
+  elif [[ $step == "5%-" ]]; then
+    if (( current <= 5 )); then
+      (( target = current - 1 ))
+    else
+      (( target = current - 5 ))
+    fi
+
+    (( target < 1 )) && target=1
+    step="$target%"
+  fi
+
+  # Set brightness of the display device.
+  brightnessctl -d "$device" set "$step" >/dev/null
+
+  # Show the new brightness in OSD
+  (( no_osd )) || magikos-osd -i brightness -p "$(backlight_brightness "$device")"
+fi

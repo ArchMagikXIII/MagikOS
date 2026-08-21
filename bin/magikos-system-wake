@@ -1,0 +1,10 @@
+#!/bin/bash
+
+# magikos:summary=Wake displays and restore brightness after idle
+# magikos:group=system
+# magikos:name=wake
+# magikos:examples=magikos system wake
+
+magikos-brightness-display on
+magikos-brightness-keyboard restore
+magikos-hyprland-monitor-clamshell >/dev/null 2>&1 || true

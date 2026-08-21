@@ -1,0 +1,6 @@
+#!/bin/bash
+
+# magikos:summary=Toggle notification do-not-disturb mode
+
+state=$(magikos-shell notifications toggleDnd 2>/dev/null || echo "")
+magikos-shell -q magikos.indicators refresh

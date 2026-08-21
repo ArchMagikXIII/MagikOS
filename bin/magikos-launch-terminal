@@ -1,0 +1,6 @@
+#!/bin/bash
+
+# magikos:summary=Launch a terminal in the active terminal's current directory
+# magikos:args=[command...]
+
+exec setsid uwsm-app -- xdg-terminal-exec --dir="$(magikos-cmd-terminal-cwd)" "$@"

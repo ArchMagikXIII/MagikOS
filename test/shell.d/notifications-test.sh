@@ -42,12 +42,12 @@ assert(notifications.shouldRenderCompactGlyph('K', '', true), 'notifications ren
 assert(!notifications.shouldRenderCompactGlyph('K', '', false), 'notifications give glyph hints with bodies the large icon slot')
 assert(!notifications.shouldRenderCompactGlyph('K', 'file:///tmp/image.png', true), 'notifications keep image-backed glyph hints in the icon slot')
 
-assert(notifications.shouldBypassDnd({ appName: 'omarchy-action', urgency: 1 }, 2), 'omarchy action toasts bypass DND')
+assert(notifications.shouldBypassDnd({ appName: 'magikos-action', urgency: 1 }, 2), 'magikos action toasts bypass DND')
 assert(notifications.shouldBypassDnd({ appName: 'notify-send', urgency: 2 }, 2), 'critical notify-send bypasses DND')
 assert(!notifications.shouldBypassDnd({ appName: 'notify-send', urgency: 1 }, 2), 'normal notify-send does not bypass DND')
 assert(!notifications.shouldBypassDnd({ appName: 'Slack', urgency: 2 }, 2), 'critical app notifications do not bypass DND')
-assert(!notifications.shouldBypassDnd({ appName: 'omarchy-menu-keybindings', urgency: 1 }, 2), 'omarchy command app names do not bypass DND')
-assert(!notifications.isEphemeralApp('omarchy-menu-keybindings'), 'notifications treat omarchy command app names as normal apps')
+assert(!notifications.shouldBypassDnd({ appName: 'magikos-menu-keybindings', urgency: 1 }, 2), 'magikos command app names do not bypass DND')
+assert(!notifications.isEphemeralApp('magikos-menu-keybindings'), 'notifications treat magikos command app names as normal apps')
 
 assertDeepEqual(
   notifications.popupPlacement('top', 32, 6),
@@ -89,7 +89,7 @@ const notification = {
   summary: 42,
   body: 'Body',
   image: 'file:///tmp/mail.png',
-  hints: { 'omarchy-glyph': '!' },
+  hints: { 'magikos-glyph': '!' },
   urgency: 1,
   expireTimeout: 1.5
 }
@@ -133,7 +133,7 @@ const replacement = notifications.replacementSnapshot(
     summary: 'Thread v2',
     body: 'message 2',
     image: 'file:///tmp/new.png',
-    hints: { 'omarchy-glyph': '!' },
+    hints: { 'magikos-glyph': '!' },
     urgency: 2,
     expireTimeout: 4000
   },
@@ -357,12 +357,12 @@ assertEqual(
 // restart: a libnotify action leaves its sender waiting on an id from a server
 // generation that no longer exists.
 assertEqual(
-  notifications.snapshotOf({ id: 3, hints: { 'omarchy-exec': 'omarchy-menu-keybindings' } }, 1).exec,
-  'omarchy-menu-keybindings',
+  notifications.snapshotOf({ id: 3, hints: { 'magikos-exec': 'magikos-menu-keybindings' } }, 1).exec,
+  'magikos-menu-keybindings',
   'notifications capture the click command from the exec hint'
 )
 assertEqual(
-  notifications.snapshotOf({ id: 3, hints: { 'omarchy-glyph': '!' } }, 1).exec,
+  notifications.snapshotOf({ id: 3, hints: { 'magikos-glyph': '!' } }, 1).exec,
   '',
   'notifications leave the click command empty without an exec hint'
 )
@@ -396,7 +396,7 @@ assert(
 )
 assert(
   /readonly property string popupStateDir: stateDir \+ "notifications\/"/.test(serviceQml),
-  'notifications service persists popups under the omarchy state dir'
+  'notifications service persists popups under the magikos state dir'
 )
 assert(
   /readonly property string historyDir: popupStateDir \+ "history\/"/.test(serviceQml),

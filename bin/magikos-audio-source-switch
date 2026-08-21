@@ -1,0 +1,20 @@
+#!/bin/bash
+
+# magikos:summary=Cycle to the next media source and transfer playback when the current source is playing
+# magikos:args=[next|previous]
+# magikos:examples=magikos audio source switch | magikos-audio-source-switch previous
+
+direction="${1:-next}"
+
+case "$direction" in
+  next)
+    magikos-shell media sourceSwitch
+    ;;
+  previous)
+    magikos-shell media sourceSwitchPrevious
+    ;;
+  *)
+    echo "Usage: magikos-audio-source-switch [next|previous]" >&2
+    exit 1
+    ;;
+esac

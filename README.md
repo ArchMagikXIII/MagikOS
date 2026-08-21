@@ -1,16 +1,16 @@
-# Omarchy
+# Magikos
 
-Omarchy is a beautiful, modern & opinionated Linux distribution by DHH.
+Magikos is a beautiful, modern & opinionated Linux distribution by DHH.
 
-Read more at [omarchy.org](https://omarchy.org).
+Read more at [magikos.org](https://magikos.org).
 
-## The Omarchy Manual
+## The Magikos Manual
 
 The manual lives in [`manual/`](manual/), which is its authoritative source. It's
-mirrored to [learn.omacom.io](https://learn.omacom.io/2/the-omarchy-manual), where
+mirrored to [learn.omacom.io](https://learn.omacom.io/2/the-magikos-manual), where
 its screenshots are also hosted.
 
-- [Welcome to Omarchy!](manual/01-welcome-to-omarchy.md)
+- [Welcome to Magikos!](manual/01-welcome-to-magikos.md)
 
 **The Basics**
 
@@ -26,7 +26,7 @@ its screenshots are also hosted.
 - [Text Extraction & Dictation](manual/11-text-extraction-dictation.md)
 - [Screenshots & Recording](manual/12-screenshots-recording.md)
 - [Toggles, idle & screensaver](manual/13-toggles-idle-screensaver.md)
-- [Omarchy CLI](manual/14-omarchy-cli.md)
+- [Magikos CLI](manual/14-magikos-cli.md)
 
 **The Applications**
 
@@ -71,10 +71,10 @@ its screenshots are also hosted.
 - [FAQ](manual/47-faq.md)
 - [System snapshots](manual/48-system-snapshots.md)
 - [Security](manual/49-security.md)
-- [Omarchy on...](manual/50-omarchy-on.md)
+- [Magikos on...](manual/50-magikos-on.md)
 - [Dual Boot Install](manual/51-dual-boot-install.md)
 - [Unattended Installs](manual/52-unattended-installs.md)
 
 ## License
 
-Omarchy is released under the [MIT License](https://opensource.org/licenses/MIT).
+Magikos is released under the [MIT License](https://opensource.org/licenses/MIT).

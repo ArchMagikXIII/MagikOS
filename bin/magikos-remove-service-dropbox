@@ -1,0 +1,11 @@
+#!/bin/bash
+
+# magikos:summary=Remove Dropbox and its bar plugin.
+# magikos:requires-sudo=true
+
+dropbox-cli stop 2>/dev/null || true
+magikos-plugin-disable magikos.dropbox
+magikos-pkg-drop dropbox dropbox-cli libappindicator-gtk3 python-gpgme nautilus-dropbox
+
+echo ""
+echo "Dropbox has been removed."

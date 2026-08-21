@@ -1,0 +1,14 @@
+#!/bin/bash
+
+# magikos:summary=Remove Tailscale and its bar plugin.
+# magikos:requires-sudo=true
+
+tailscale down 2>/dev/null || true
+systemctl --user disable --now magikos-tailscale-receive.service 2>/dev/null || true
+sudo systemctl disable --now tailscaled.service 2>/dev/null || true
+magikos-plugin-disable magikos.tailscale
+magikos-webapp-remove "Tailscale" 2>/dev/null || true
+magikos-pkg-drop tailscale
+
+echo ""
+echo "Tailscale has been removed."

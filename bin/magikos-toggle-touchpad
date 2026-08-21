@@ -1,0 +1,6 @@
+#!/bin/bash
+
+# magikos:summary=Enable, disable, or toggle the touchpad
+# magikos:args=[on|off|toggle]
+
+exec magikos-toggle-input-device touchpad "${1:-toggle}"

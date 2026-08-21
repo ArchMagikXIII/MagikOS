@@ -1,0 +1,71 @@
+#!/bin/bash
+
+# magikos:summary=Enable, disable, toggle, or recover the internal laptop display
+# magikos:args=<on|off|toggle|recover>
+
+TOGGLE="internal-monitor-disable"
+TOGGLE_FLAG="$HOME/.local/state/magikos/toggles/hypr/$TOGGLE.lua"
+MIRROR_TOGGLE="internal-monitor-mirror"
+
+INTERNAL=$(magikos-hyprland-monitor-laptop)
+
+wake() {
+  hyprctl dispatch 'hl.dsp.dpms({ action = "enable" })' >/dev/null 2>&1 || true
+}
+
+on() {
+  if magikos-hyprland-toggle-enabled $TOGGLE; then
+    magikos-hyprland-toggle $TOGGLE off
+    magikos-notification-send -g 󰍹 "Laptop display enabled"
+  fi
+
+  wake
+}
+
+off() {
+  if [[ -z $INTERNAL ]]; then
+    magikos-notification-send -g 󰍹 "No laptop display found"
+    exit 1
+  fi
+
+  if ! magikos-hyprland-monitor-external-active; then
+    magikos-notification-send -g 󰍹 "Can't disable the only active display"
+    exit 1
+  fi
+
+  if magikos-hyprland-toggle-disabled $TOGGLE && magikos-hyprland-toggle-disabled $MIRROR_TOGGLE; then
+    printf 'hl.monitor({ output = "%s", disabled = true })\n' "$INTERNAL" >"$TOGGLE_FLAG"
+    magikos-notification-send -g 󰍹 "Laptop display disabled"
+    hyprctl reload
+  fi
+}
+
+recover() {
+  # Runs from the clamshell watcher every few seconds, so it must be a no-op
+  # unless it actually re-enables a display: an unconditional wake here undoes
+  # lock-screen blanking and races the resume modeset into a visible flash.
+  magikos-hyprland-monitor-external-active && return 0
+  magikos-hyprland-toggle-enabled $TOGGLE || return 0
+
+  magikos-hyprland-toggle $TOGGLE off
+  wake
+}
+
+toggle() {
+  if magikos-hyprland-toggle-enabled $TOGGLE; then
+    on
+  else
+    off
+  fi
+}
+
+case "$1" in
+  on) on ;;
+  off) off ;;
+  toggle) toggle ;;
+  recover) recover ;;
+  *)
+    echo "Usage: $(basename "$0") {on|off|toggle|recover}" >&2
+    exit 1
+    ;;
+esac

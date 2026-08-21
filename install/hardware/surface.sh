@@ -1,3 +1,3 @@
-if omarchy-hw-surface; then
-  omarchy-pkg-add linux-firmware-marvell
+if magikos-hw-surface; then
+  magikos-pkg-add linux-firmware-marvell
 fi

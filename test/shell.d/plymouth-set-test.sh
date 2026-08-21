@@ -19,7 +19,7 @@ cp -a --no-preserve=mode,ownership "$source_dir/." "$theme_dir/"
 
 grep -Fq \
   'cp -a --no-preserve=mode,ownership "$staging_dir/." "$theme_dir/"' \
-  "$ROOT/bin/omarchy-plymouth-set" ||
-  fail "omarchy-plymouth-set avoids copying staging directory ownership and mode"
+  "$ROOT/bin/magikos-plymouth-set" ||
+  fail "magikos-plymouth-set avoids copying staging directory ownership and mode"
 
 pass "Plymouth asset copy preserves the package-owned directory metadata"

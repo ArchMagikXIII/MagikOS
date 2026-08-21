@@ -1,3 +1,3 @@
-if omarchy-hw-asus-rog; then
-  omarchy-pkg-add asusctl
+if magikos-hw-asus-rog; then
+  magikos-pkg-add asusctl
 fi

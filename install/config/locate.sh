@@ -1,4 +1,4 @@
-UPDATEDB_CONF_PATH="${OMARCHY_UPDATEDB_CONF_PATH:-/etc/updatedb.conf}"
+UPDATEDB_CONF_PATH="${MAGIKOS_UPDATEDB_CONF_PATH:-/etc/updatedb.conf}"
 
 echo "Configuring locate to skip Btrfs snapshots and index Btrfs subvolumes"
 

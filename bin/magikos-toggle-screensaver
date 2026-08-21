@@ -1,0 +1,11 @@
+#!/bin/bash
+
+# magikos:summary=Toggle screensaver availability
+
+magikos-toggle screensaver-off
+
+if magikos-toggle-enabled screensaver-off; then
+  magikos-notification-send -g 󱄄 "Screensaver disabled"
+else
+  magikos-notification-send -g 󱄄 "Screensaver enabled"
+fi

@@ -1,0 +1,11 @@
+#!/bin/bash
+
+# magikos:summary=Reset shell.json to Magikos defaults
+# magikos:examples=magikos refresh shell
+
+set -euo pipefail
+
+magikos-refresh-config magikos/shell.json
+magikos-bar defaults
+
+magikos-restart-shell

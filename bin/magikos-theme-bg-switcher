@@ -1,0 +1,14 @@
+#!/bin/bash
+
+# magikos:summary=Open the Magikos background switcher
+# magikos:group=theme
+# magikos:name=bg-switcher
+# magikos:aliases=magikos background
+
+theme_name=$(cat "$HOME/.local/state/magikos/current/theme.name" 2>/dev/null)
+current_background=$(readlink -f "$HOME/.local/state/magikos/current/background" 2>/dev/null)
+
+magikos-menu-images \
+  --selected "$current_background" \
+  "$HOME/.local/state/magikos/current/theme/backgrounds" \
+  "$HOME/.config/magikos/backgrounds/$theme_name"

@@ -1,0 +1,6 @@
+#!/bin/bash
+
+# magikos:summary=Compatibility wrapper for magikos-migrate-notify.
+# magikos:hidden=true
+
+exec magikos-migrate-notify "$@"

@@ -1,6 +1,6 @@
 {
-  "name": "com.omarchy.ytdlp",
-  "description": "Omarchy yt-dlp download host",
+  "name": "com.magikos.ytdlp",
+  "description": "Magikos yt-dlp download host",
   "path": "__HOST_PATH__",
   "type": "stdio",
   "allowed_origins": [

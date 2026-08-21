@@ -1,6 +1,5 @@
 import QtQuick
 import Quickshell
-import Quickshell.Hyprland
 import qs.Commons
 
 PopupWindow {
@@ -17,7 +16,7 @@ PopupWindow {
   property var borderSpec: Border.localOrSurfaceSpec("popups", "border", borderColor, Color.popups.border, Math.max(1, Style.space(2)))
   property bool open: false
   property bool centerOnBar: false
-  // "click" — uses HyprlandFocusGrab so clicking outside dismisses the popup.
+  // "click" — uses MouseArea for outside-click dismissal (Sway compatible)
   // "hover" — passive overlay; the owning widget controls open via hover.
   property string triggerMode: "click"
 
@@ -75,14 +74,22 @@ PopupWindow {
     else if (bar.activePopout === coordinatorKey) bar.releasePopout(coordinatorKey)
   }
 
-  // Outside-click dismissal via Hyprland's focus grab. While `active`, input
-  // is routed only to the listed windows; clicking anywhere else clears the
-  // grab and we close the popup. Skipped for hover-mode popups so the cursor
-  // can move freely between the trigger and the popup.
-  HyprlandFocusGrab {
-    active: root.open && root.triggerMode === "click"
-    windows: root.anchorWindow ? [root, root.anchorWindow] : [root]
-    onCleared: root.close()
+  // Sway-compatible outside-click dismissal using a full-screen MouseArea
+  // When the popup is open, we create an invisible overlay that catches clicks
+  // outside the popup and closes it
+  MouseArea {
+    id: outsideClickArea
+    anchors.fill: parent
+    visible: root.open && root.triggerMode === "click"
+    z: -1  // Behind the popup content
+    onClicked: function(mouse) {
+      // Check if click is outside the card
+      var cardPoint = card.mapFromItem(outsideClickArea, mouse.x, mouse.y)
+      if (cardPoint.x < 0 || cardPoint.x > card.width ||
+          cardPoint.y < 0 || cardPoint.y > card.height) {
+        root.close()
+      }
+    }
   }
 
   anchor {

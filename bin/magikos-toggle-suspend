@@ -1,0 +1,11 @@
+#!/bin/bash
+
+# magikos:summary=Toggle suspend availability in the system menu
+
+magikos-toggle suspend-off
+
+if magikos-toggle-enabled suspend-off; then
+  magikos-notification-send -g 󰒲 "Suspend removed from system menu"
+else
+  magikos-notification-send -g 󰒲 "Suspend now available in system menu"
+fi

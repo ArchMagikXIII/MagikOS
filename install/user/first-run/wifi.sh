@@ -1,11 +1,11 @@
 notify_update() {
-  omarchy-notification-send -u critical -g  "Update System" "Click to update the system." \
-    --exec "omarchy-launch-floating-terminal-with-presentation omarchy-update"
+  magikos-notification-send -u critical -g  "Update System" "Click to update the system." \
+    --exec "magikos-launch-floating-terminal-with-presentation magikos-update"
 }
 
 notify_wifi() {
-  omarchy-notification-send -u critical -g 󰖩 "Setup Wi-Fi" "Click to configure the wireless network." \
-    --exec "omarchy-shell shell toggle omarchy.network"
+  magikos-notification-send -u critical -g 󰖩 "Setup Wi-Fi" "Click to configure the wireless network." \
+    --exec "magikos-shell shell toggle magikos.network"
 }
 
 announce_network() {

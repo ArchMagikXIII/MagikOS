@@ -1,1 +1,1 @@
-omarchy-apply-lock
+magikos-apply-lock

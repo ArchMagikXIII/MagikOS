@@ -1,0 +1,6 @@
+#!/bin/bash
+# magikos:summary=Launch the clipboard manager
+# magikos:group=menu
+# magikos:examples=magikos menu clipboard
+
+magikos-shell shell toggle magikos.clipboard

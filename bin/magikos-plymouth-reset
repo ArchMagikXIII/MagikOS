@@ -1,0 +1,7 @@
+#!/bin/bash
+
+# magikos:summary=Restore the default Magikos Plymouth boot theme and SDDM login screen
+# magikos:requires-sudo=true
+
+magikos-refresh-plymouth
+magikos-refresh-sddm

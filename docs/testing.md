@@ -15,10 +15,10 @@ the end and exits non-zero.
 - **`./test/cli`** — one big script, one suite. It owns the CLI router: help
   and group rendering, route resolution, aliases, hidden commands, and the
   guarantee that a trailing `--help` never executes the target. It also owns
-  the metadata lint — every `omarchy-*` executable under `bin/` is checked for a
-  `# omarchy:summary=` header and against removed or redundant fields — plus
-  the theme pipeline: template rendering (`omarchy-theme-set-templates`,
-  `omarchy-theme-color`, `omarchy-theme-osc`), the theme sync commands
+  the metadata lint — every `magikos-*` executable under `bin/` is checked for a
+  `# magikos:summary=` header and against removed or redundant fields — plus
+  the theme pipeline: template rendering (`magikos-theme-set-templates`,
+  `magikos-theme-color`, `magikos-theme-osc`), the theme sync commands
   (tmux, GNOME, VS Code, Pi, Claude) run against stub binaries and a fake
   `$HOME`, and the theme-state migrations.
 - **`./test/shell`** — runs every `test/shell.d/*-test.sh` (except
@@ -48,7 +48,7 @@ source "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/base-test.sh"
 `base-test.sh` refuses to be executed directly — it is a library. It discovers
 the repo root from its own location and exports it as `ROOT`, so tests
 reference files as `$ROOT/bin/...` and never depend on the caller's working
-directory or an installed Omarchy.
+directory or an installed Magikos.
 
 Assertions are TAP-flavored and blunt:
 
@@ -124,9 +124,9 @@ only a live session can prove.
   executables (`sudo`, `tmux`, `gsettings`, helper commands) that log their
   arguments to a file, prepend it to `PATH`, and then run the real script
   under test. Assertions grep the call log and the files the script wrote.
-- **Fake `$HOME`, real `$OMARCHY_PATH`.** Anything touching user state runs
+- **Fake `$HOME`, real `$MAGIKOS_PATH`.** Anything touching user state runs
   with `HOME` pointed at a `mktemp -d` directory (cleaned up via
-  `trap ... EXIT`) and `OMARCHY_PATH="$ROOT"`, so tests exercise the checkout
+  `trap ... EXIT`) and `MAGIKOS_PATH="$ROOT"`, so tests exercise the checkout
   without touching the developer's machine.
 - **Migrations run directly.** A migration test builds the legacy state in a
   fake `$HOME`, runs `bash -euo pipefail "$ROOT/migrations/<ts>.sh"`, and

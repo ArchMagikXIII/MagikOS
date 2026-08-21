@@ -1,49 +1,49 @@
 # Reporting Issues and Submitting PRs
 
-Read this when the user wants to report an Omarchy bug, suggest a feature, or
+Read this when the user wants to report an Magikos bug, suggest a feature, or
 contribute a fix upstream.
 
-Omarchy lives at https://github.com/basecamp/omarchy. Route requests to the
+Magikos lives at https://github.com/basecamp/magikos. Route requests to the
 right place:
 
 - **Verified bugs** -> GitHub issues. Issues are for validated bugs only, not
   support requests.
 - **Feature ideas and suggestions** ->
-  https://github.com/basecamp/omarchy/discussions/categories/suggestions
+  https://github.com/basecamp/magikos/discussions/categories/suggestions
 - **Support and "is this a bug?" questions** -> the Discord community at
-  https://omarchy.org/discord. Start here when the problem isn't clearly a bug
-  in Omarchy itself.
+  https://magikos.org/discord. Start here when the problem isn't clearly a bug
+  in Magikos itself.
 
 ## Filing a Good Bug Report
 
-The bug template asks for system details (CPU, GPU, Omarchy version), a
+The bug template asks for system details (CPU, GPU, Magikos version), a
 description with steps to reproduce, and diagnostics. Gather them:
 
 ```bash
-omarchy version
+magikos version
 
-# Generate the diagnostic log (also written to /tmp/omarchy-debug.log)
-omarchy debug --no-sudo --print
+# Generate the diagnostic log (also written to /tmp/magikos-debug.log)
+magikos debug --no-sudo --print
 
-# Interactive variant: `omarchy debug` offers to upload the log to
-# logs.omarchy.org (expires after 24h) and prints a shareable URL to
+# Interactive variant: `magikos debug` offers to upload the log to
+# logs.magikos.org (expires after 24h) and prints a shareable URL to
 # include in the issue.
 ```
 
 **Capture the problem on screen.** A screenshot or short recording of the bug
 is often worth more than the description — see [`capture.md`](capture.md) for
-`omarchy capture screenshot` and `omarchy screenrecord`. Keep recordings short
+`magikos capture screenshot` and `magikos screenrecord`. Keep recordings short
 and focused on the misbehavior. GitHub issue attachments are added by
 drag-and-drop in the web form, so save the capture and hand the user the file
 path to attach (`gh` cannot upload media).
 
 For screen-recording failures specifically, rerun with
-`OMARCHY_SCREENRECORD_DEBUG=true` and attach `/tmp/omarchy-screenrecord.log`.
+`MAGIKOS_SCREENRECORD_DEBUG=true` and attach `/tmp/magikos-screenrecord.log`.
 
 File the issue with `gh` when available:
 
 ```bash
-gh issue create --repo basecamp/omarchy --title "..." --body "..."
+gh issue create --repo basecamp/magikos --title "..." --body "..."
 ```
 
 Include: what happened, what was expected, steps to reproduce, system details,
@@ -51,11 +51,11 @@ the debug log URL (or attached log), and the capture.
 
 ## Submitting a PR
 
-Never develop against `/usr/share/omarchy`. Clone a working copy instead:
+Never develop against `/usr/share/magikos`. Clone a working copy instead:
 
 ```bash
-gh repo fork basecamp/omarchy --clone
-cd omarchy
+gh repo fork basecamp/magikos --clone
+cd magikos
 ```
 
 Follow the repository's own `AGENTS.md` for style, testing, and commit

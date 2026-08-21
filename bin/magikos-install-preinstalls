@@ -1,0 +1,36 @@
+#!/bin/bash
+
+# magikos:summary=Restore the preinstalled Magikos applications (web apps, TUIs, and selected packages).
+# magikos:requires-sudo=true
+
+if gum confirm "Are you sure you want to restore all preinstalled web apps, TUI wrappers, and desktop applications?"; then
+  echo -e "Restoring preinstalled Magikos applications...\n"
+
+  # Recreates the shipped .desktop launchers (web apps and TUIs) and the mise stubs
+  # that back claude, gh, opencode, and the rest of the agents
+  magikos-refresh-applications
+
+  # Mirrors the list in magikos-remove-preinstalls; both track magikos-base.packages
+  if ! magikos-pkg-add \
+    aether \
+    cliamp \
+    libreoffice-fresh \
+    xournalpp \
+    pinta \
+    obsidian \
+    obs-studio \
+    kdenlive \
+    moonlight-qt \
+    lazydocker \
+    omacut \
+    omacalc \
+    omawrite; then
+    echo -e "\nPreinstalls are still marked as removed. Fix the errors above and try again."
+    exit 1
+  fi
+
+  # Last, so a failure above leaves the opt-out intact rather than restoring
+  # keybindings for apps that never came back
+  rm -f ~/.local/state/magikos/preinstalls-removed
+  hyprctl reload
+fi

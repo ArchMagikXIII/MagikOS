@@ -1,0 +1,11 @@
+#!/bin/bash
+
+# magikos:summary=Dismiss a notification by summary substring. Used by the first-run notifications to dismiss them after clicking for action.
+# magikos:args=<summary>
+
+if (($# == 0)); then
+  echo "Usage: magikos-notification-dismiss <summary>"
+  exit 1
+fi
+
+magikos-shell -q notifications dismiss "$1"

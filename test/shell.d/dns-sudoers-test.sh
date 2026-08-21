@@ -4,9 +4,9 @@ set -euo pipefail
 
 source "$(dirname "$0")/base-test.sh"
 
-dns="$ROOT/bin/omarchy-dns"
-sudoers_file="$ROOT/etc/sudoers.d/omarchy-dns"
-rule='%wheel ALL=(root) NOPASSWD: /usr/bin/omarchy-dns Cloudflare, /usr/bin/omarchy-dns Google, /usr/bin/omarchy-dns DHCP'
+dns="$ROOT/bin/magikos-dns"
+sudoers_file="$ROOT/etc/sudoers.d/magikos-dns"
+rule='%wheel ALL=(root) NOPASSWD: /usr/bin/magikos-dns Cloudflare, /usr/bin/magikos-dns Google, /usr/bin/magikos-dns DHCP'
 
 # Exactly one rule, matched whole. A second line -- or the same command with its
 # arguments dropped, which sudoers reads as "any arguments" -- would widen the
@@ -19,14 +19,14 @@ if command -v visudo >/dev/null; then
   visudo -cf "$sudoers_file" >/dev/null || fail "dns sudoers rule parses"
 fi
 
-grep -Fx 'PACKAGED_PATH=/usr/bin/omarchy-dns' "$dns" >/dev/null ||
-  fail "omarchy-dns elevates the path the sudoers rule names"
+grep -Fx 'PACKAGED_PATH=/usr/bin/magikos-dns' "$dns" >/dev/null ||
+  fail "magikos-dns elevates the path the sudoers rule names"
 
 # `sudo -l` on its own answers whether a command is permitted, not whether it
-# is passwordless, and Omarchy ships a blanket %wheel rule that permits
+# is passwordless, and Magikos ships a blanket %wheel rule that permits
 # everything. Only the long listing prints the matched entry's tags.
 grep -E 'sudo -n -l -l' "$dns" >/dev/null ||
-  fail "omarchy-dns reads the grant from the long sudo listing"
+  fail "magikos-dns reads the grant from the long sudo listing"
 
 pass "dns sudoers rule is scoped to the stock providers"
 
@@ -52,9 +52,9 @@ SH
 chmod +x "$stub_bin/pkexec"
 
 # The sudo stub plays both parts: it answers the passwordless probe from
-# STUB_GRANTED, the providers etc/sudoers.d/omarchy-dns covers on this machine,
+# STUB_GRANTED, the providers etc/sudoers.d/magikos-dns covers on this machine,
 # and logs the elevation otherwise. STUB_GRANTED empty stands for an install
-# whose omarchy-settings predates the file.
+# whose magikos-settings predates the file.
 cat >"$stub_bin/sudo" <<'SH'
 #!/bin/bash
 if [[ $1 == -n && $2 == -l ]]; then
@@ -80,28 +80,28 @@ elevation_for() {
 
 for provider in Cloudflare Google DHCP; do
   elevation=$(elevation_for "$provider")
-  [[ $elevation == "sudo /usr/bin/omarchy-dns $provider" ]] ||
-    fail "omarchy-dns takes the passwordless sudo grant for $provider without a terminal" "got: $elevation"
+  [[ $elevation == "sudo /usr/bin/magikos-dns $provider" ]] ||
+    fail "magikos-dns takes the passwordless sudo grant for $provider without a terminal" "got: $elevation"
 done
 
-pass "omarchy-dns elevates the stock providers through sudo, not polkit"
+pass "magikos-dns elevates the stock providers through sudo, not polkit"
 
 # A dev-linked checkout elevates the packaged path like everyone else, rather
 # than handing sudo a path no rule can name and losing the grant.
-dev_linked=$(OMARCHY_PATH="$test_tmp/checkout" elevation_for Cloudflare)
-[[ $dev_linked == "sudo /usr/bin/omarchy-dns Cloudflare" ]] ||
-  fail "omarchy-dns elevates the system install wherever OMARCHY_PATH points" "got: $dev_linked"
+dev_linked=$(MAGIKOS_PATH="$test_tmp/checkout" elevation_for Cloudflare)
+[[ $dev_linked == "sudo /usr/bin/magikos-dns Cloudflare" ]] ||
+  fail "magikos-dns elevates the system install wherever MAGIKOS_PATH points" "got: $dev_linked"
 
 custom=$(elevation_for Custom)
-[[ $custom == "pkexec /usr/bin/omarchy-dns Custom" ]] ||
-  fail "omarchy-dns leaves Custom on the polkit path, since no sudoers rule covers it" "got: $custom"
+[[ $custom == "pkexec /usr/bin/magikos-dns Custom" ]] ||
+  fail "magikos-dns leaves Custom on the polkit path, since no sudoers rule covers it" "got: $custom"
 
 # The grant is what makes sudo passwordless, so its absence -- an install still
-# on an older omarchy-settings, or a user outside %wheel the rule cannot match
+# on an older magikos-settings, or a user outside %wheel the rule cannot match
 # -- has to route to polkit. Betting on sudo here leaves the panel's one-click
 # toggle execing into a password prompt it has no terminal to show.
 ungranted=$(STUB_GRANTED="" elevation_for Cloudflare)
-[[ $ungranted == "pkexec /usr/bin/omarchy-dns Cloudflare" ]] ||
-  fail "omarchy-dns falls back to polkit where the sudoers grant is not installed" "got: $ungranted"
+[[ $ungranted == "pkexec /usr/bin/magikos-dns Cloudflare" ]] ||
+  fail "magikos-dns falls back to polkit where the sudoers grant is not installed" "got: $ungranted"
 
-pass "omarchy-dns falls back to polkit wherever the grant does not reach"
+pass "magikos-dns falls back to polkit wherever the grant does not reach"

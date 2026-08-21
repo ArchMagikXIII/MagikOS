@@ -1,0 +1,10 @@
+#!/bin/bash
+
+# magikos:summary=Cache background switcher thumbnails for the current theme
+
+theme_name=$(cat "$HOME/.local/state/magikos/current/theme.name" 2>/dev/null)
+
+magikos-menu-images \
+  --cache-only \
+  "$HOME/.local/state/magikos/current/theme/backgrounds" \
+  "$HOME/.config/magikos/backgrounds/$theme_name"

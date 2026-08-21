@@ -1,0 +1,5 @@
+#!/bin/bash
+
+# magikos:summary=Detect ASUS Zenbook UX5406AA series laptops on Intel Panther Lake.
+
+magikos-hw-match "ux5406aa" && magikos-hw-intel-ptl

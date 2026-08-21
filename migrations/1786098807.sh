@@ -1,7 +1,7 @@
-echo "Relink agent skill symlinks to default/agents/skills/omarchy"
+echo "Relink agent skill symlinks to default/agents/skills/magikos"
 
 mkdir -p ~/.agents/skills ~/.claude/skills ~/.codex/skills ~/.pi/agent/skills
-ln -sfn "$OMARCHY_PATH/default/agents/skills/omarchy" ~/.agents/skills/omarchy
-ln -sfn "$OMARCHY_PATH/default/agents/skills/omarchy" ~/.claude/skills/omarchy
-ln -sfn "$OMARCHY_PATH/default/agents/skills/omarchy" ~/.codex/skills/omarchy
-ln -sfn "$OMARCHY_PATH/default/agents/skills/omarchy" ~/.pi/agent/skills/omarchy
+ln -sfn "$MAGIKOS_PATH/default/agents/skills/magikos" ~/.agents/skills/magikos
+ln -sfn "$MAGIKOS_PATH/default/agents/skills/magikos" ~/.claude/skills/magikos
+ln -sfn "$MAGIKOS_PATH/default/agents/skills/magikos" ~/.codex/skills/magikos
+ln -sfn "$MAGIKOS_PATH/default/agents/skills/magikos" ~/.pi/agent/skills/magikos

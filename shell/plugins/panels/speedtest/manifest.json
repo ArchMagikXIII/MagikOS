@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "id": "omarchy.speedtest",
+  "id": "magikos.speedtest",
   "name": "Speed Test",
   "version": "1.0.0",
-  "author": "Omarchy",
+  "author": "Magikos",
   "description": "Internet speed test with download and upload dials",
   "kinds": [
     "panel"

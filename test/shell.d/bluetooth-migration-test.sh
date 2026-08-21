@@ -19,10 +19,10 @@ printf 'sudo %s\n' "$*" >>"$CALLS"
 exec "$@"
 STUB
 
-cat >"$test_dir/bin/omarchy-bluetooth-power" <<'STUB'
+cat >"$test_dir/bin/magikos-bluetooth-power" <<'STUB'
 #!/bin/bash
 
-printf 'omarchy-bluetooth-power %s\n' "$*" >>"$CALLS"
+printf 'magikos-bluetooth-power %s\n' "$*" >>"$CALLS"
 [[ $1 == "is-on" ]] || exit 0
 [[ ${POWERED:-} == "yes" ]]
 STUB
@@ -42,8 +42,8 @@ reset_machine() {
 run_migration() {
   : >"$CALLS"
 
-  OMARCHY_BLUETOOTH_MIGRATION_MARKER="$marker" \
-    OMARCHY_BLUETOOTH_MAIN_CONF="$main_conf" \
+  MAGIKOS_BLUETOOTH_MIGRATION_MARKER="$marker" \
+    MAGIKOS_BLUETOOTH_MAIN_CONF="$main_conf" \
     PATH="$test_dir/bin:$PATH" \
     bash -euo pipefail "$migration" >/dev/null
 }
@@ -52,7 +52,7 @@ run_migration() {
 reset_machine
 POWERED=yes run_migration
 
-grep -qx 'omarchy-bluetooth-power on' "$CALLS" ||
+grep -qx 'magikos-bluetooth-power on' "$CALLS" ||
   fail "migration keeps a powered adapter on" "$(cat "$CALLS")"
 pass "migration keeps a powered adapter on"
 
@@ -68,7 +68,7 @@ pass "migration records the machine as done"
 reset_machine
 POWERED=no run_migration
 
-grep -qx 'omarchy-bluetooth-power off' "$CALLS" ||
+grep -qx 'magikos-bluetooth-power off' "$CALLS" ||
   fail "migration carries an unpowered adapter over to the block" "$(cat "$CALLS")"
 pass "migration carries an unpowered adapter over to the block"
 
@@ -76,13 +76,13 @@ pass "migration carries an unpowered adapter over to the block"
 reset_machine
 run_migration
 
-grep -qx 'omarchy-bluetooth-power off' "$CALLS" ||
+grep -qx 'magikos-bluetooth-power off' "$CALLS" ||
   fail "migration blocks when no adapter can be read" "$(cat "$CALLS")"
 pass "migration blocks when no adapter can be read"
 
 # /dev/rfkill is only writable unelevated from an active graphical seat, so an
 # update run over SSH would abort here and abort again on every retry.
-grep -qx 'sudo omarchy-bluetooth-power off' "$CALLS" ||
+grep -qx 'sudo magikos-bluetooth-power off' "$CALLS" ||
   fail "migration changes the radio through sudo" "$(cat "$CALLS")"
 pass "migration changes the radio through sudo"
 
@@ -99,7 +99,7 @@ pass "migration leaves a later opt-out alone"
   fail "migration touches no radio state on a second run" "$(cat "$CALLS")"
 pass "migration touches no radio state on a second run"
 
-# Only the exact line Omarchy wrote is reverted, so a hand-edited opt-out stands.
+# Only the exact line Magikos wrote is reverted, so a hand-edited opt-out stands.
 reset_machine
 printf '[Policy]\nAutoEnable = false\n' >"$main_conf"
 POWERED=yes run_migration

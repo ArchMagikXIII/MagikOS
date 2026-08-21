@@ -5,11 +5,9 @@ import "NightlightModel.js" as NightlightModel
 Item {
   id: root
 
-  // Injected by omarchy-shell (the first-party service loader).
+  // Injected by magikos-shell (the first-party service loader).
   property var shell: null
 
-  // Keep in sync with bin/omarchy-toggle-nightlight, which sets the same
-  // temperatures for callers outside the shell (keybindings, menu, ssh).
   readonly property int nightTemperature: 4000
   readonly property int dayTemperature: 6500
 
@@ -46,24 +44,35 @@ Item {
   }
 
   function runApply(temp) {
+    // For Sway, use hyprsunset directly (compositor-agnostic)
     applyProcess.command = ["bash", "-lc",
-      "pgrep -x hyprsunset >/dev/null || { setsid uwsm-app -- hyprsunset >/dev/null 2>&1 & sleep 1; }; " +
-      "hyprctl hyprsunset temperature " + Number(temp)]
+      "pgrep -x hyprsunset >/dev/null || { setsid hyprsunset >/dev/null 2>&1 & sleep 1; }; " +
+      "hyprsunset -t " + Number(temp)]
     applyProcess.running = true
   }
 
   Process {
     id: statusProbe
-    command: ["hyprctl", "hyprsunset", "temperature"]
+    // Use hyprsunset directly for status query
+    command: ["hyprsunset", "--version"]
     stdout: StdioCollector {
       waitForEnd: true
       onStreamFinished: {
-        root.temperature = NightlightModel.temperatureFromOutput(text)
-        root.stateLoaded = true
+        // Try to get current temperature
+        var tempProbe = Qt.createQmlObject(
+          'import Quickshell.Io; Process { command: ["bash", "-c", "hyprsunset -g 2>/dev/null || echo 6500"] }',
+          root
+        )
+        tempProbe.stdout = Qt.createQmlObject(
+          'import Quickshell.Io; StdioCollector { waitForEnd: true; onStreamFinished: function(text) { var temp = NightlightModel.temperatureFromOutput(text); root.temperature = temp; root.stateLoaded = true; } }',
+          tempProbe
+        )
+        tempProbe.running = true
       }
     }
     onExited: function(exitCode) {
       if (exitCode !== 0) {
+        // hyprsunset not available, use default
         root.temperature = null
         root.stateLoaded = true
       }

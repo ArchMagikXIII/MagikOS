@@ -1,0 +1,9 @@
+#!/bin/bash
+
+# magikos:summary=Install Emacs with Magikos theme and font integration via the magikos-emacs AUR package
+
+echo "Installing Emacs..."
+magikos-pkg-aur-add magikos-emacs && magikos-install-emacs
+
+# emacsclient opens a frame on the running daemon, not a second Emacs
+setsid uwsm-app -- gtk-launch emacsclient >/dev/null 2>&1 &

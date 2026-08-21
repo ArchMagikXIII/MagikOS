@@ -1,0 +1,28 @@
+#!/bin/bash
+
+# magikos:summary=Print the installed Magikos version
+
+magikos_path=${MAGIKOS_PATH:-/usr/share/magikos}
+magikos_path=${magikos_path%/}
+
+if [[ $magikos_path != "/usr/share/magikos" ]]; then
+  hash=$(git -C "$magikos_path" rev-parse --short HEAD 2>/dev/null || true)
+
+  if [[ -n $hash ]]; then
+    echo "dev ($hash)"
+  else
+    echo "dev"
+  fi
+
+  exit 0
+fi
+
+# The edge channel installs magikos-dev instead of magikos, so check both.
+for package in magikos-dev magikos; do
+  version=$(pacman -Q "$package" 2>/dev/null | awk '{ print $2 }')
+  [[ -n $version ]] && break
+done
+
+[[ -n $version ]] || exit 1
+
+echo "$version"

@@ -27,11 +27,11 @@ fi
 require_command jq
 
 shell_ipc() {
-  OMARCHY_PATH="$test_root" "$ROOT/bin/omarchy-shell" "$@"
+  MAGIKOS_PATH="$test_root" "$ROOT/bin/magikos-shell" "$@"
 }
 
 shell_ipc_quiet() {
-  OMARCHY_PATH="$test_root" "$ROOT/bin/omarchy-shell" -q "$@"
+  MAGIKOS_PATH="$test_root" "$ROOT/bin/magikos-shell" -q "$@"
 }
 
 fail_with_log() {
@@ -41,7 +41,7 @@ fail_with_log() {
 }
 
 TMPDIR=$(mktemp -d)
-test_root="$TMPDIR/omarchy"
+test_root="$TMPDIR/magikos"
 test_home="$TMPDIR/home"
 stub_bin="$TMPDIR/bin"
 log="$TMPDIR/quickshell.log"
@@ -50,9 +50,9 @@ cp -a "$ROOT/shell" "$test_root/shell"
 ln -s "$ROOT/config" "$test_root/config"
 ln -s "$ROOT/bin" "$test_root/bin"
 
-# Every plugin under ~/.config/omarchy/plugins hot-reloads, whoever wrote it.
+# Every plugin under ~/.config/magikos/plugins hot-reloads, whoever wrote it.
 hot_reload_id="acme.hot-reload"
-hot_reload_dir="$test_home/.config/omarchy/plugins/$hot_reload_id"
+hot_reload_dir="$test_home/.config/magikos/plugins/$hot_reload_id"
 mkdir -p "$hot_reload_dir"
 cat >"$hot_reload_dir/manifest.json" <<JSON
 {
@@ -62,7 +62,7 @@ cat >"$hot_reload_dir/manifest.json" <<JSON
   "version": "1.0.0",
   "kinds": ["overlay"],
   "entryPoints": {"overlay": "Overlay.qml"},
-  "omarchy": {"clonedFrom": "omarchy.emojis"}
+  "magikos": {"clonedFrom": "magikos.emojis"}
 }
 JSON
 cat >"$hot_reload_dir/Overlay.qml" <<'QML'
@@ -74,12 +74,12 @@ Item {
 }
 QML
 
-cat >"$stub_bin/omarchy-update-available" <<'SH'
+cat >"$stub_bin/magikos-update-available" <<'SH'
 #!/bin/bash
-echo "Omarchy update available (test)"
+echo "Magikos update available (test)"
 exit 0
 SH
-chmod +x "$stub_bin/omarchy-update-available"
+chmod +x "$stub_bin/magikos-update-available"
 
 cat >"$stub_bin/curl" <<'SH'
 #!/bin/bash
@@ -98,7 +98,7 @@ esac
 SH
 chmod +x "$stub_bin/curl"
 
-OMARCHY_PATH="$test_root" \
+MAGIKOS_PATH="$test_root" \
 HOME="$test_home" \
 XDG_CONFIG_HOME="$test_home/.config" \
 XDG_CACHE_HOME="$test_home/.cache" \
@@ -131,7 +131,7 @@ done
 
 jq -e '
   map(.id) as $ids |
-  all(["omarchy.menu", "omarchy.notifications", "omarchy.clock", "omarchy.osd"][]; $ids | index(.)) and
+  all(["magikos.menu", "magikos.notifications", "magikos.clock", "magikos.osd"][]; $ids | index(.)) and
   all(.[]; (.kinds | type == "array") and (.enabled | type == "boolean") and (.canDisable | type == "boolean") and (.firstParty | type == "boolean") and (.clonedFrom | type == "string")) and
   ([.[].name] == ([.[].name] | sort))
 ' <<<"$plugins" >/dev/null || {
@@ -159,9 +159,9 @@ pass "installed plugin changes reload without an explicit rescan"
 
 [[ $(shell_ipc shell setPluginEnabled "$hot_reload_id" true) == "ok" ]] ||
   fail_with_log "installed plugin could not be enabled"
-[[ $(shell_ipc shell summon omarchy.emojis "{}") == "ok" ]] ||
+[[ $(shell_ipc shell summon magikos.emojis "{}") == "ok" ]] ||
   fail_with_log "calls to a cloned source id do not reach its enabled clone"
-shell_ipc_quiet shell hide omarchy.emojis >/dev/null
+shell_ipc_quiet shell hide magikos.emojis >/dev/null
 shell_ipc_quiet shell setPluginEnabled "$hot_reload_id" false >/dev/null
 pass "shell IPC routes built-in ids to enabled clones"
 
@@ -177,8 +177,8 @@ jq -e '
 }
 pass "shell IPC returns effective shell config"
 
-[[ $(shell_ipc shell summon omarchy.menu '{"menu":"apps"}') == "ok" ]] || fail_with_log "shell IPC summons menu apps overlay"
-shell_ipc_quiet shell hide omarchy.menu >/dev/null
+[[ $(shell_ipc shell summon magikos.menu '{"menu":"apps"}') == "ok" ]] || fail_with_log "shell IPC summons menu apps overlay"
+shell_ipc_quiet shell hide magikos.menu >/dev/null
 [[ $(shell_ipc shell summon missing.plugin "{}") == "unknown" ]] || fail_with_log "shell IPC rejects unknown plugin"
 pass "shell IPC summon and hide contract works"
 
@@ -215,19 +215,19 @@ shell_ipc_quiet image-selector cancel "$selector_done_file" >/dev/null
 rm -f "$selector_selection_file" "$selector_done_file"
 pass "image selector IPC survives plugin rescan"
 
-shell_ipc_quiet omarchy.system-update refresh >/dev/null 2>&1 || true
+shell_ipc_quiet magikos.system-update refresh >/dev/null 2>&1 || true
 sleep 0.8
 
-default_ids=$(jq -c '(.bar.layout.left + .bar.layout.center + .bar.layout.right) | map(.id // .)' "$ROOT/config/omarchy/shell.json")
+default_ids=$(jq -c '(.bar.layout.left + .bar.layout.center + .bar.layout.right) | map(.id // .)' "$ROOT/config/magikos/shell.json")
 visible_default_ids='[
-  "omarchy.menu",
-  "omarchy.workspaces",
-  "omarchy.clock",
-  "omarchy.weather",
-  "omarchy.system-update",
-  "omarchy.network",
-  "omarchy.audio",
-  "omarchy.monitor"
+  "magikos.menu",
+  "magikos.workspaces",
+  "magikos.clock",
+  "magikos.weather",
+  "magikos.system-update",
+  "magikos.network",
+  "magikos.audio",
+  "magikos.monitor"
 ]'
 
 geometry=""
@@ -261,11 +261,11 @@ pass "default bar layout renders expected module slots"
 
 jq -e '
   map(select(.section == "center")) | map(.id) as $center |
-  ($center | index("omarchy.weather")) != null and
-  ($center | index("omarchy.system-update")) != null and
-  ($center | index("omarchy.indicators")) != null and
-  (($center | index("omarchy.weather")) < ($center | index("omarchy.system-update"))) and
-  (($center | index("omarchy.system-update")) < ($center | index("omarchy.indicators")))
+  ($center | index("magikos.weather")) != null and
+  ($center | index("magikos.system-update")) != null and
+  ($center | index("magikos.indicators")) != null and
+  (($center | index("magikos.weather")) < ($center | index("magikos.system-update"))) and
+  (($center | index("magikos.system-update")) < ($center | index("magikos.indicators")))
 ' <<<"$geometry" >/dev/null || {
   printf 'Geometry:\n' >&2
   jq . <<<"$geometry" >&2
@@ -274,7 +274,7 @@ jq -e '
 
 pass "runtime geometry keeps update before indicators"
 
-for panel_id in omarchy.audio omarchy.bluetooth omarchy.monitor omarchy.network omarchy.power; do
+for panel_id in magikos.audio magikos.bluetooth magikos.monitor magikos.network magikos.power; do
   shell_ipc "$panel_id" open >/dev/null || fail_with_log "direct panel IPC opens $panel_id"
   shell_ipc "$panel_id" close >/dev/null || fail_with_log "direct panel IPC closes $panel_id"
 done
@@ -298,13 +298,13 @@ if (( worst > screens - 1 )); then
 fi
 pass "each widget registers its IPC handler once per screen"
 
-HOME="$test_home" OMARCHY_PATH="$test_root" PATH="$ROOT/bin:$PATH" "$ROOT/bin/omarchy-plugin-disable" omarchy.audio
+HOME="$test_home" MAGIKOS_PATH="$test_root" PATH="$ROOT/bin:$PATH" "$ROOT/bin/magikos-plugin-disable" magikos.audio
 
 for _ in {1..80}; do
   shell_config=$(shell_ipc shell listShellConfig 2>/dev/null || true)
   geometry=$(shell_ipc shell debugBarGeometry 2>/dev/null || true)
-  if jq -e 'all(.bar.layout.right[]; (.id // .) != "omarchy.audio")' <<<"$shell_config" >/dev/null 2>&1 && \
-     jq -e 'all(.[]; .id != "omarchy.audio")' <<<"$geometry" >/dev/null 2>&1; then
+  if jq -e 'all(.bar.layout.right[]; (.id // .) != "magikos.audio")' <<<"$shell_config" >/dev/null 2>&1 && \
+     jq -e 'all(.[]; .id != "magikos.audio")' <<<"$geometry" >/dev/null 2>&1; then
     break
   fi
   if ! kill -0 "$QS_PID" 2>/dev/null; then
@@ -313,12 +313,12 @@ for _ in {1..80}; do
   sleep 0.1
 done
 
-jq -e 'all(.bar.layout.right[]; (.id // .) != "omarchy.audio")' <<<"$shell_config" >/dev/null || {
+jq -e 'all(.bar.layout.right[]; (.id // .) != "magikos.audio")' <<<"$shell_config" >/dev/null || {
   printf 'Shell config after reload:\n%s\n' "$shell_config" | jq . >&2
   fail_with_log "plugin disable reloads shell config"
 }
 
-jq -e 'all(.[]; .id != "omarchy.audio")' <<<"$geometry" >/dev/null || {
+jq -e 'all(.[]; .id != "magikos.audio")' <<<"$geometry" >/dev/null || {
   printf 'Geometry after reload:\n' >&2
   jq . <<<"$geometry" >&2
   fail_with_log "runtime bar layout updates after shell config reload"
@@ -330,35 +330,35 @@ pass "bar remove reloads shell config and updates bar layout"
 # to place one that is missing and leave one that is already there alone,
 # however often it runs.
 bar_put() {
-  HOME="$test_home" OMARCHY_PATH="$test_root" PATH="$ROOT/bin:$PATH" "$ROOT/bin/omarchy-bar" put "$@"
+  HOME="$test_home" MAGIKOS_PATH="$test_root" PATH="$ROOT/bin:$PATH" "$ROOT/bin/magikos-bar" put "$@"
 }
 
 center_ids() {
   jq -c '[.bar.layout.center[] | .id // .]' <<<"$(shell_ipc shell listShellConfig)"
 }
 
-bar_put omarchy.keyboard-layout --after omarchy.clock >/dev/null
+bar_put magikos.keyboard-layout --after magikos.clock >/dev/null
 for _ in {1..80}; do
-  [[ $(center_ids) == *omarchy.keyboard-layout* ]] && break
+  [[ $(center_ids) == *magikos.keyboard-layout* ]] && break
   kill -0 "$QS_PID" 2>/dev/null || fail_with_log "test shell exited while putting a bar widget"
   sleep 0.1
 done
 
 jq -e '
   [.bar.layout.center[] | .id // .] as $ids
-  | ($ids | index("omarchy.clock")) as $clock
-  | ($ids | index("omarchy.keyboard-layout")) as $widget
+  | ($ids | index("magikos.clock")) as $clock
+  | ($ids | index("magikos.keyboard-layout")) as $widget
   | $clock != null and $widget == $clock + 1
 ' <<<"$(shell_ipc shell listShellConfig)" >/dev/null ||
   fail_with_log "bar put places a widget after the one it names ($(center_ids))"
 pass "bar put places a widget after the one it names"
 
 placed=$(center_ids)
-bar_put omarchy.keyboard-layout --section right >/dev/null
+bar_put magikos.keyboard-layout --section right >/dev/null
 sleep 0.5
 [[ $(center_ids) == "$placed" ]] ||
   fail_with_log "bar put left a widget already on the bar alone (was $placed, now $(center_ids))"
-jq -e 'all(.bar.layout.right[]; (.id // .) != "omarchy.keyboard-layout")' \
+jq -e 'all(.bar.layout.right[]; (.id // .) != "magikos.keyboard-layout")' \
   <<<"$(shell_ipc shell listShellConfig)" >/dev/null ||
   fail_with_log "bar put added a second copy of a widget already on the bar"
 pass "bar put leaves a widget already on the bar alone"

@@ -1,0 +1,11 @@
+#!/bin/bash
+
+# magikos:summary=Open the Magikos Discord community in the Discord app or a browser.
+
+invite="https://discord.gg/tXFUdasqhY"
+
+if magikos-cmd-present discord; then
+  exec setsid uwsm-app -- discord --url -- "discord://-/invite/${invite##*/}"
+else
+  exec magikos-launch-webapp "$invite"
+fi

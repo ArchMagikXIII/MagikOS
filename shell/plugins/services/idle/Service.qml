@@ -1,6 +1,5 @@
 import QtQuick
 import Quickshell
-import Quickshell.Hyprland
 import Quickshell.Io
 import Quickshell.Wayland
 import "IdleModel.js" as IdleModel
@@ -8,11 +7,11 @@ import "IdleModel.js" as IdleModel
 Item {
   id: root
 
-  // Injected by omarchy-shell (the first-party service loader).
+  // Injected by magikos-shell (the first-party service loader).
   property var shell: null
 
   readonly property string home: Quickshell.env("HOME")
-  readonly property string stayAwakeStateDir: home + "/.local/state/omarchy/indicators"
+  readonly property string stayAwakeStateDir: home + "/.local/state/magikos/indicators"
   readonly property string stayAwakeStatePath: stayAwakeStateDir + "/stay-awake"
   readonly property int defaultScreensaverSeconds: 150
   readonly property int defaultLockSeconds: 300
@@ -23,7 +22,7 @@ Item {
   readonly property int screensaverDelaySeconds: Math.max(0, screensaverTimeoutSeconds - firstIdleTimeoutSeconds)
   readonly property int lockDelaySeconds: Math.max(0, lockTimeoutSeconds - firstIdleTimeoutSeconds)
   readonly property bool idleEnabled: stayAwakeStateLoaded && !stayAwake
-  readonly property string screensaverClass: "org.omarchy.screensaver"
+  readonly property string screensaverClass: "org.magikos.screensaver"
 
   property bool stayAwake: false
   property bool stayAwakeStateLoaded: false
@@ -48,7 +47,7 @@ Item {
     var suffix = details === undefined || details === null || details === "" ? "" : ": " + String(details)
     root.lastEventAt = nowIso()
     root.lastEvent = event + suffix
-    console.log("omarchy idle " + root.lastEventAt + " " + root.lastEvent)
+    console.log("magikos idle " + root.lastEventAt + " " + root.lastEvent)
   }
 
   function runProcess(process, label, command) {
@@ -65,7 +64,7 @@ Item {
   function launchScreensaver() {
     root.screensaverStartedThisCycle = true
     screensaverLaunchGraceTimer.restart()
-    runProcess(screensaverProcess, "screensaver", "[[ $(omarchy-shell lock isLocked 2>/dev/null) == \"true\" ]] || omarchy-launch-screensaver")
+    runProcess(screensaverProcess, "screensaver", "[[ $(magikos-shell lock isLocked 2>/dev/null) == \"true\" ]] || magikos-launch-screensaver")
   }
 
   function lockSystem(reason) {
@@ -76,7 +75,7 @@ Item {
     root.idledThisCycle = false
     root.screensaverStartedThisCycle = false
     resetScreensaverWindows()
-    runProcess(lockProcess, "lock", "omarchy-system-lock")
+    runProcess(lockProcess, "lock", "magikos-system-lock")
   }
 
   function startIdleCycle() {
@@ -103,7 +102,7 @@ Item {
     lockTimer.stop()
     screensaverLaunchGraceTimer.stop()
 
-    if (root.idledThisCycle) runProcess(wakeProcess, "wake", "omarchy-system-wake")
+    if (root.idledThisCycle) runProcess(wakeProcess, "wake", "magikos-system-wake")
 
     root.idledThisCycle = false
     root.screensaverStartedThisCycle = false
@@ -142,15 +141,24 @@ Item {
     return IdleModel.eventParts(event, count)
   }
 
-  function handleHyprlandEvent(event) {
-    var name = String(event && event.name ? event.name : "")
-    if (name === "openwindow") {
-      var open = eventParts(event, 4)
-      if (String(open[2] || "") === root.screensaverClass) root.handleScreensaverWindowOpened(open[0])
-    } else if (name === "closewindow") {
-      var close = eventParts(event, 1)
-      var address = String(close[0] || "")
-      if (root.screensaverWindows[address]) root.handleScreensaverWindowClosed(address)
+  // Sway-compatible window event handling
+  // Instead of Hyprland raw events, we use a polling approach or
+  // monitor window changes via Sway IPC
+  function handleSwayWindowEvent(eventType, windowData) {
+    // For Sway, we'd need to subscribe to window events via IPC
+    // For now, we'll use a simplified approach
+    if (eventType === "window") {
+      var change = windowData.change
+      var container = windowData.container
+
+      if (change === "new" && container && container.app_id === root.screensaverClass) {
+        root.handleScreensaverWindowOpened(container.id)
+      } else if (change === "close" && container) {
+        var address = String(container.id || "")
+        if (root.screensaverWindows[address]) {
+          root.handleScreensaverWindowClosed(address)
+        }
+      }
     }
   }
 
@@ -159,7 +167,7 @@ Item {
 
     // Starting the screensaver can make the compositor report activity. Keep
     // the lock timer running once the screensaver exists (or during its short
-    // launch grace); Hyprland window events cancel the cycle if it exits before
+    // launch grace); window events cancel the cycle if it exits before
     // the normal lock deadline.
     if (root.screensaverStartedThisCycle && (root.screensaverWindowCount > 0 || screensaverLaunchGraceTimer.running)) {
       logEvent("idle-monitor-active", "screensaver cycle remains armed")
@@ -208,8 +216,8 @@ Item {
 
   function persistStayAwake(value) {
     var command = value
-      ? "mkdir -p \"$HOME/.local/state/omarchy/indicators\" && touch \"$HOME/.local/state/omarchy/indicators/stay-awake\""
-      : "rm -f \"$HOME/.local/state/omarchy/indicators/stay-awake\""
+      ? "mkdir -p \"$HOME/.local/state/magikos/indicators\" && touch \"$HOME/.local/state/magikos/indicators/stay-awake\""
+      : "rm -f \"$HOME/.local/state/magikos/indicators/stay-awake\""
 
     if (stayAwakeStateWriter.running) {
       root.pendingStayAwakePersist = !!value
@@ -280,9 +288,28 @@ Item {
     }
   }
 
-  Connections {
-    target: Hyprland
-    function onRawEvent(event) { root.handleHyprlandEvent(event) }
+  // Sway window event subscription
+  // This process subscribes to Sway window events and forwards them to handleSwayWindowEvent
+  Process {
+    id: swayEventSubscription
+    command: ["swaymsg", "-t", "subscribe", "[\"window\"]"]
+    running: root.idleEnabled
+    stdout: SplitParser {
+      onRead: function(line) {
+        try {
+          var event = JSON.parse(line)
+          root.handleSwayWindowEvent("window", event)
+        } catch (e) {
+          // Ignore parse errors
+        }
+      }
+    }
+    onExited: function() {
+      // Restart subscription if it stops and idle is enabled
+      if (root.idleEnabled) {
+        Qt.callLater(function() { swayEventSubscription.running = true })
+      }
+    }
   }
 
   Process {
@@ -300,7 +327,7 @@ Item {
 
   Process {
     id: stayAwakeStateProbe
-    command: ["bash", "-c", "mkdir -p \"$HOME/.local/state/omarchy/indicators\"; if [[ -f $HOME/.local/state/omarchy/indicators/stay-awake ]]; then echo yes; else echo no; fi"]
+    command: ["bash", "-c", "mkdir -p \"$HOME/.local/state/magikos/indicators\"; if [[ -f $HOME/.local/state/magikos/indicators/stay-awake ]]; then echo yes; else echo no; fi"]
     stdout: SplitParser {
       onRead: function(line) { root.applyStayAwake(String(line).trim() === "yes", false, "state-file") }
     }

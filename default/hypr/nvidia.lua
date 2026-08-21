@@ -1,8 +1,8 @@
 local paths = require("default.hypr.paths")
 
-local nvidia = paths.omarchy_path .. "/bin/omarchy-hw-nvidia"
-local nvidia_gsp = paths.omarchy_path .. "/bin/omarchy-hw-nvidia-gsp"
-local nvidia_without_gsp = paths.omarchy_path .. "/bin/omarchy-hw-nvidia-without-gsp"
+local nvidia = paths.magikos_path .. "/bin/magikos-hw-nvidia"
+local nvidia_gsp = paths.magikos_path .. "/bin/magikos-hw-nvidia-gsp"
+local nvidia_without_gsp = paths.magikos_path .. "/bin/magikos-hw-nvidia-without-gsp"
 
 -- These detectors read cached sysfs IDs rather than shelling out to lspci.
 -- lspci reads PCI config space, which resumes a runtime-suspended GPU, and on a

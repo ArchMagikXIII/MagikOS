@@ -1,0 +1,7 @@
+#!/bin/bash
+
+# magikos:summary=Returns true when clamshell mode is active
+# magikos:hidden=true
+
+# Clamshell = lid closed while driving one or more external monitors.
+magikos-hw-laptop-closed && magikos-hw-external-monitors

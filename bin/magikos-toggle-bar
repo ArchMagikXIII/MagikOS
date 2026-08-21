@@ -1,0 +1,7 @@
+#!/bin/bash
+
+# magikos:summary=Toggle bar visibility without killing the Magikos shell
+# magikos:args=[toggle|on|off]
+# magikos:examples=magikos toggle bar | magikos toggle bar off | magikos toggle bar on
+
+magikos-toggle bar-off "${1:-toggle}"

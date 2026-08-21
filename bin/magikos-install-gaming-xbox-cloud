@@ -1,0 +1,12 @@
+#!/bin/bash
+
+# magikos:summary=Install Xbox Cloud Gaming as a web app and launch it.
+# magikos:group=install
+# magikos:name=gaming xbox-cloud
+
+set -e
+
+echo "Installing Xbox Cloud Gaming..."
+magikos-webapp-install "Xbox Cloud Gaming" "https://www.xbox.com/en-US/play" "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/png/xbox.png"
+
+setsid magikos-launch-webapp "https://www.xbox.com/en-US/play" >/dev/null 2>&1 &

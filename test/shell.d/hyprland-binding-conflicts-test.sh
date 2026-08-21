@@ -12,8 +12,8 @@ list_bindings() {
   local home="$1"
   local epilogue="${2:-}"
 
-  HOME="$home" XDG_CONFIG_HOME="$home/.config" XDG_STATE_HOME="$home/.local/state" OMARCHY_PATH="$ROOT" OMARCHY_BINDING_EPILOGUE="$epilogue" lua <<'LUA'
-package.path = os.getenv("HOME") .. "/.config/?.lua;" .. os.getenv("OMARCHY_PATH") .. "/?.lua;" .. package.path
+  HOME="$home" XDG_CONFIG_HOME="$home/.config" XDG_STATE_HOME="$home/.local/state" MAGIKOS_PATH="$ROOT" MAGIKOS_BINDING_EPILOGUE="$epilogue" lua <<'LUA'
+package.path = os.getenv("HOME") .. "/.config/?.lua;" .. os.getenv("MAGIKOS_PATH") .. "/?.lua;" .. package.path
 
 local function proxy()
   return setmetatable({}, {
@@ -63,14 +63,14 @@ hl = setmetatable({
   end,
 })
 
-require("default.hypr.omarchy")
+require("default.hypr.magikos")
 
-local epilogue = os.getenv("OMARCHY_BINDING_EPILOGUE") or ""
+local epilogue = os.getenv("MAGIKOS_BINDING_EPILOGUE") or ""
 if epilogue ~= "" then
   assert(load(epilogue))()
 end
 
--- X11 keycodes are evdev codes plus 8. Only the rows Omarchy binds by code
+-- X11 keycodes are evdev codes plus 8. Only the rows Magikos binds by code
 -- need naming; anything else keeps its code: form and still compares exactly.
 local keycode_keysyms = {
   [10] = "1", [11] = "2", [12] = "3", [13] = "4", [14] = "5",

@@ -1,8 +1,8 @@
-# Omarchy migrations
+# Magikos migrations
 
 Read this before creating or changing migrations under `migrations/`.
 
-Omarchy migrations are one-time repair scripts for existing installs. They are
+Magikos migrations are one-time repair scripts for existing installs. They are
 used when a package update needs to change state that pacman cannot safely own by
 itself.
 
@@ -14,15 +14,15 @@ Migrations live in:
 migrations/*.sh
 ```
 
-They run as the current Omarchy user through `omarchy-migrate`, normally during
-`omarchy update`. A migration may touch user/session state (`~/.config`,
+They run as the current Magikos user through `magikos-migrate`, normally during
+`magikos update`. A migration may touch user/session state (`~/.config`,
 `~/.local`, user systemd, browser/editor prefs, DBus/session state), and may also
 perform machine-wide repairs when needed.
 
 Completion state is per-user:
 
 ```text
-~/.local/state/omarchy/migrations/<migration filename>
+~/.local/state/magikos/migrations/<migration filename>
 ```
 
 That means every user gets a chance to run every migration. Migrations run as the
@@ -33,54 +33,54 @@ that and no-op.
 
 ## When migrations run
 
-### During `omarchy update`
+### During `magikos update`
 
-`omarchy update` is the normal update path. It runs package updates, then:
+`magikos update` is the normal update path. It runs package updates, then:
 
 ```bash
-omarchy-migrate
-omarchy-hook post-update
+magikos-migrate
+magikos-hook post-update
 ```
 
-`omarchy-migrate` waits for any active pacman transaction to finish, then runs
+`magikos-migrate` waits for any active pacman transaction to finish, then runs
 all pending migrations for the current user in the visible update terminal.
 
 ### At login
 
-Every graphical login starts `omarchy-migrate-notify.service` after
+Every graphical login starts `magikos-migrate-notify.service` after
 `graphical-session.target`. The notifier checks:
 
 ```bash
-omarchy-migrate --pending
+magikos-migrate --pending
 ```
 
-It stays silent while `omarchy update` holds its lock, since that update applies
+It stays silent while `magikos update` holds its lock, since that update applies
 the pending migrations itself.
 
 If that user has pending migrations, it shows a notification that opens a
 terminal for:
 
 ```bash
-omarchy-migrate
+magikos-migrate
 ```
 
 The notifier never runs migrations silently in the background.
 
 This is what covers users who did not run the update themselves: someone who
-bypassed the pacman guard with `sudo env OMARCHY_ALLOW_DIRECT_PACMAN=1 pacman
+bypassed the pacman guard with `sudo env MAGIKOS_ALLOW_DIRECT_PACMAN=1 pacman
 -Syu`, and any second user on the machine, whose migration markers are per-user
 and therefore still missing after another user updated.
 
 Login is the only trigger on purpose. Watching the packaged migration directory
-also fires during a normal `omarchy update`, which prompts for migrations that
-`omarchy-migrate` is about to run in the visible update terminal.
+also fires during a normal `magikos update`, which prompts for migrations that
+`magikos-migrate` is about to run in the visible update terminal.
 
 ### Manually
 
 Users can safely run:
 
 ```bash
-omarchy-migrate
+magikos-migrate
 ```
 
 at any time. Already-completed migrations are skipped.
@@ -90,7 +90,7 @@ at any time. Already-completed migrations are skipped.
 Use:
 
 ```bash
-omarchy-migrate --pending
+magikos-migrate --pending
 ```
 
 Exit behavior:
@@ -109,7 +109,7 @@ Output is one pending migration per line:
 Use the helper:
 
 ```bash
-omarchy-dev-add-migration --no-edit
+magikos-dev-add-migration --no-edit
 ```
 
 This creates:
@@ -124,12 +124,12 @@ New migration format:
   with `bash -euo pipefail`, not through executable bits.
 - No shebang line.
 - Start with an `echo` describing what the migration does.
-- Use `$OMARCHY_PATH` to reference the Omarchy directory.
+- Use `$MAGIKOS_PATH` to reference the Magikos directory.
 - Be idempotent. Check existing state before changing it.
-- Use helper commands such as `omarchy-cmd-present`, `omarchy-cmd-missing`,
-  `omarchy-pkg-add`, `omarchy-pkg-drop`, `omarchy-pkg-present`, and
-  `omarchy-pkg-missing` when appropriate.
-- Never restart the Omarchy shell. `omarchy update` restarts it unconditionally
+- Use helper commands such as `magikos-cmd-present`, `magikos-cmd-missing`,
+  `magikos-pkg-add`, `magikos-pkg-drop`, `magikos-pkg-present`, and
+  `magikos-pkg-missing` when appropriate.
+- Never restart the Magikos shell. `magikos update` restarts it unconditionally
   after migrations run, and the login-time shell already runs current code and
   hot-reloads `shell.json` edits.
 - Raw `pacman`, `command -v`, and direct config edits are acceptable when
@@ -138,10 +138,10 @@ New migration format:
 Example:
 
 ```bash
-echo "Relink Neovim theme to Omarchy current state"
+echo "Relink Neovim theme to Magikos current state"
 
 theme_link="$HOME/.config/nvim/lua/plugins/theme.lua"
-current_relative_target="../../../../.local/state/omarchy/current/theme/neovim.lua"
+current_relative_target="../../../../.local/state/magikos/current/theme/neovim.lua"
 
 [[ -L $theme_link ]] || exit 0
 ln -sfn "$current_relative_target" "$theme_link"
@@ -158,10 +158,10 @@ HOME=$(mktemp -d) bash -euo pipefail migrations/<timestamp>.sh
 To rerun a migration locally, remove its marker and run the migrator:
 
 ```bash
-rm ~/.local/state/omarchy/migrations/<migration>.sh
-omarchy-migrate
+rm ~/.local/state/magikos/migrations/<migration>.sh
+magikos-migrate
 ```
 
-Omarchy 4.0 is upgraded through `bin/omarchy-upgrade-to-quattro`, not through the
+Magikos 4.0 is upgraded through `bin/magikos-upgrade-to-quattro`, not through the
 normal migration runner. Do not add compatibility migrations for old installer
 layouts; put pre-4 package-layout transition work in the upgrade command instead.

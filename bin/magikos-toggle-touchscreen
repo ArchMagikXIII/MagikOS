@@ -1,0 +1,6 @@
+#!/bin/bash
+
+# magikos:summary=Enable, disable, or toggle the touch functionality of the screen
+# magikos:args=[on|off|toggle]
+
+exec magikos-toggle-input-device touchscreen "${1:-toggle}"

@@ -1,44 +1,44 @@
-# Omarchy theming
+# Magikos theming
 
-Omarchy themes live under `themes/<name>/` in the source tree (installed at
-`/usr/share/omarchy/themes/<name>/`), with optional user themes under
-`~/.config/omarchy/themes/<name>/`. A theme normally starts with a
-`colors.toml`; Omarchy generates the active theme files from
-`default/themed/*.tpl` when `omarchy-theme-set <name>` runs.
+Magikos themes live under `themes/<name>/` in the source tree (installed at
+`/usr/share/magikos/themes/<name>/`), with optional user themes under
+`~/.config/magikos/themes/<name>/`. A theme normally starts with a
+`colors.toml`; Magikos generates the active theme files from
+`default/themed/*.tpl` when `magikos-theme-set <name>` runs.
 
 Beyond `colors.toml` and hand-written config overrides, a theme can ship
 `backgrounds/` (users overlay their own via
-`~/.config/omarchy/backgrounds/<name>/`; the active image is the
-`~/.local/state/omarchy/current/background` symlink), `preview.png` and
+`~/.config/magikos/backgrounds/<name>/`; the active image is the
+`~/.local/state/magikos/current/background` symlink), `preview.png` and
 `preview-unlock.png` for the theme switcher, `icons.theme`, `keyboard.rgb`,
 `unlock.png`, and a `light.mode` marker file.
 
 ## Theme activation flow
 
-`omarchy-theme-set <name>` builds a clean staging directory at
-`~/.local/state/omarchy/current/next-theme`:
+`magikos-theme-set <name>` builds a clean staging directory at
+`~/.local/state/magikos/current/next-theme`:
 
 1. Copy the first-party theme from `themes/<name>/`.
-2. Overlay any user theme files from `~/.config/omarchy/themes/<name>/`.
+2. Overlay any user theme files from `~/.config/magikos/themes/<name>/`.
 3. If needed, generate `colors.toml` from `alacritty.toml`.
-4. Run `omarchy-theme-set-templates` to render templates into the staging
+4. Run `magikos-theme-set-templates` to render templates into the staging
    theme.
-5. Move the staging theme into `~/.local/state/omarchy/current/theme`, write
-   `~/.local/state/omarchy/current/theme.name`, and notify the running shell.
+5. Move the staging theme into `~/.local/state/magikos/current/theme`, write
+   `~/.local/state/magikos/current/theme.name`, and notify the running shell.
 
 Template rendering only happens when the staged theme has `colors.toml`.
 Existing files are never overwritten by a template, so a hand-written
 `themes/<name>/shell.toml` or `hyprland.lua` wins over
 `default/themed/shell.toml.tpl` or `hyprland.lua.tpl`.
 
-User templates in `~/.config/omarchy/themed/*.tpl` are processed before the
+User templates in `~/.config/magikos/themed/*.tpl` are processed before the
 built-in templates. If a user template has the same output filename as a
 built-in template, the built-in output is skipped.
 
-After activation, `omarchy-theme-set` fires the `theme-set` hook
-(`~/.config/omarchy/hooks/theme-set*`, theme name in `$1`) and dispatches a
+After activation, `magikos-theme-set` fires the `theme-set` hook
+(`~/.config/magikos/hooks/theme-set*`, theme name in `$1`) and dispatches a
 parallel retint of running apps — terminals, Hyprland, btop, browser, editors,
-and the rest of the `post_theme_commands` list in `bin/omarchy-theme-set`.
+and the rest of the `post_theme_commands` list in `bin/magikos-theme-set`.
 Making a new app follow theme changes means adding its restart/retint command
 to that list. Runs serialize on a `flock`, so scripted theme changes queue
 instead of racing.
@@ -101,14 +101,14 @@ The neutral ramp is centered on `background -> bright_foreground`. Dark themes
 should read from darkest to lightest; light themes should read from lightest to
 darkest. Terminal and editor cursors use `bright_foreground`; there is no
 separate cursor palette key. `selection` is the text-selection background stop
-in that ramp; Omarchy derives `selection_background = selection` and
+in that ramp; Magikos derives `selection_background = selection` and
 `selection_foreground = bright_foreground`. Use
-`omarchy dev theme-preview [theme]` to inspect that ramp, including
+`magikos dev theme-preview [theme]` to inspect that ramp, including
 `dark_background`, `darker_background`, and a selected-text sample.
 
 ## Template placeholders
 
-Templates are plain files ending in `.tpl`. `omarchy-theme-set-templates`
+Templates are plain files ending in `.tpl`. `magikos-theme-set-templates`
 replaces placeholders with values from `colors.toml`.
 
 ### Color placeholders
@@ -357,7 +357,7 @@ local active_border_color = { colors = { "rgba(33ccffee)", "rgba(00ff99ee)" }, a
   override the generated output entirely.
 - Add a new built-in template under `default/themed/<file>.tpl` when every
   theme should generate that file.
-- Add a user-wide template under `~/.config/omarchy/themed/<file>.tpl` when a
+- Add a user-wide template under `~/.config/magikos/themed/<file>.tpl` when a
   local customization should apply across themes.
 
 When changing templates or theme helpers, run focused tests such as:

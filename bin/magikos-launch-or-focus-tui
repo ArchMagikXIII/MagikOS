@@ -1,0 +1,14 @@
+#!/bin/bash
+
+# magikos:summary=Launch a TUI or focus an existing terminal window for it
+# magikos:args=[--app-id=<app-id>] <command> [args...]
+
+if [[ ${1:-} == --app-id=* ]]; then
+  APP_ID="${1#--app-id=}"
+else
+  APP_ID="org.magikos.$(basename "$1")"
+fi
+
+LAUNCH_COMMAND="magikos-launch-tui $@"
+
+exec magikos-launch-or-focus "$APP_ID" "$LAUNCH_COMMAND"

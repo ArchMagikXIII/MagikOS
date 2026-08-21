@@ -11,7 +11,7 @@ if pacman -Q libfprint-git &>/dev/null; then
   # Deps-only removal keeps fprintd installed while its libfprint
   # dependency is swapped out underneath it.
   sudo pacman -Rdd --noconfirm libfprint-git
-  omarchy-pkg-add libfprint
+  magikos-pkg-add libfprint
 elif pacman -Q fprintd &>/dev/null && ! pacman -Q libfprint &>/dev/null; then
-  omarchy-pkg-add libfprint
+  magikos-pkg-add libfprint
 fi

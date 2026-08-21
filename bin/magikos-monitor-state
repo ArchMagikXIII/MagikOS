@@ -1,0 +1,26 @@
+#!/bin/bash
+
+# magikos:summary=Print monitor panel state for the shell
+# magikos:group=monitor
+
+monitors_json=$(swaymsg -t get_outputs -r)
+focused_monitor=$(printf '%s\n' "$monitors_json" | jq -r '[.[] | select(.focused == true)][0].name // ""')
+
+{ magikos-brightness-display --monitor "$focused_monitor" 2>/dev/null; echo; } | head -n 1
+
+printf '%s\n' "$monitors_json" | jq -r '
+  def internal: test("^(eDP|LVDS|DSI)-");
+  ([.[] | select(.name | internal)][0].name // ""),
+  ([.[] | select((.name | internal) | not)][0].name // ""),
+  ([.[] | select(.name | internal) | select(.active == true)][0].name // ""),
+  ""
+'
+
+printf '%s\n' "$focused_monitor"
+
+printf '%s\n' "$monitors_json" | jq -r '
+  ([.[] | select(.focused == true)][0].scale // 1) | tostring
+'
+
+printf '%s\n' "$monitors_json" | jq -c \
+  '[.[] | {name, enabled:.active, focused:(.focused == true), width:.current_mode.width, height:.current_mode.height}]'

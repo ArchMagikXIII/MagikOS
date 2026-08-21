@@ -94,7 +94,7 @@ assert(
 )
 
 assert(
-  /function remove\(desktopId, name\) \{[\s\S]*?omarchy-remove-launcher-entry[\s\S]*?\n  \}/.test(appLibraryQml),
+  /function remove\(desktopId, name\) \{[\s\S]*?magikos-remove-launcher-entry[\s\S]*?\n  \}/.test(appLibraryQml),
   'app library remove runs the remover through the shell'
 )
 

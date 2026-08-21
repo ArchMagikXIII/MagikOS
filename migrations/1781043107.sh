@@ -1,9 +1,9 @@
-echo "Move current Omarchy theme state to ~/.local/state"
+echo "Move current Magikos theme state to ~/.local/state"
 
-legacy_current_dir="$HOME/.config/omarchy/current"
-current_state_dir="$HOME/.local/state/omarchy/current"
+legacy_current_dir="$HOME/.config/magikos/current"
+current_state_dir="$HOME/.local/state/magikos/current"
 
-mkdir -p "$HOME/.local/state/omarchy"
+mkdir -p "$HOME/.local/state/magikos"
 
 if [[ -e $legacy_current_dir || -L $legacy_current_dir ]]; then
   if [[ ! -e $current_state_dir && ! -L $current_state_dir ]]; then
@@ -46,9 +46,9 @@ replace_current_path() {
 
   [[ -f $file ]] || return 0
 
-  replace_literal_in_file "$file" "$HOME/.config/omarchy/current" "$HOME/.local/state/omarchy/current"
-  replace_literal_in_file "$file" "~/.config/omarchy/current" "~/.local/state/omarchy/current"
-  replace_literal_in_file "$file" "../omarchy/current" "../../.local/state/omarchy/current"
+  replace_literal_in_file "$file" "$HOME/.config/magikos/current" "$HOME/.local/state/magikos/current"
+  replace_literal_in_file "$file" "~/.config/magikos/current" "~/.local/state/magikos/current"
+  replace_literal_in_file "$file" "../magikos/current" "../../.local/state/magikos/current"
 }
 
 ensure_hyprland_state_path() {
@@ -98,10 +98,10 @@ relink_current_symlink() {
       suffix=${target#"$legacy_current_dir"/}
       ln -sfn "$current_state_dir/$suffix" "$link"
       ;;
-    "~/.config/omarchy/current/"*)
+    "~/.config/magikos/current/"*)
       # The filesystem never expands a literal ~ in a symlink target, so keep
       # $HOME out of the quoted string and let the shell expand it instead.
-      suffix=${target#"~/.config/omarchy/current/"}
+      suffix=${target#"~/.config/magikos/current/"}
       ln -sfn "$current_state_dir/$suffix" "$link"
       ;;
   esac
@@ -109,10 +109,10 @@ relink_current_symlink() {
 
 for link in \
   "$HOME/.config/btop/themes/current.theme" \
-  "$HOME/.config/helix/themes/omarchy.toml" \
-  "$HOME/.vscode/extensions/omarchy-theme/themes/omarchy-color-theme.json" \
-  "$HOME/.vscode-insiders/extensions/omarchy-theme/themes/omarchy-color-theme.json" \
-  "$HOME/.vscode-oss/extensions/omarchy-theme/themes/omarchy-color-theme.json" \
-  "$HOME/.cursor/extensions/omarchy-theme/themes/omarchy-color-theme.json"; do
+  "$HOME/.config/helix/themes/magikos.toml" \
+  "$HOME/.vscode/extensions/magikos-theme/themes/magikos-color-theme.json" \
+  "$HOME/.vscode-insiders/extensions/magikos-theme/themes/magikos-color-theme.json" \
+  "$HOME/.vscode-oss/extensions/magikos-theme/themes/magikos-color-theme.json" \
+  "$HOME/.cursor/extensions/magikos-theme/themes/magikos-color-theme.json"; do
   relink_current_symlink "$link"
 done

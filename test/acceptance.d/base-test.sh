@@ -6,7 +6,7 @@ if [[ ${BASH_SOURCE[0]} == "$0" ]]; then
 fi
 
 ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
-ARTIFACTS="${OMARCHY_ACCEPTANCE_DIR:-/tmp/omarchy-acceptance}"
+ARTIFACTS="${MAGIKOS_ACCEPTANCE_DIR:-/tmp/magikos-acceptance}"
 
 mkdir -p "$ARTIFACTS"
 
@@ -34,7 +34,7 @@ screenshot() {
 
 screen_contains() {
   local text="$1"
-  local snapshot="/tmp/omarchy-acceptance-ocr-$$.png"
+  local snapshot="/tmp/magikos-acceptance-ocr-$$.png"
 
   if ! timeout 10 grim "$snapshot" 2>/dev/null; then
     rm -f "$snapshot"

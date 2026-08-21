@@ -1,0 +1,11 @@
+[Trigger]
+Operation = Upgrade
+Type = Package
+Target = *
+
+[Action]
+Description = Checking Magikos update entrypoint...
+When = PreTransaction
+Depends = magikos
+Exec = /usr/bin/magikos-update-pacman-guard
+AbortOnFail

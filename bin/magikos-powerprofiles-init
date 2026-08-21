@@ -1,0 +1,5 @@
+#!/bin/bash
+
+# magikos:summary=Set the correct power profile on boot based on current AC/battery state.
+
+exec magikos-powerprofiles-set autodetect

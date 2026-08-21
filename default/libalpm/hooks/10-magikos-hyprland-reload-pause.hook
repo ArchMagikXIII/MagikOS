@@ -1,0 +1,12 @@
+[Trigger]
+Operation = Install
+Operation = Upgrade
+Type = Package
+Target = magikos-settings
+Target = magikos-settings-dev
+
+[Action]
+Description = Pausing Hyprland config auto-reload for Magikos settings update...
+When = PreTransaction
+Depends = magikos
+Exec = /usr/bin/magikos-hyprland-reload-guard pause

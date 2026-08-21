@@ -1,0 +1,99 @@
+#!/bin/bash
+
+# magikos:summary=Set the Magikos package channel.
+# magikos:args=<stable|rc|edge|dev>
+# magikos:requires-sudo=true
+
+set -euo pipefail
+
+usage() { echo "Usage: magikos-channel-set [stable|rc|edge|dev]"; }
+fail() { echo "Error: $*" >&2; exit 1; }
+
+confirm_dev() {
+  cat <<'WARNING'
+
+The dev channel links Magikos directly to a checkout of the source in ~/magikos.
+It's exclusively intended for developers working on Magikos itself.
+
+WARNING
+
+  gum confirm --default=false "Switch to dev channel?"
+}
+
+validate_dev_checkout() {
+  local checkout="$1"
+
+  if [[ -e $checkout && ! -d $checkout/.git ]]; then
+    fail "$checkout already exists and is not a git checkout."
+  fi
+
+  if [[ -d $checkout/.git && ( ! -d $checkout/bin || ! -d $checkout/default || ! -d $checkout/shell ) ]]; then
+    fail "$checkout is a git checkout, but it does not look like Magikos."
+  fi
+}
+
+link_dev_checkout() {
+  local checkout="$1"
+  [[ -d $checkout/.git ]] || git clone https://github.com/basecamp/magikos.git "$checkout"
+
+  magikos-dev-link "$checkout" --no-reboot
+}
+
+(( $# > 0 )) || { usage; exit 1; }
+
+dev_checkout=""
+channel="$1"
+leaving_dev=0
+
+case "$channel" in
+  stable)
+    pacman_channel=stable
+    packages=(magikos magikos-settings)
+    ;;
+  rc)
+    pacman_channel=rc
+    packages=(magikos magikos-settings)
+    ;;
+  edge)
+    pacman_channel=edge
+    packages=(magikos-dev magikos-settings-dev)
+    ;;
+  dev)
+    confirm_dev || { echo "Cancelled."; exit 0; }
+    dev_checkout="$HOME/magikos"
+    validate_dev_checkout "$dev_checkout"
+    pacman_channel=edge
+    packages=(magikos-dev magikos-settings-dev)
+    ;;
+  *)
+    echo "Unknown channel: $channel" >&2
+    usage >&2
+    exit 1
+    ;;
+esac
+
+if [[ -z $dev_checkout && $MAGIKOS_PATH != "/usr/share/magikos" ]]; then
+  leaving_dev=1
+fi
+
+if [[ -n $dev_checkout ]]; then
+  link_dev_checkout "$dev_checkout"
+  export MAGIKOS_PATH="$dev_checkout"
+  export PATH="$MAGIKOS_PATH/bin:$PATH"
+  magikos-state set reboot-required
+fi
+
+magikos-refresh-pacman "$pacman_channel"
+# --ask 4 accepts magikos <-> magikos-dev replacement prompts without file overwrites.
+sudo env MAGIKOS_UPDATE_PACMAN=1 pacman -S --needed --noconfirm --ask 4 "${packages[@]}"
+
+if [[ -z $dev_checkout ]]; then
+  magikos-dev-unlink --no-reboot
+  export MAGIKOS_PATH=/usr/share/magikos
+
+  if (( leaving_dev )); then
+    magikos-state set reboot-required
+  fi
+fi
+
+magikos-update -y

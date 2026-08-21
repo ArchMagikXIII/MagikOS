@@ -10,16 +10,16 @@ trap 'rm -rf "$test_tmp"' EXIT
 stub_bin="$test_tmp/bin"
 mkdir -p "$stub_bin"
 
-# The edge channel installs omarchy-dev. Older builds did not declare
-# provides=(omarchy), so a query for plain omarchy finds nothing there.
+# The edge channel installs magikos-dev. Older builds did not declare
+# provides=(magikos), so a query for plain magikos finds nothing there.
 cat >"$stub_bin/pacman" <<'STUB'
 #!/bin/bash
 [[ $1 == "-Q" ]] || exit 1
 shift
 for package in "$@"; do
-  case ",${OMARCHY_TEST_PACKAGES:-}," in
+  case ",${MAGIKOS_TEST_PACKAGES:-}," in
     *",$package,"*)
-      echo "$package ${OMARCHY_TEST_VERSION:-4.0.0-1}"
+      echo "$package ${MAGIKOS_TEST_VERSION:-4.0.0-1}"
       exit 0
       ;;
   esac
@@ -30,16 +30,16 @@ STUB
 chmod +x "$stub_bin/pacman"
 
 version() {
-  OMARCHY_TEST_PACKAGES="$1" \
-    OMARCHY_PATH="${2:-/usr/share/omarchy}" \
+  MAGIKOS_TEST_PACKAGES="$1" \
+    MAGIKOS_PATH="${2:-/usr/share/magikos}" \
     PATH="$stub_bin:$PATH" \
-    "$ROOT/bin/omarchy-version"
+    "$ROOT/bin/magikos-version"
 }
 
-[[ $(version omarchy) == "4.0.0-1" ]] || fail "version reports the stable package"
+[[ $(version magikos) == "4.0.0-1" ]] || fail "version reports the stable package"
 pass "version reports the stable package"
 
-[[ $(version omarchy-dev) == "4.0.0-1" ]] || fail "version reports the edge package"
+[[ $(version magikos-dev) == "4.0.0-1" ]] || fail "version reports the edge package"
 pass "version reports the edge package"
 
 # A checkout reports its hash instead, so packages are irrelevant there.
@@ -47,16 +47,16 @@ pass "version reports the edge package"
 pass "version reports a dev checkout"
 
 if version "" >/dev/null 2>&1; then
-  fail "version fails when no Omarchy package is installed"
+  fail "version fails when no Magikos package is installed"
 fi
-pass "version fails when no Omarchy package is installed"
+pass "version fails when no Magikos package is installed"
 
 # The snapshot description is only a label, so a failed lookup must not abort
 # the update under set -e.
 snapshot_desc=$(
   set -e
-  PATH="$stub_bin:$PATH" OMARCHY_TEST_PACKAGES="" OMARCHY_PATH=/usr/share/omarchy \
-    bash -c 'DESC="$(omarchy-version 2>/dev/null || echo unknown)"; echo "$DESC"' 2>/dev/null
+  PATH="$stub_bin:$PATH" MAGIKOS_TEST_PACKAGES="" MAGIKOS_PATH=/usr/share/magikos \
+    bash -c 'DESC="$(magikos-version 2>/dev/null || echo unknown)"; echo "$DESC"' 2>/dev/null
 ) || fail "snapshot survives an unknown version"
 
 [[ $snapshot_desc == "unknown" ]] || fail "snapshot labels an unknown version" "actual: $snapshot_desc"

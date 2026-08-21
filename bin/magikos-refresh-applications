@@ -1,0 +1,17 @@
+#!/bin/bash
+
+# magikos:summary=Ensure default application launchers and mise wrappers are installed.
+
+# Copy .desktop declarations
+mkdir -p ~/.local/share/applications
+cp "$MAGIKOS_PATH"/applications/*.desktop ~/.local/share/applications/
+
+if magikos-cmd-present alacritty; then
+  cp "$MAGIKOS_PATH/default/alacritty/Alacritty.desktop" ~/.local/share/applications/
+fi
+
+if [[ -f "$MAGIKOS_PATH/install/user/mise.sh" ]]; then
+  bash "$MAGIKOS_PATH/install/user/mise.sh"
+fi
+
+update-desktop-database ~/.local/share/applications

@@ -1,0 +1,5 @@
+#!/bin/bash
+
+# magikos:summary=Reload btop configuration (used by the Magikos theme switching).
+
+pkill -SIGUSR2 btop

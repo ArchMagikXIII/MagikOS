@@ -1,0 +1,8 @@
+#!/bin/bash
+
+# magikos:summary=Toggle single-window square aspect ratio.
+
+case $(magikos-hyprland-toggle single-window-aspect-ratio) in
+  on) magikos-notification-send -g  "Enable single-window square aspect ratio" ;;
+  off) magikos-notification-send -g  "Disable single-window square aspect ratio" ;;
+esac

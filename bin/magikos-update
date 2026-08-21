@@ -1,0 +1,64 @@
+#!/bin/bash
+
+# magikos:summary=Update Magikos and system packages
+# magikos:args=[-y]
+# magikos:examples=magikos update | magikos update -y
+# magikos:requires-sudo=true
+
+set -e
+
+if [[ -z ${MAGIKOS_UPDATE_LOGGED:-} ]]; then
+  script_command=$(printf '%q ' "$0" "$@")
+  exec env MAGIKOS_UPDATE_LOGGED=1 script -qefc "$script_command" "/tmp/magikos-update.log"
+fi
+
+if ! magikos-update-lock held; then
+  exec magikos-update-lock run "$0" "$@"
+fi
+
+trap 'echo ""; echo -e "\033[0;31mSomething went wrong during the update!\n\nPlease review the output above carefully, correct the error, and retry the update.\n\nIf you need assistance, get help from the community at https://magikos.org/discord\033[0m"' ERR
+trap 'magikos-update-stay-awake stop' EXIT
+
+magikos-update-requires-free-space
+
+# -y is a promise not to ask anything. Steps that would need an answer report
+# and move on instead of waiting on a prompt nobody is here to give.
+[[ ${1:-} != "-y" ]] || export MAGIKOS_UPDATE_UNATTENDED=1
+
+if [[ ${1:-} == "-y" ]] || magikos-update-confirm; then
+  # Before the snapshot: the cache is on the snapshotted subvolume, so pruning
+  # after it frees nothing until that snapshot ages out.
+  magikos-update-pkg-prune
+
+  # 127 means Snapper is deliberately absent. Any other failure already said
+  # what went wrong, and a missing snapshot is not worth blocking an update
+  # over, but it must not pass for one either.
+  magikos-snapshot create || (($? == 127)) ||
+    echo -e "\e[33mContinuing the update without a snapshot.\e[0m" >&2
+
+  magikos-update-stay-awake start
+
+  magikos-update-dev
+  magikos-update-keyring
+
+  # Migrations ship with the packages installed here and are written against
+  # them, so everything below waits on this finishing. An upgrade that stopped
+  # takes the update with it rather than migrating against what is still on disk.
+  magikos-update-system-pkgs
+  magikos-migrate
+  magikos-hook post-update
+  magikos-update-aur-pkgs
+  magikos-update-mise
+  magikos-update-orphan-pkgs
+
+  magikos-update-analyze-logs
+  magikos-update-status
+
+  # Release update-owned inhibitors before offering a reboot. A confirmed
+  # reboot can terminate this process before its EXIT trap gets a chance to
+  # remove the persistent Stay Awake marker.
+  magikos-update-stay-awake stop
+  trap - EXIT
+
+  magikos-update-restart
+fi

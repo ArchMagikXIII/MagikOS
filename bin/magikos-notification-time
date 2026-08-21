@@ -1,0 +1,5 @@
+#!/bin/bash
+
+# magikos:summary=Show the current time and date notification
+
+magikos-notification-send -g  -u low "$(date +"%A %H:%M  ·  %d %B %Y  ·  Week %V")"

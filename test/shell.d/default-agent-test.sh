@@ -9,7 +9,7 @@ trap 'rm -rf "$test_tmp"' EXIT
 
 mock_bin="$test_tmp/bin"
 test_home="$test_tmp/home"
-agent_file="$test_home/.config/omarchy/defaults/agent"
+agent_file="$test_home/.config/magikos/defaults/agent"
 notification_history="$test_tmp/notification-history"
 agent_open_log="$test_tmp/agent-open"
 launch_log="$test_tmp/launch"
@@ -21,77 +21,77 @@ terminal_log="$test_tmp/terminal"
 menu_log="$test_tmp/menu"
 mkdir -p "$mock_bin" "$test_home"
 
-cat >"$mock_bin/omarchy-notification-send" <<'SH'
+cat >"$mock_bin/magikos-notification-send" <<'SH'
 #!/bin/bash
-printf '%s\0' "$@" >>"$OMARCHY_TEST_NOTIFICATION_HISTORY"
+printf '%s\0' "$@" >>"$MAGIKOS_TEST_NOTIFICATION_HISTORY"
 SH
 
-cat >"$mock_bin/omarchy-cmd-missing" <<'SH'
+cat >"$mock_bin/magikos-cmd-missing" <<'SH'
 #!/bin/bash
-[[ $1 == ${OMARCHY_TEST_MISSING_COMMAND:-} ]]
+[[ $1 == ${MAGIKOS_TEST_MISSING_COMMAND:-} ]]
 SH
 
-cat >"$mock_bin/omarchy-launch-tui" <<'SH'
+cat >"$mock_bin/magikos-launch-tui" <<'SH'
 #!/bin/bash
-printf '%s\0' "$@" >"$OMARCHY_TEST_AGENT_LAUNCH_LOG"
+printf '%s\0' "$@" >"$MAGIKOS_TEST_AGENT_LAUNCH_LOG"
 SH
 
-cat >"$mock_bin/omarchy-launch-floating-terminal-with-presentation" <<'SH'
+cat >"$mock_bin/magikos-launch-floating-terminal-with-presentation" <<'SH'
 #!/bin/bash
-printf '%s\0' "$@" >"$OMARCHY_TEST_AGENT_TERMINAL_LOG"
+printf '%s\0' "$@" >"$MAGIKOS_TEST_AGENT_TERMINAL_LOG"
 SH
 
 cat >"$mock_bin/opencode" <<'SH'
 #!/bin/bash
-printf '%s\0' opencode "$@" >"$OMARCHY_TEST_AGENT_INLINE_LOG"
+printf '%s\0' opencode "$@" >"$MAGIKOS_TEST_AGENT_INLINE_LOG"
 SH
 
-cat >"$mock_bin/omarchy-mise-install" <<'SH'
+cat >"$mock_bin/magikos-mise-install" <<'SH'
 #!/bin/bash
-printf '%s\n' "$*" >>"$OMARCHY_TEST_STUB_LOG"
+printf '%s\n' "$*" >>"$MAGIKOS_TEST_STUB_LOG"
 SH
 
 cat >"$mock_bin/mise" <<'SH'
 #!/bin/bash
-printf '%s\0' "$@" >"$OMARCHY_TEST_MISE_LOG"
-printf '%s\n' "$*" >>"$OMARCHY_TEST_MISE_HISTORY"
+printf '%s\0' "$@" >"$MAGIKOS_TEST_MISE_LOG"
+printf '%s\n' "$*" >>"$MAGIKOS_TEST_MISE_HISTORY"
 
 if [[ $1 == "where" ]]; then
-  [[ ${OMARCHY_TEST_AGENT_INSTALLED:-false} == "true" ]]
+  [[ ${MAGIKOS_TEST_AGENT_INSTALLED:-false} == "true" ]]
   exit
 fi
 
-[[ ${OMARCHY_TEST_MISE_FAIL:-false} != "true" ]]
+[[ ${MAGIKOS_TEST_MISE_FAIL:-false} != "true" ]]
 SH
 
-cat >"$mock_bin/omarchy-menu" <<'SH'
+cat >"$mock_bin/magikos-menu" <<'SH'
 #!/bin/bash
-printf '%s\0' "$@" >"$OMARCHY_TEST_AGENT_MENU_LOG"
+printf '%s\0' "$@" >"$MAGIKOS_TEST_AGENT_MENU_LOG"
 SH
 
-cat >"$mock_bin/omarchy-test-noop" <<'SH'
+cat >"$mock_bin/magikos-test-noop" <<'SH'
 #!/bin/bash
 exit 0
 SH
 
-for command in gum hyprctl omarchy-webapp-remove-all omarchy-tui-remove-all omarchy-pkg-drop; do
-  ln -s omarchy-test-noop "$mock_bin/$command"
+for command in gum hyprctl magikos-webapp-remove-all magikos-tui-remove-all magikos-pkg-drop; do
+  ln -s magikos-test-noop "$mock_bin/$command"
 done
 
 chmod +x "$mock_bin"/*
 
 export HOME="$test_home"
 export PATH="$mock_bin:$ROOT/bin:$PATH"
-export OMARCHY_TEST_NOTIFICATION_HISTORY="$notification_history"
-export OMARCHY_TEST_AGENT_OPEN_LOG="$agent_open_log"
-export OMARCHY_TEST_AGENT_LAUNCH_LOG="$launch_log"
-export OMARCHY_TEST_AGENT_INLINE_LOG="$inline_log"
-export OMARCHY_TEST_MISE_LOG="$mise_log"
-export OMARCHY_TEST_MISE_HISTORY="$mise_history"
-export OMARCHY_TEST_STUB_LOG="$stub_log"
-export OMARCHY_TEST_AGENT_TERMINAL_LOG="$terminal_log"
-export OMARCHY_TEST_AGENT_MENU_LOG="$menu_log"
-export OMARCHY_PATH="$ROOT"
+export MAGIKOS_TEST_NOTIFICATION_HISTORY="$notification_history"
+export MAGIKOS_TEST_AGENT_OPEN_LOG="$agent_open_log"
+export MAGIKOS_TEST_AGENT_LAUNCH_LOG="$launch_log"
+export MAGIKOS_TEST_AGENT_INLINE_LOG="$inline_log"
+export MAGIKOS_TEST_MISE_LOG="$mise_log"
+export MAGIKOS_TEST_MISE_HISTORY="$mise_history"
+export MAGIKOS_TEST_STUB_LOG="$stub_log"
+export MAGIKOS_TEST_AGENT_TERMINAL_LOG="$terminal_log"
+export MAGIKOS_TEST_AGENT_MENU_LOG="$menu_log"
+export MAGIKOS_PATH="$ROOT"
 
 grok_package="npm:@xai-official/grok"
 omp_package="github:can1357/oh-my-pi"
@@ -103,7 +103,7 @@ assert_lazy_stub() {
   local command=$2
 
   : >"$mise_history"
-  "$ROOT/bin/omarchy-mise-install" "$package" "$command"
+  "$ROOT/bin/magikos-mise-install" "$package" "$command"
   "$test_home/.local/bin/$command" --version
   mapfile -t mise_calls <"$mise_history"
 
@@ -136,18 +136,18 @@ grep -Fx "$crush_package" "$stub_log" >/dev/null || fail "agent migration create
 : >"$stub_log"
 mkdir -p "$(dirname "$agent_file")"
 printf '%s\n' gemini >"$agent_file"
-"$ROOT/bin/omarchy-mise-install" gemini
-export OMARCHY_TEST_MISSING_COMMAND=agy
+"$ROOT/bin/magikos-mise-install" gemini
+export MAGIKOS_TEST_MISSING_COMMAND=agy
 source "$ROOT/migrations/1786719479.sh" >/dev/null
-unset OMARCHY_TEST_MISSING_COMMAND
+unset MAGIKOS_TEST_MISSING_COMMAND
 grep -Fx "$agy_package agy" "$stub_log" >/dev/null || fail "Antigravity migration creates its lazy stub"
 [[ $(<"$agent_file") == "agy" ]] || fail "Antigravity migration replaces a Gemini default"
 
 : >"$stub_log"
 printf '  %s  \n' gemini >"$agent_file"
-export OMARCHY_TEST_MISSING_COMMAND=agy
+export MAGIKOS_TEST_MISSING_COMMAND=agy
 source "$ROOT/migrations/1786719479.sh" >/dev/null
-unset OMARCHY_TEST_MISSING_COMMAND
+unset MAGIKOS_TEST_MISSING_COMMAND
 [[ $(<"$agent_file") == "agy" ]] ||
   fail "Antigravity migration replaces a padded Gemini default the launcher would still read"
 pass "Antigravity migration reads the default the way the launcher does"
@@ -171,19 +171,19 @@ source "$ROOT/migrations/1786719479.sh" >/dev/null
 [[ -e $test_home/.local/bin/gemini ]] ||
   fail "Antigravity migration leaves a wrapper that only mentions the installer line"
 rm -f "$test_home/.local/bin/gemini"
-pass "Antigravity migration only removes the Gemini wrapper Omarchy wrote"
+pass "Antigravity migration only removes the Gemini wrapper Magikos wrote"
 
-[[ -L "$test_home/.gemini/config/skills/omarchy" && $(readlink "$test_home/.gemini/config/skills/omarchy") == "$ROOT/default/agents/skills/omarchy" ]] ||
-   fail "Antigravity migration provisions the omarchy skill"
+[[ -L "$test_home/.gemini/config/skills/magikos" && $(readlink "$test_home/.gemini/config/skills/magikos") == "$ROOT/default/agents/skills/magikos" ]] ||
+   fail "Antigravity migration provisions the magikos skill"
 [[ -L "$test_home/.gemini/config/skills/diagnose-crash" && $(readlink "$test_home/.gemini/config/skills/diagnose-crash") == "$ROOT/default/agents/skills/diagnose-crash" ]] ||
    fail "Antigravity migration provisions the diagnose-crash skill"
 pass "Antigravity migration provisions Antigravity skills"
 
 
 : >"$stub_log"
-mkdir -p "$test_home/.local/state/omarchy"
-touch "$test_home/.local/state/omarchy/preinstalls-removed"
-export OMARCHY_TEST_MISSING_COMMAND=agy
+mkdir -p "$test_home/.local/state/magikos"
+touch "$test_home/.local/state/magikos/preinstalls-removed"
+export MAGIKOS_TEST_MISSING_COMMAND=agy
 source "$ROOT/migrations/1786719479.sh" >/dev/null
 [[ ! -s $stub_log ]] || fail "Antigravity migration preserves removed preinstalls"
 pass "Antigravity migration respects removed preinstalls"
@@ -191,20 +191,20 @@ pass "Antigravity migration respects removed preinstalls"
 : >"$stub_log"
 printf '%s\n' gemini >"$agent_file"
 source "$ROOT/migrations/1786719479.sh" >/dev/null
-unset OMARCHY_TEST_MISSING_COMMAND
+unset MAGIKOS_TEST_MISSING_COMMAND
 grep -Fx "$agy_package agy" "$stub_log" >/dev/null || fail "Antigravity migration installs the agent a Gemini default now names"
 [[ $(<"$agent_file") == "agy" ]] || fail "Antigravity migration replaces a Gemini default after opt-out"
 pass "Antigravity migration never leaves the default naming a missing agent"
 
 : >"$stub_log"
-rm "$test_home/.local/state/omarchy/preinstalls-removed"
+rm "$test_home/.local/state/magikos/preinstalls-removed"
 source "$ROOT/migrations/1786719479.sh" >/dev/null
 [[ ! -s $stub_log ]] || fail "Antigravity migration reinstalls an existing Antigravity command"
 pass "Antigravity migration preserves an existing Antigravity install"
 
-mkdir -p "$test_home/.local/state/omarchy"
-touch "$test_home/.local/state/omarchy/preinstalls-removed"
-"$ROOT/bin/omarchy-mise-install" oh-my-pi omp
+mkdir -p "$test_home/.local/state/magikos"
+touch "$test_home/.local/state/magikos/preinstalls-removed"
+"$ROOT/bin/magikos-mise-install" oh-my-pi omp
 : >"$stub_log"
 source "$ROOT/migrations/1785617047.sh" >/dev/null
 source "$ROOT/migrations/1785846769.sh" >/dev/null
@@ -228,22 +228,22 @@ source "$ROOT/migrations/1785846769.sh" >/dev/null
   fail "agent migration keeps a wrapper built on $omp_package"
 rm -f "$test_home/.local/bin/omp"
 
-rm "$test_home/.local/state/omarchy/preinstalls-removed"
+rm "$test_home/.local/state/magikos/preinstalls-removed"
 rm -f "$agent_file"
 pass "agent migrations install working wrappers without overriding the preinstall opt-out"
 
 touch "$test_home/.local/bin/agy"
-omarchy-remove-preinstalls >/dev/null
+magikos-remove-preinstalls >/dev/null
 for command in agy omp grok crush; do
   [[ ! -e $test_home/.local/bin/$command ]] || fail "Remove Preinstalls deletes the $command lazy stub"
 done
 pass "Remove Preinstalls deletes every optional agent lazy stub"
 
-[[ -z $(omarchy-default-agent) ]] || fail "default agent is unset until one is chosen"
+[[ -z $(magikos-default-agent) ]] || fail "default agent is unset until one is chosen"
 pass "default agent is unset until one is chosen"
 
 : >"$launch_log"
-if omarchy-agent >"$test_tmp/no-agent-output" 2>&1; then
+if magikos-agent >"$test_tmp/no-agent-output" 2>&1; then
   fail "agent launcher refuses to launch without a default"
 fi
 grep -Fq "Choose default agent with" "$test_tmp/no-agent-output" ||
@@ -255,7 +255,7 @@ pass "agent launcher refuses to launch without a default"
 # the keypress look broken. It offers the choice instead.
 : >"$launch_log"
 : >"$menu_log"
-omarchy-agent --pick
+magikos-agent --pick
 mapfile -d '' -t menu_args <"$menu_log"
 [[ ${menu_args[*]} == "summon setup.default.agent" ]] ||
   fail "--pick opens the agent defaults menu when none is set"
@@ -263,20 +263,20 @@ mapfile -d '' -t menu_args <"$menu_log"
 pass "--pick opens the agent defaults menu when none is set"
 
 source "$ROOT/default/bash/aliases"
-[[ $(alias a) == "alias a='omarchy-agent --inline'" ]] ||
+[[ $(alias a) == "alias a='magikos-agent --inline'" ]] ||
   fail "terminal alias launches the default agent inline"
 pass "terminal alias launches the default agent inline"
 
-grep -Fq 'o.bind("SUPER + SHIFT + CTRL + A", "Agent", "omarchy-agent --pick")' \
+grep -Fq 'o.bind("SUPER + SHIFT + CTRL + A", "Agent", "magikos-agent --pick")' \
   "$ROOT/default/hypr/bindings/utilities.lua" ||
   fail "agent launcher has a keyboard shortcut"
 pass "agent launcher has a keyboard shortcut"
 
-cat >"$mock_bin/omarchy-agent" <<'SH'
+cat >"$mock_bin/magikos-agent" <<'SH'
 #!/bin/bash
-printf '%s\0' omarchy-agent "$@" >"$OMARCHY_TEST_AGENT_OPEN_LOG"
+printf '%s\0' magikos-agent "$@" >"$MAGIKOS_TEST_AGENT_OPEN_LOG"
 SH
-chmod +x "$mock_bin/omarchy-agent"
+chmod +x "$mock_bin/magikos-agent"
 hash -r
 
 declare -A expected_agents=(
@@ -314,77 +314,77 @@ declare -A expected_packages=(
 for selection in "${!expected_agents[@]}"; do
   expected=${expected_agents[$selection]}
   : >"$agent_open_log"
-  OMARCHY_TEST_AGENT_INSTALLED=true omarchy-default-agent "$selection"
-  [[ $(omarchy-default-agent) == $expected ]] || fail "default agent canonicalizes $selection"
+  MAGIKOS_TEST_AGENT_INSTALLED=true magikos-default-agent "$selection"
+  [[ $(magikos-default-agent) == $expected ]] || fail "default agent canonicalizes $selection"
 
   mapfile -d '' -t mise_args <"$mise_log"
   [[ ${mise_args[0]} == "use" && ${mise_args[1]} == "-g" && ${mise_args[2]} == ${expected_packages[$expected]} ]] ||
     fail "default agent installs $selection globally through mise"
 
   mapfile -d '' -t agent_open_args <"$agent_open_log"
-  [[ ${#agent_open_args[@]} == 1 && ${agent_open_args[0]} == "omarchy-agent" ]] ||
+  [[ ${#agent_open_args[@]} == 1 && ${agent_open_args[0]} == "magikos-agent" ]] ||
     fail "default agent opens $selection after selecting it"
 done
 pass "default agent selects and opens every supported provider and alias"
-[[ -f $agent_file && ! -e $test_home/.local/state/omarchy/defaults/agent ]] ||
-  fail "default agent stores its selection in Omarchy user config"
-pass "default agent stores its selection in Omarchy user config"
+[[ -f $agent_file && ! -e $test_home/.local/state/magikos/defaults/agent ]] ||
+  fail "default agent stores its selection in Magikos user config"
+pass "default agent stores its selection in Magikos user config"
 
-OMARCHY_TEST_AGENT_INSTALLED=true omarchy-default-agent pi
+MAGIKOS_TEST_AGENT_INSTALLED=true magikos-default-agent pi
 : >"$notification_history"
 : >"$agent_open_log"
 : >"$terminal_log"
-omarchy-default-agent github-copilot
+magikos-default-agent github-copilot
 mapfile -d '' -t terminal_args <"$terminal_log"
-[[ ${terminal_args[0]} == "omarchy-default-agent" && ${terminal_args[1]} == "--install" && ${terminal_args[2]} == "copilot" ]] ||
+[[ ${terminal_args[0]} == "magikos-default-agent" && ${terminal_args[1]} == "--install" && ${terminal_args[2]} == "copilot" ]] ||
   fail "missing agent installation opens in a terminal"
 [[ ! -s $notification_history ]] || fail "missing agent installation skips notifications"
 [[ ! -s $agent_open_log ]] || fail "missing agent installation waits to open the agent"
-[[ $(omarchy-default-agent) == "pi" ]] || fail "missing agent installation waits to change the selection"
+[[ $(magikos-default-agent) == "pi" ]] || fail "missing agent installation waits to change the selection"
 
-omarchy-default-agent --install github-copilot >"$test_tmp/install-output"
+magikos-default-agent --install github-copilot >"$test_tmp/install-output"
 mapfile -d '' -t mise_args <"$mise_log"
 [[ ${mise_args[0]} == "use" && ${mise_args[1]} == "-g" && ${mise_args[2]} == "copilot" ]] ||
   fail "visible agent installation activates the provider globally through mise"
-[[ $(omarchy-default-agent) == "copilot" ]] || fail "visible agent installation changes the selection after mise succeeds"
+[[ $(magikos-default-agent) == "copilot" ]] || fail "visible agent installation changes the selection after mise succeeds"
 [[ ! -s $notification_history ]] || fail "visible agent installation leaves progress to the terminal"
 [[ $(<"$test_tmp/install-output") == $'\033[2J\033[3J\033[H' ]] ||
   fail "visible agent installation clears its terminal before opening the agent"
 mapfile -d '' -t agent_open_args <"$agent_open_log"
-[[ ${#agent_open_args[@]} == 2 && ${agent_open_args[0]} == "omarchy-agent" && ${agent_open_args[1]} == "--inline" ]] ||
+[[ ${#agent_open_args[@]} == 2 && ${agent_open_args[0]} == "magikos-agent" && ${agent_open_args[1]} == "--inline" ]] ||
   fail "newly installed agent opens in the installation terminal"
 pass "missing agents install visibly and open in the same terminal"
 
 : >"$notification_history"
 : >"$agent_open_log"
 : >"$terminal_log"
-OMARCHY_TEST_AGENT_INSTALLED=true omarchy-default-agent github-copilot
+MAGIKOS_TEST_AGENT_INSTALLED=true magikos-default-agent github-copilot
 [[ ! -s $terminal_log ]] || fail "installed agent selection skips the terminal"
 [[ ! -s $notification_history ]] || fail "installed agent selection skips notifications"
 mapfile -d '' -t mise_args <"$mise_log"
 [[ ${mise_args[0]} == "use" && ${mise_args[1]} == "-g" && ${mise_args[2]} == "copilot" ]] ||
   fail "default agent still activates an installed provider globally through mise"
 mapfile -d '' -t agent_open_args <"$agent_open_log"
-[[ ${#agent_open_args[@]} == 1 && ${agent_open_args[0]} == "omarchy-agent" ]] ||
+[[ ${#agent_open_args[@]} == 1 && ${agent_open_args[0]} == "magikos-agent" ]] ||
   fail "installed agent opens in a new terminal after selection"
 pass "installed agents select and open without notifications"
 
 : >"$agent_open_log"
-if omarchy-default-agent unsupported >"$test_tmp/invalid-output" 2>&1; then
+if magikos-default-agent unsupported >"$test_tmp/invalid-output" 2>&1; then
   fail "default agent rejects unsupported providers"
 fi
-grep -F "Usage: omarchy-default-agent" "$test_tmp/invalid-output" >/dev/null ||
+grep -F "Usage: magikos-default-agent" "$test_tmp/invalid-output" >/dev/null ||
   fail "default agent explains supported providers"
-[[ $(omarchy-default-agent) == "copilot" ]] || fail "invalid selection preserves the current default agent"
+[[ $(magikos-default-agent) == "copilot" ]] || fail "invalid selection preserves the current default agent"
 [[ ! -s $agent_open_log ]] || fail "invalid selection does not open an agent"
 pass "default agent rejects unsupported providers without changing the selection"
 
 : >"$notification_history"
 : >"$agent_open_log"
-if OMARCHY_TEST_MISE_FAIL=true omarchy-default-agent --install codex >"$test_tmp/install-failure-output" 2>&1; then
+if MAGIKOS_TEST_MISE_FAIL=true magikos-default-agent --install codex >"$test_tmp/install-failure-output" 2>&1; then
   fail "default agent rejects a failed mise installation"
 fi
-[[ $(omarchy-default-agent) == "copilot" ]] || fail "failed installation preserves the current default agent"
+[[ $(magikos-default-agent) == "copilot" ]] || fail "failed installation preserves the current default agent"
 grep -F "Could not install Codex with mise" "$test_tmp/install-failure-output" >/dev/null ||
   fail "default agent reports a failed mise installation in the terminal"
 [[ ! -s $notification_history ]] || fail "failed visible agent installation skips notifications"
@@ -393,17 +393,17 @@ pass "default agent opens only after mise installs the provider"
 
 : >"$notification_history"
 : >"$agent_open_log"
-if OMARCHY_TEST_AGENT_INSTALLED=true OMARCHY_TEST_MISE_FAIL=true omarchy-default-agent codex >"$test_tmp/setup-failure-output" 2>&1; then
+if MAGIKOS_TEST_AGENT_INSTALLED=true MAGIKOS_TEST_MISE_FAIL=true magikos-default-agent codex >"$test_tmp/setup-failure-output" 2>&1; then
   fail "default agent rejects a failed mise activation"
 fi
-[[ $(omarchy-default-agent) == "copilot" ]] || fail "failed activation preserves the current default agent"
+[[ $(magikos-default-agent) == "copilot" ]] || fail "failed activation preserves the current default agent"
 grep -F "Could not set Codex as the default coding agent" "$test_tmp/setup-failure-output" >/dev/null ||
   fail "default agent reports a failed activation for an installed provider"
 [[ ! -s $notification_history ]] || fail "failed activation skips notifications"
 [[ ! -s $agent_open_log ]] || fail "failed activation does not open an agent"
 pass "default agent reports mise failures without notifications"
 
-rm "$mock_bin/omarchy-agent"
+rm "$mock_bin/magikos-agent"
 hash -r
 
 assert_launched() {
@@ -412,7 +412,7 @@ assert_launched() {
   shift 2
   # Every agent window launches under the same app-id, whichever agent is
   # default, so window rules and themes see one class for all of them.
-  local expected=(--app-id=org.omarchy.agent "$@")
+  local expected=(--app-id=org.magikos.agent "$@")
 
   mapfile -d '' -t actual <"$launch_log"
 
@@ -430,7 +430,7 @@ assert_launch() {
   shift
 
   printf '%s\n' "$agent" >"$agent_file"
-  omarchy-agent-prompt "Review this" project
+  magikos-agent-prompt "Review this" project
   assert_launched "$agent" "forwards the interactive prompt" "$@"
 }
 
@@ -439,7 +439,7 @@ assert_bypass() {
   shift
 
   printf '%s\n' "$agent" >"$agent_file"
-  omarchy-agent
+  magikos-agent
   assert_launched "$agent" "skips permission prompts" "$@"
 }
 
@@ -466,13 +466,13 @@ assert_bypass copilot copilot --allow-all
 pass "agent launcher skips permission prompts for every supported agent"
 
 printf '%s\n' "opencode" >"$agent_file"
-omarchy-agent
+magikos-agent
 mapfile -d '' -t launch_args <"$launch_log"
-[[ ${launch_args[*]} == "--app-id=org.omarchy.agent opencode --auto" ]] ||
+[[ ${launch_args[*]} == "--app-id=org.magikos.agent opencode --auto" ]] ||
   fail "agent launcher starts the selected agent without an initial prompt"
 pass "agent launcher starts the selected agent without an initial prompt"
 
-omarchy-agent-prompt --inline "Review this project"
+magikos-agent-prompt --inline "Review this project"
 mapfile -d '' -t inline_args <"$inline_log"
 [[ ${inline_args[*]} == "opencode --auto --prompt Review this project" ]] ||
   fail "inline agent launcher runs in the current terminal"
@@ -481,38 +481,38 @@ pass "inline agent launcher runs in the current terminal"
 # The prompt route exists so the router can tell a prompt from a subcommand, so
 # cover the public routes and not only the binaries behind them.
 : >"$launch_log"
-omarchy agent
+magikos agent
 mapfile -d '' -t launch_args <"$launch_log"
-[[ ${launch_args[*]} == "--app-id=org.omarchy.agent opencode --auto" ]] ||
-  fail "omarchy agent routes to the launcher"
+[[ ${launch_args[*]} == "--app-id=org.magikos.agent opencode --auto" ]] ||
+  fail "magikos agent routes to the launcher"
 
 # With an agent chosen there is nothing to pick, so the keybinding launches.
 : >"$launch_log"
 : >"$menu_log"
-omarchy-agent --pick
+magikos-agent --pick
 mapfile -d '' -t launch_args <"$launch_log"
-[[ ${launch_args[*]} == "--app-id=org.omarchy.agent opencode --auto" ]] ||
+[[ ${launch_args[*]} == "--app-id=org.magikos.agent opencode --auto" ]] ||
   fail "--pick launches once an agent is chosen"
 [[ ! -s $menu_log ]] || fail "--pick opens no menu once an agent is chosen"
 pass "--pick launches once an agent is chosen"
 
 : >"$launch_log"
-omarchy agent prompt "Review this project"
+magikos agent prompt "Review this project"
 mapfile -d '' -t launch_args <"$launch_log"
-[[ ${launch_args[*]} == "--app-id=org.omarchy.agent opencode --auto --prompt Review this project" ]] ||
-  fail "omarchy agent prompt routes the prompt to the launcher"
+[[ ${launch_args[*]} == "--app-id=org.magikos.agent opencode --auto --prompt Review this project" ]] ||
+  fail "magikos agent prompt routes the prompt to the launcher"
 
 : >"$launch_log"
-if omarchy agent Review this project >"$test_tmp/positional-output" 2>&1; then
-  fail "omarchy agent rejects a positional prompt"
+if magikos agent Review this project >"$test_tmp/positional-output" 2>&1; then
+  fail "magikos agent rejects a positional prompt"
 fi
-grep -F "omarchy agent prompt" "$test_tmp/positional-output" >/dev/null ||
-  fail "omarchy agent points a positional prompt at the prompt route"
-[[ ! -s $launch_log ]] || fail "omarchy agent starts nothing for a positional prompt"
-pass "omarchy agent keeps prompts on the prompt route"
+grep -F "magikos agent prompt" "$test_tmp/positional-output" >/dev/null ||
+  fail "magikos agent points a positional prompt at the prompt route"
+[[ ! -s $launch_log ]] || fail "magikos agent starts nothing for a positional prompt"
+pass "magikos agent keeps prompts on the prompt route"
 
 printf '%s\n' "missing" >"$agent_file"
-if OMARCHY_TEST_MISSING_COMMAND=missing omarchy-agent >"$test_tmp/missing-output" 2>&1; then
+if MAGIKOS_TEST_MISSING_COMMAND=missing magikos-agent >"$test_tmp/missing-output" 2>&1; then
   fail "agent launcher rejects a missing default command"
 fi
 grep -F "missing is not installed" "$test_tmp/missing-output" >/dev/null ||

@@ -6,7 +6,7 @@ description: >
   why an application crashed or disappeared, or when a "Process crashed:" desktop
   notification is acted on. Triggers: crash, segfault, SIGSEGV, SIGABRT, core dump,
   coredumpctl, "why did X crash", "X keeps crashing", backtrace symbolization.
-  Covers reporting a confirmed Omarchy bug upstream — see reporting.md.
+  Covers reporting a confirmed Magikos bug upstream — see reporting.md.
 ---
 
 # Diagnosing a Crash
@@ -89,9 +89,9 @@ ambiguous, say so rather than assembling confidence out of guesswork.
 reconfigure. The one thing to clean up is your own: delete the core you extracted
 above, which is a copy of the crashed process's memory.
 
-## If it is an Omarchy bug
+## If it is an Magikos bug
 
-Most application crashes are upstream bugs in those applications, not Omarchy's
-doing. In the minority of cases where the cause really does sit within Omarchy's
+Most application crashes are upstream bugs in those applications, not Magikos's
+doing. In the minority of cases where the cause really does sit within Magikos's
 sphere of control, read [`reporting.md`](reporting.md) before offering to file
 anything.

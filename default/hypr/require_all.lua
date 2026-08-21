@@ -1,8 +1,8 @@
 -- Require every *.lua file in a directory in sorted order.
--- Used for Omarchy extension-style folders such as default/hypr/apps,
--- default/hypr/bindings, and ~/.local/state/omarchy/toggles/hypr.
+-- Used for Magikos extension-style folders such as default/hypr/apps,
+-- default/hypr/bindings, and ~/.local/state/magikos/toggles/hypr.
 -- Pass a module prefix for normal package.path modules, e.g.
---   require_all.files(paths.omarchy_path .. "/default/hypr/apps", "default.hypr.apps")
+--   require_all.files(paths.magikos_path .. "/default/hypr/apps", "default.hypr.apps")
 -- Pass nil as the prefix when the directory itself has been added to package.path.
 
 local M = {}

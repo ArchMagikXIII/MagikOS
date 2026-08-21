@@ -9,11 +9,11 @@ trap 'rm -rf "$tmp_dir"' EXIT
 
 mkdir -p "$tmp_dir/bin"
 
-cat >"$tmp_dir/bin/omarchy-pkg-drop" <<'SCRIPT'
+cat >"$tmp_dir/bin/magikos-pkg-drop" <<'SCRIPT'
 #!/bin/bash
 printf 'drop:%s\n' "$*" >>"$TEST_LOG"
 SCRIPT
-chmod +x "$tmp_dir/bin/omarchy-pkg-drop"
+chmod +x "$tmp_dir/bin/magikos-pkg-drop"
 
 export TEST_LOG="$tmp_dir/log"
 export PATH="$tmp_dir/bin:$PATH"
@@ -28,7 +28,7 @@ fresh_home() {
 # ~/.cache/codex-runtimes, so removing the desktop app must not take it.
 fresh_home
 mkdir -p "$HOME/.config/Codex" "$HOME/.cache/Codex" "$HOME/.cache/codex-runtimes/codex-primary-runtime" "$HOME/.codex"
-"$ROOT/bin/omarchy-remove-ai-chatgpt" >/dev/null
+"$ROOT/bin/magikos-remove-ai-chatgpt" >/dev/null
 
 [[ ! -e $HOME/.config/Codex ]] || fail "ChatGPT removal deletes the desktop app's config"
 pass "ChatGPT removal deletes the desktop app's config"
@@ -44,7 +44,7 @@ fresh_home
 mkdir -p "$tmp_dir/relocated-models/models"
 printf '%s' "$tmp_dir/relocated-models" >"$HOME/.lmstudio-home-pointer"
 mkdir -p "$HOME/.config/LM Studio"
-"$ROOT/bin/omarchy-remove-ai-lm-studio" >/dev/null
+"$ROOT/bin/magikos-remove-ai-lm-studio" >/dev/null
 
 [[ ! -e $tmp_dir/relocated-models ]] || fail "LM Studio removal follows a relocated home pointer"
 pass "LM Studio removal follows a relocated home pointer"
@@ -56,7 +56,7 @@ pass "LM Studio removal deletes its config"
 fresh_home
 printf '%s' "$HOME" >"$HOME/.lmstudio-home-pointer"
 mkdir -p "$HOME/Documents"
-"$ROOT/bin/omarchy-remove-ai-lm-studio" >/dev/null
+"$ROOT/bin/magikos-remove-ai-lm-studio" >/dev/null
 
 [[ -d $HOME/Documents ]] || fail "LM Studio removal refuses a pointer aimed at the home directory"
 pass "LM Studio removal refuses a pointer aimed at the home directory"
@@ -65,7 +65,7 @@ pass "LM Studio removal refuses a pointer aimed at the home directory"
 fresh_home
 mkdir -p "$HOME/.config/t3code" "$HOME/.t3" "$HOME/.grok" "$HOME/.local/share/opencode" "$HOME/.npm"
 touch "$HOME/.claude.json"
-"$ROOT/bin/omarchy-remove-ai-t3-code" >/dev/null
+"$ROOT/bin/magikos-remove-ai-t3-code" >/dev/null
 
 [[ ! -e $HOME/.t3 ]] || fail "T3 Code removal deletes its own data"
 pass "T3 Code removal deletes its own data"
@@ -75,10 +75,10 @@ for kept in .grok .claude.json .npm .local/share/opencode; do
 done
 pass "T3 Code removal keeps the agent state it bootstrapped"
 
-# ~/.grok belongs to the Grok CLI that omarchy-default-agent installs.
+# ~/.grok belongs to the Grok CLI that magikos-default-agent installs.
 fresh_home
 mkdir -p "$HOME/.config/Grok Bot" "$HOME/.grokbot" "$HOME/.grok"
-"$ROOT/bin/omarchy-remove-ai-grok-bot" >/dev/null
+"$ROOT/bin/magikos-remove-ai-grok-bot" >/dev/null
 
 [[ ! -e $HOME/.grokbot ]] || fail "Grok Bot removal deletes its own data"
 pass "Grok Bot removal deletes its own data"
@@ -88,8 +88,8 @@ pass "Grok Bot removal keeps the Grok CLI's state"
 
 # Every acceleration variant depends on the base package, so package presence is
 # the test the remover can actually act on; the command alone is also provided by
-# builds omarchy-pkg-drop will not touch.
-ollama_row=$(grep '^  "remove.ai.ollama":' "$ROOT/default/omarchy/omarchy-menu.jsonc")
-[[ $ollama_row == *'"when":"omarchy-pkg-present ollama"'* ]] ||
+# builds magikos-pkg-drop will not touch.
+ollama_row=$(grep '^  "remove.ai.ollama":' "$ROOT/default/magikos/magikos-menu.jsonc")
+[[ $ollama_row == *'"when":"magikos-pkg-present ollama"'* ]] ||
   fail "Ollama removal is offered only where the package is installed" "$ollama_row"
 pass "Ollama removal is offered only where the package is installed"

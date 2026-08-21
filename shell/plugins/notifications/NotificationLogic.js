@@ -33,13 +33,13 @@ function summaryStartsWithGlyph(summary) {
 
 function shouldBypassDnd(notification, criticalUrgency) {
   var appName = String((notification && notification.appName) || "")
-  if (appName === "omarchy-action") return true
+  if (appName === "magikos-action") return true
   return appName === "notify-send" && notification && notification.urgency === criticalUrgency
 }
 
 function isEphemeralApp(appName) {
   var name = String(appName || "")
-  return name === "notify-send" || name === "omarchy-action"
+  return name === "notify-send" || name === "magikos-action"
 }
 
 function stringHint(hints, name) {
@@ -54,17 +54,17 @@ function stringHint(hints, name) {
 }
 
 function glyphFromHints(hints) {
-  return stringHint(hints, "omarchy-glyph")
+  return stringHint(hints, "magikos-glyph")
 }
 
 // Shell command to run when the card is clicked, sent by
-// omarchy-notification-send --exec. Carrying the action as data means it
+// magikos-notification-send --exec. Carrying the action as data means it
 // travels with the popup through the persistence files, so a toast restored
 // after a shell restart clicks through exactly like a live one. A libnotify
 // action can't: its sender is still waiting on an id from a server generation
 // that no longer exists.
 function execFromHints(hints) {
-  return stringHint(hints, "omarchy-exec")
+  return stringHint(hints, "magikos-exec")
 }
 
 function shouldRenderCompactGlyph(glyph, iconSource, singleLineToast) {
@@ -166,8 +166,8 @@ function parseSettings(raw) {
 // ---------------------------------------------------- popup persistence
 //
 // Each on-screen popup is mirrored to its own file under
-// ~/.local/state/omarchy/notifications/ so toasts survive shell restarts
-// (e.g. the restart `omarchy-update` performs). The file exists exactly as
+// ~/.local/state/magikos/notifications/ so toasts survive shell restarts
+// (e.g. the restart `magikos-update` performs). The file exists exactly as
 // long as the popup is on screen: it is written when the toast appears and
 // moved into the history/ subdirectory when the toast expires, is dismissed,
 // or its action is invoked. History is those moved files, newest last-10.
@@ -192,7 +192,7 @@ function popupFileName(entry) {
 // ---------------------------------------------------- persisted images
 //
 // A notification's images only exist while it is live: Chromium-family
-// senders (all Omarchy web apps) delete their scoped /tmp files on close,
+// senders (all Magikos web apps) delete their scoped /tmp files on close,
 // and image-data hints surface as in-process image:// URLs that die with
 // the server object. Persisted entries therefore reference their own
 // copies, named by the entry's file stem so cleanup can find them from

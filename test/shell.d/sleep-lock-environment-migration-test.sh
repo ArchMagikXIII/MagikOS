@@ -32,22 +32,22 @@ case "$*" in
     fi
     printf '%s\n' "${GRAPHICAL_STATE:-inactive}"
     ;;
-  '--user show --property=ActiveState --value omarchy-sleep-lock.service')
+  '--user show --property=ActiveState --value magikos-sleep-lock.service')
     printf '%s\n' "${SLEEP_LOCK_STATE:-inactive}"
     ;;
-  '--user restart omarchy-sleep-lock.service')
+  '--user restart magikos-sleep-lock.service')
     if [[ ${FAIL_SYSTEMCTL_ACTION:-} == "restart" ]]; then
       echo "restart failed" >&2
       exit 1
     fi
     ;;
-  '--user stop omarchy-sleep-lock.service')
+  '--user stop magikos-sleep-lock.service')
     if [[ ${FAIL_SYSTEMCTL_ACTION:-} == "stop" ]]; then
       echo "stop failed" >&2
       exit 1
     fi
     ;;
-  '--user reset-failed omarchy-sleep-lock.service') ;;
+  '--user reset-failed magikos-sleep-lock.service') ;;
   *) exit 1 ;;
 esac
 STUB
@@ -68,30 +68,30 @@ run_migration() {
 active_home="$test_tmp/active-home"
 active_calls="$test_tmp/active-calls"
 mkdir -p "$active_home/.config/systemd/user"
-printf '%s\n' '[Service]' 'ExecStart=/usr/bin/omarchy-system-sleep-monitor' \
-  >"$active_home/.config/systemd/user/omarchy-sleep-lock.service"
+printf '%s\n' '[Service]' 'ExecStart=/usr/bin/magikos-system-sleep-monitor' \
+  >"$active_home/.config/systemd/user/magikos-sleep-lock.service"
 
 run_migration "$active_home" "$active_calls" \
   env GRAPHICAL_STATE=active SLEEP_LOCK_STATE=active >/dev/null
 
-dropin="$active_home/.config/systemd/user/omarchy-sleep-lock.service.d/90-omarchy-session-environment.conf"
+dropin="$active_home/.config/systemd/user/magikos-sleep-lock.service.d/90-magikos-session-environment.conf"
 grep -Fx 'After=dbus.socket wayland-session-waitenv.service' "$dropin" >/dev/null ||
   fail "sleep lock migration orders a retained unit after the session environment import"
 grep -Fx 'PartOf=graphical-session.target' "$dropin" >/dev/null ||
   fail "sleep lock migration ties a retained unit to the graphical session lifecycle"
-grep -Fx 'ConditionEnvironment=OMARCHY_PATH' "$dropin" >/dev/null ||
-  fail "sleep lock migration gates a retained unit on the Omarchy path"
+grep -Fx 'ConditionEnvironment=MAGIKOS_PATH' "$dropin" >/dev/null ||
+  fail "sleep lock migration gates a retained unit on the Magikos path"
 grep -Fx 'ConditionEnvironment=WAYLAND_DISPLAY' "$dropin" >/dev/null ||
   fail "sleep lock migration gates a retained unit on the Wayland display"
 pass "sleep lock migration repairs retained full-unit overrides with a drop-in"
 
 grep -Fx -- '--user daemon-reload' "$active_calls" >/dev/null ||
   fail "sleep lock migration reloads the live user manager"
-grep -Fx -- '--user reset-failed omarchy-sleep-lock.service' "$active_calls" >/dev/null ||
+grep -Fx -- '--user reset-failed magikos-sleep-lock.service' "$active_calls" >/dev/null ||
   fail "sleep lock migration cannot recover a start-limited monitor"
-grep -Fx -- '--user restart omarchy-sleep-lock.service' "$active_calls" >/dev/null ||
+grep -Fx -- '--user restart magikos-sleep-lock.service' "$active_calls" >/dev/null ||
   fail "sleep lock migration leaves an active monitor with its inherited environment"
-grep -Fx -- '--user stop omarchy-sleep-lock.service' "$active_calls" >/dev/null &&
+grep -Fx -- '--user stop magikos-sleep-lock.service' "$active_calls" >/dev/null &&
   fail "sleep lock migration stops the monitor inside an active graphical session"
 pass "sleep lock migration replaces the monitor inside an active graphical session"
 
@@ -102,9 +102,9 @@ mkdir -p "$inactive_home"
 run_migration "$inactive_home" "$inactive_calls" \
   env GRAPHICAL_STATE=inactive >/dev/null
 
-grep -Fx -- '--user stop omarchy-sleep-lock.service' "$inactive_calls" >/dev/null ||
+grep -Fx -- '--user stop magikos-sleep-lock.service' "$inactive_calls" >/dev/null ||
   fail "sleep lock migration leaves a stale monitor running after logout"
-grep -Fx -- '--user restart omarchy-sleep-lock.service' "$inactive_calls" >/dev/null &&
+grep -Fx -- '--user restart magikos-sleep-lock.service' "$inactive_calls" >/dev/null &&
   fail "sleep lock migration starts the monitor outside a graphical session"
 pass "sleep lock migration stops a monitor left behind after logout"
 
@@ -114,7 +114,7 @@ if run_migration "$test_tmp/failed-home" "$failed_calls" \
   >"$test_tmp/failed-output" 2>&1; then
   fail "sleep lock migration marks a failed active-session repair complete"
 fi
-grep -F 'will be retried by omarchy-migrate' "$test_tmp/failed-output" >/dev/null ||
+grep -F 'will be retried by magikos-migrate' "$test_tmp/failed-output" >/dev/null ||
   fail "sleep lock migration does not explain that a failed repair remains pending"
 pass "sleep lock migration keeps an active-session repair failure retryable"
 
@@ -133,7 +133,7 @@ if run_migration "$test_tmp/stop-failed-home" "$stop_failed_calls" \
   >"$test_tmp/stop-failed-output" 2>&1; then
   fail "sleep lock migration ignores a stale monitor that could not be stopped"
 fi
-grep -F 'Could not stop stale omarchy-sleep-lock.service' "$test_tmp/stop-failed-output" >/dev/null ||
+grep -F 'Could not stop stale magikos-sleep-lock.service' "$test_tmp/stop-failed-output" >/dev/null ||
   fail "sleep lock migration does not report a stale monitor stop failure"
 pass "sleep lock migration keeps a stale-monitor stop failure retryable"
 
@@ -149,12 +149,12 @@ pass "sleep lock migration keeps an indeterminate session repair retryable"
 deferred_home="$test_tmp/deferred-home"
 deferred_calls="$test_tmp/deferred-calls"
 mkdir -p "$deferred_home/.config/systemd/user"
-touch "$deferred_home/.config/systemd/user/omarchy-sleep-lock.service"
+touch "$deferred_home/.config/systemd/user/magikos-sleep-lock.service"
 
 run_migration "$deferred_home" "$deferred_calls" \
   env MANAGER_AVAILABLE=false >/dev/null
 
-[[ -f $deferred_home/.config/systemd/user/omarchy-sleep-lock.service.d/90-omarchy-session-environment.conf ]] ||
+[[ -f $deferred_home/.config/systemd/user/magikos-sleep-lock.service.d/90-magikos-session-environment.conf ]] ||
   fail "sleep lock migration does not persist the repair without a live user manager"
 deferred_call_count=$(wc -l <"$deferred_calls")
 (( deferred_call_count == 1 )) ||

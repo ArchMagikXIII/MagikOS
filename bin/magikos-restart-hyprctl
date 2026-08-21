@@ -1,0 +1,5 @@
+#!/bin/bash
+
+# magikos:summary=Reload hyprland configuration (used by the Magikos theme switching).
+
+hyprctl reload >/dev/null

@@ -5,7 +5,7 @@ set -euo pipefail
 source "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/base-test.sh"
 
 migration="$ROOT/migrations/1786605598.sh"
-packaged_hooks="$ROOT/etc/mkinitcpio.conf.d/omarchy_hooks.conf"
+packaged_hooks="$ROOT/etc/mkinitcpio.conf.d/magikos_hooks.conf"
 
 test_tmp=$(mktemp -d)
 trap 'rm -rf "$test_tmp"' EXIT
@@ -15,7 +15,7 @@ calls="$test_tmp/calls.log"
 mkdir -p "$stub_bin"
 : >"$calls"
 
-cat >"$stub_bin/omarchy-cmd-present" <<'SH'
+cat >"$stub_bin/magikos-cmd-present" <<'SH'
 #!/bin/bash
 
 (( ${LIMINE_MKINITCPIO_INSTALLED:-1} == 1 ))
@@ -38,7 +38,7 @@ SH
 
 chmod +x "$stub_bin"/*
 
-hooks_conf="$test_tmp/omarchy_hooks.conf"
+hooks_conf="$test_tmp/magikos_hooks.conf"
 nvidia_conf="$test_tmp/nvidia.conf"
 rebuild_marker="$test_tmp/rebuild-complete"
 
@@ -65,10 +65,10 @@ write_pci_devices() {
 run_migration() {
   PATH="$stub_bin:$PATH" \
     TEST_LOG="$calls" \
-    OMARCHY_MKINITCPIO_HOOKS_CONF="$hooks_conf" \
-    OMARCHY_MKINITCPIO_NVIDIA_CONF="$nvidia_conf" \
-    OMARCHY_KMS_REBUILD_MARKER="$rebuild_marker" \
-    OMARCHY_PCI_DEVICES_PATH="$test_tmp/devices" \
+    MAGIKOS_MKINITCPIO_HOOKS_CONF="$hooks_conf" \
+    MAGIKOS_MKINITCPIO_NVIDIA_CONF="$nvidia_conf" \
+    MAGIKOS_KMS_REBUILD_MARKER="$rebuild_marker" \
+    MAGIKOS_PCI_DEVICES_PATH="$test_tmp/devices" \
     bash -euo pipefail "$migration" >/dev/null
 }
 

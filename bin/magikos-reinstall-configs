@@ -1,0 +1,28 @@
+#!/bin/bash
+
+# magikos:summary=Reset Magikos user configs and shipped defaults in $HOME (destructive)
+
+set -euo pipefail
+
+if (( EUID == 0 )); then
+  echo "Error: This script should not be run as root"
+  exit 1
+fi
+
+echo "Resetting Magikos user configs to shipped defaults..."
+
+# /etc/skel is the same tree useradd -m copies to seed a fresh user's $HOME.
+# Replaying it over an existing user resyncs every package-shipped user
+# default in one pass: .bashrc, .config/**, .local/share/applications,
+# nautilus-python extensions, branding, hypr toggles, and migration markers.
+# Trailing dot copies dotfiles; the shell wouldn't glob them with /etc/skel/*.
+cp -af /etc/skel/. ~/
+
+magikos-refresh-limine
+magikos-refresh-plymouth
+
+if magikos-cmd-present magikos-nvim-refresh; then
+  magikos-nvim-refresh
+elif magikos-cmd-present magikos-nvim-setup; then
+  magikos-nvim-setup --force
+fi

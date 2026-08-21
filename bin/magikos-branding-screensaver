@@ -1,0 +1,28 @@
+#!/bin/bash
+
+# magikos:summary=Edit, set, or reset screensaver branding
+# magikos:group=branding
+# magikos:name=screensaver
+# magikos:args=<image|text|reset>
+# magikos:examples=magikos branding screensaver image | magikos branding screensaver text | magikos branding screensaver reset
+
+set -euo pipefail
+
+case "${1:-}" in
+image)
+  image=$(magikos-file-select --title "Pick PNG or SVG for screensaver" --extensions "png svg")
+  if magikos-transcode-ascii "$image" ~/.config/magikos/branding/screensaver.txt; then
+    magikos-launch-screensaver force >/dev/null 2>&1
+  fi
+  ;;
+text)
+  magikos-launch-editor ~/.config/magikos/branding/screensaver.txt >/dev/null 2>&1 && magikos-launch-screensaver force >/dev/null 2>&1
+  ;;
+reset)
+  cp "$MAGIKOS_PATH/logo.txt" ~/.config/magikos/branding/screensaver.txt && magikos-launch-screensaver force >/dev/null 2>&1
+  ;;
+*)
+  echo "Usage: magikos-branding-screensaver <image|text|reset>" >&2
+  exit 1
+  ;;
+esac

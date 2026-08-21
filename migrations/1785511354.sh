@@ -1,3 +1,3 @@
 echo "Install qrencode for Wi-Fi QR sharing"
 
-omarchy-pkg-add qrencode
+magikos-pkg-add qrencode

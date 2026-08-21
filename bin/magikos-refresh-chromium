@@ -1,0 +1,25 @@
+#!/bin/bash
+
+# magikos:summary=Refresh the ~/.config/chromium-flags.conf file from the Magikos defaults.
+
+CONFIG_FILE="$HOME/.config/chromium-flags.conf"
+INSTALL_GOOGLE_ACCOUNTS=false
+
+# Check if google accounts were installed
+if [[ -f $CONFIG_FILE ]] && \
+  grep -q -- "--oauth2-client-id" "$CONFIG_FILE" && \
+  grep -q -- "--oauth2-client-secret" "$CONFIG_FILE"; then
+  INSTALL_GOOGLE_ACCOUNTS=true
+fi
+
+# Refresh the Chromium configuration
+magikos-refresh-config chromium-flags.conf
+
+# Install/refresh the native messaging hosts used by the bundled extensions
+magikos-install-chromium-copy-url
+magikos-install-chromium-ytdlp
+
+# Re-install Google accounts if previously configured
+if [[ $INSTALL_GOOGLE_ACCOUNTS == "true" ]]; then
+  magikos-install-chromium-google-account
+fi

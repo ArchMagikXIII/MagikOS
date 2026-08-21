@@ -1,0 +1,5 @@
+#!/bin/bash
+
+# magikos:summary=Detect ASUS ExpertBook B9406 series laptops on Intel Panther Lake.
+
+magikos-hw-match "B9406" && magikos-hw-intel-ptl

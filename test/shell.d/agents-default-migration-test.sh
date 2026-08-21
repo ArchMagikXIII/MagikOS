@@ -12,7 +12,7 @@ trap 'rm -rf "$test_dir"' EXIT
 
 mkdir -p "$test_dir/bin"
 
-cat >"$test_dir/bin/omarchy-restart-shell" <<'STUB'
+cat >"$test_dir/bin/magikos-restart-shell" <<'STUB'
 #!/bin/bash
 
 echo restart >>"$SHELL_RESTARTS"
@@ -23,7 +23,7 @@ chmod +x "$test_dir/bin/"*
 export SHELL_RESTARTS="$test_dir/shell-restarts"
 
 home="$test_dir/home"
-config="$home/.config/omarchy/shell.json"
+config="$home/.config/magikos/shell.json"
 
 run_migration() {
   : >"$SHELL_RESTARTS"
@@ -34,11 +34,11 @@ run_migration() {
 # this migration has on disk.
 write_config() {
   rm -rf "$home"
-  mkdir -p "$home/.config/omarchy"
-  jq "${1:-.}" "$ROOT/config/omarchy/shell.json" >"$config"
+  mkdir -p "$home/.config/magikos"
+  jq "${1:-.}" "$ROOT/config/magikos/shell.json" >"$config"
 }
 
-without_widget='del(.bar.layout[][] | select((if type == "object" then .id else . end) == "omarchy.agents"))'
+without_widget='del(.bar.layout[][] | select((if type == "object" then .id else . end) == "magikos.agents"))'
 
 ids() {
   jq -c --arg section "$1" '[.bar.layout[$section][]? | if type == "object" then .id else . end]' "$config"
@@ -46,7 +46,7 @@ ids() {
 
 # ------------------------------------------------------------------ shipped default
 
-jq -e '[.bar.layout.right[].id] | index("omarchy.agents")' "$ROOT/config/omarchy/shell.json" >/dev/null ||
+jq -e '[.bar.layout.right[].id] | index("magikos.agents")' "$ROOT/config/magikos/shell.json" >/dev/null ||
   fail "shipped config puts the agents widget in the bar"
 pass "shipped config puts the agents widget in the bar"
 
@@ -55,12 +55,12 @@ pass "shipped config puts the agents widget in the bar"
 write_config "$without_widget"
 run_migration
 
-[[ $(ids right) == '["omarchy.tray","omarchy.agents","omarchy.bluetooth","omarchy.network","omarchy.audio","omarchy.monitor","omarchy.power"]' ]] ||
+[[ $(ids right) == '["magikos.tray","magikos.agents","magikos.bluetooth","magikos.network","magikos.audio","magikos.monitor","magikos.power"]' ]] ||
   fail "migration inserts the agents widget after the tray" "$(ids right)"
 pass "migration inserts the agents widget after the tray"
 
-(($(wc -l <"$SHELL_RESTARTS") == 0)) || fail "migration leaves the shell restart to omarchy update"
-pass "migration leaves the shell restart to omarchy update"
+(($(wc -l <"$SHELL_RESTARTS") == 0)) || fail "migration leaves the shell restart to magikos update"
+pass "migration leaves the shell restart to magikos update"
 
 before=$(sha256sum "$config")
 run_migration
@@ -71,26 +71,26 @@ pass "migration is idempotent"
 
 # A user who already placed the widget keeps it exactly where they put it, in
 # whichever section, and never gets a second copy.
-write_config "$without_widget | .bar.layout.center += [{ id: \"omarchy.agents\" }]"
+write_config "$without_widget | .bar.layout.center += [{ id: \"magikos.agents\" }]"
 run_migration
 
-[[ $(ids center) == *'"omarchy.agents"'* ]] || fail "migration leaves a user-placed widget alone" "$(ids center)"
-[[ $(ids right) != *'"omarchy.agents"'* ]] || fail "migration does not add a second copy" "$(ids right)"
+[[ $(ids center) == *'"magikos.agents"'* ]] || fail "migration leaves a user-placed widget alone" "$(ids center)"
+[[ $(ids right) != *'"magikos.agents"'* ]] || fail "migration does not add a second copy" "$(ids right)"
 pass "migration respects a widget the user already placed"
 
 # Layouts written before entries grew options are bare id strings.
-write_config "$without_widget | .bar.layout.right = [\"omarchy.tray\", \"omarchy.agents\", \"omarchy.power\"]"
+write_config "$without_widget | .bar.layout.right = [\"magikos.tray\", \"magikos.agents\", \"magikos.power\"]"
 run_migration
 
-[[ $(ids right) == '["omarchy.tray","omarchy.agents","omarchy.power"]' ]] ||
+[[ $(ids right) == '["magikos.tray","magikos.agents","magikos.power"]' ]] ||
   fail "migration reads string-form entries" "$(ids right)"
 pass "migration reads string-form entries"
 
 # A tray dropped from the right section must not strand the widget or drop it.
-write_config "$without_widget | del(.bar.layout.right[] | select(.id == \"omarchy.tray\"))"
+write_config "$without_widget | del(.bar.layout.right[] | select(.id == \"magikos.tray\"))"
 run_migration
 
-[[ $(ids right) == '["omarchy.agents",'* ]] || fail "migration places the widget without a tray" "$(ids right)"
+[[ $(ids right) == '["magikos.agents",'* ]] || fail "migration places the widget without a tray" "$(ids right)"
 pass "migration places the widget without a tray"
 
 # ------------------------------------------------------------------ everything else
@@ -105,7 +105,7 @@ pass "migration touches nothing but the right section"
 
 # A config the migration cannot parse is left alone rather than truncated.
 rm -rf "$home"
-mkdir -p "$home/.config/omarchy"
+mkdir -p "$home/.config/magikos"
 printf '{ not json' >"$config"
 run_migration
 

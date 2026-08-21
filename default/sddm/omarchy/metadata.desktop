@@ -1,7 +1,7 @@
 [SddmGreeterTheme]
-Name=Omarchy
+Name=Magikos
 Description=Minimal terminal-style login theme matching the Limine bootloader aesthetic
-Author=Omarchy
+Author=Magikos
 Type=sddm-theme
 Version=1.0
 QtVersion=6

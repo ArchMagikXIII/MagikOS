@@ -1,0 +1,12 @@
+#!/bin/bash
+
+# magikos:summary=Refresh the shell update status
+# magikos:hidden=true
+
+set -e
+
+if magikos-update-available >/dev/null; then
+  magikos-shell -q magikos.system-update refresh
+else
+  magikos-shell -q magikos.system-update clear
+fi

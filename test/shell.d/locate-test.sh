@@ -34,20 +34,20 @@ assert_conf_parses() {
 conf="$test_tmp/updatedb.conf"
 stock_conf "$conf"
 
-OMARCHY_UPDATEDB_CONF_PATH="$conf" bash -euo pipefail "$config_script" >/dev/null
+MAGIKOS_UPDATEDB_CONF_PATH="$conf" bash -euo pipefail "$config_script" >/dev/null
 
 grep -qFx 'PRUNE_BIND_MOUNTS = "no"' "$conf" || fail "locate config indexes Btrfs subvolume mounts like /home"
 grep -qF 'PRUNEPATHS = "/.snapshots /afs' "$conf" || fail "locate config prunes /.snapshots"
 assert_conf_parses "$conf"
 pass "locate config skips Btrfs snapshots and indexes Btrfs subvolumes"
 
-OMARCHY_UPDATEDB_CONF_PATH="$conf" bash -euo pipefail "$config_script" >/dev/null
+MAGIKOS_UPDATEDB_CONF_PATH="$conf" bash -euo pipefail "$config_script" >/dev/null
 
 [[ $(grep -o '/\.snapshots' "$conf" | wc -l) -eq 1 ]] || fail "locate config is idempotent"
 assert_conf_parses "$conf"
 pass "locate config leaves an already-configured file alone"
 
-OMARCHY_UPDATEDB_CONF_PATH="$test_tmp/missing.conf" bash -euo pipefail "$config_script" >/dev/null
+MAGIKOS_UPDATEDB_CONF_PATH="$test_tmp/missing.conf" bash -euo pipefail "$config_script" >/dev/null
 pass "locate config tolerates a missing updatedb.conf"
 
 # A hand-edited updatedb.conf may drop the settings entirely, or write them
@@ -55,7 +55,7 @@ pass "locate config tolerates a missing updatedb.conf"
 conf="$test_tmp/sparse-updatedb.conf"
 printf '%s\n' 'PRUNENAMES = ".git .hg .svn"' >"$conf"
 
-OMARCHY_UPDATEDB_CONF_PATH="$conf" bash -euo pipefail "$config_script" >/dev/null
+MAGIKOS_UPDATEDB_CONF_PATH="$conf" bash -euo pipefail "$config_script" >/dev/null
 
 grep -qFx 'PRUNE_BIND_MOUNTS = "no"' "$conf" || fail "locate config adds a missing PRUNE_BIND_MOUNTS"
 grep -qFx 'PRUNEPATHS = "/.snapshots"' "$conf" || fail "locate config adds a missing PRUNEPATHS"
@@ -65,7 +65,7 @@ pass "locate config adds settings a hand-edited updatedb.conf is missing"
 conf="$test_tmp/unspaced-updatedb.conf"
 printf '%s\n' 'PRUNE_BIND_MOUNTS="yes"' 'PRUNEPATHS="/tmp /var/tmp"' >"$conf"
 
-OMARCHY_UPDATEDB_CONF_PATH="$conf" bash -euo pipefail "$config_script" >/dev/null
+MAGIKOS_UPDATEDB_CONF_PATH="$conf" bash -euo pipefail "$config_script" >/dev/null
 
 grep -qFx 'PRUNE_BIND_MOUNTS = "no"' "$conf" || fail "locate config rewrites an unspaced PRUNE_BIND_MOUNTS"
 grep -qFx 'PRUNEPATHS = "/.snapshots /tmp /var/tmp"' "$conf" || fail "locate config prunes /.snapshots in an unspaced PRUNEPATHS"
@@ -79,7 +79,7 @@ conf="$test_tmp/commented-updatedb.conf"
 printf '%s\n' '  PRUNE_BIND_MOUNTS = "yes" # subvolumes look like bind mounts' \
   'PRUNEPATHS = "/tmp" # scratch' >"$conf"
 
-OMARCHY_UPDATEDB_CONF_PATH="$conf" bash -euo pipefail "$config_script" >/dev/null
+MAGIKOS_UPDATEDB_CONF_PATH="$conf" bash -euo pipefail "$config_script" >/dev/null
 
 grep -qFx 'PRUNE_BIND_MOUNTS = "no"' "$conf" || fail "locate config rewrites an indented PRUNE_BIND_MOUNTS"
 grep -qFx 'PRUNEPATHS = "/.snapshots /tmp"' "$conf" || fail "locate config keeps the paths a commented PRUNEPATHS already prunes"
@@ -92,7 +92,7 @@ pass "locate config handles indented settings and trailing comments"
 conf="$test_tmp/unquoted-updatedb.conf"
 printf '%s\n' 'PRUNEPATHS = /tmp' >"$conf"
 
-OMARCHY_UPDATEDB_CONF_PATH="$conf" bash -euo pipefail "$config_script" >/dev/null
+MAGIKOS_UPDATEDB_CONF_PATH="$conf" bash -euo pipefail "$config_script" >/dev/null
 
 grep -qFx 'PRUNEPATHS = "/.snapshots"' "$conf" || fail "locate config repairs an unquoted PRUNEPATHS"
 [[ $(grep -c 'PRUNEPATHS' "$conf") -eq 1 ]] || fail "locate config replaces an unquoted PRUNEPATHS instead of adding a second one"
@@ -103,7 +103,7 @@ pass "locate config handles updatedb.conf written without quotes"
 conf="$test_tmp/nested-snapshots-updatedb.conf"
 printf '%s\n' 'PRUNEPATHS = "/var/lib/machines/.snapshots"' >"$conf"
 
-OMARCHY_UPDATEDB_CONF_PATH="$conf" bash -euo pipefail "$config_script" >/dev/null
+MAGIKOS_UPDATEDB_CONF_PATH="$conf" bash -euo pipefail "$config_script" >/dev/null
 
 grep -qFx 'PRUNEPATHS = "/.snapshots /var/lib/machines/.snapshots"' "$conf" || fail "locate config prunes /.snapshots alongside a path that ends in it"
 assert_conf_parses "$conf"
@@ -132,8 +132,8 @@ stock_conf "$conf"
 
 TEST_LOG="$test_tmp/calls.log" \
 PATH="$fake_bin:$PATH" \
-OMARCHY_PATH="$ROOT" \
-OMARCHY_UPDATEDB_CONF_PATH="$conf" \
+MAGIKOS_PATH="$ROOT" \
+MAGIKOS_UPDATEDB_CONF_PATH="$conf" \
   bash -euo pipefail "$locate_migration" >/dev/null
 
 grep -qFx 'PRUNE_BIND_MOUNTS = "no"' "$conf" || fail "locate migration rewrites updatedb.conf"
@@ -145,23 +145,23 @@ pass "locate migration fixes existing installs and rebuilds the index"
 
 TEST_LOG="$test_tmp/calls.log" \
 PATH="$fake_bin:$PATH" \
-OMARCHY_PATH="$ROOT" \
-OMARCHY_UPDATEDB_CONF_PATH="$conf" \
+MAGIKOS_PATH="$ROOT" \
+MAGIKOS_UPDATEDB_CONF_PATH="$conf" \
   bash -euo pipefail "$locate_migration" >/dev/null
 
 [[ ! -s $test_tmp/calls.log ]] || fail "locate migration skips already-configured installs"
 pass "locate migration is a no-op once updatedb.conf is configured"
 
 # A dev checkout carries migrations from a release whose install scripts the
-# checked-out tree may not have yet, and omarchy-migrate runs under set -e.
+# checked-out tree may not have yet, and magikos-migrate runs under set -e.
 : >"$test_tmp/calls.log"
 conf="$test_tmp/no-config-script-updatedb.conf"
 stock_conf "$conf"
 
 TEST_LOG="$test_tmp/calls.log" \
 PATH="$fake_bin:$PATH" \
-OMARCHY_PATH="$test_tmp/empty" \
-OMARCHY_UPDATEDB_CONF_PATH="$conf" \
+MAGIKOS_PATH="$test_tmp/empty" \
+MAGIKOS_UPDATEDB_CONF_PATH="$conf" \
   bash -euo pipefail "$locate_migration" >/dev/null ||
   fail "locate migration survives a tree without the locate config script"
 

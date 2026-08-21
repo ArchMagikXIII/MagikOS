@@ -13,29 +13,29 @@ verify_core_packages() {
   while IFS= read -r package; do
     [[ -z $package || $package == \#* ]] && continue
     pacman -Q "$package" >/dev/null 2>&1 || missing+=("$package")
-  done <"$OMARCHY_PATH/install/omarchy-base.packages"
+  done <"$MAGIKOS_PATH/install/magikos-base.packages"
 
-  (( ${#missing[@]} == 0 )) || fail "all Omarchy core packages are installed" "missing packages: ${missing[*]}"
-  pass "all Omarchy core packages are installed (${#missing[@]} missing)"
+  (( ${#missing[@]} == 0 )) || fail "all Magikos core packages are installed" "missing packages: ${missing[*]}"
+  pass "all Magikos core packages are installed (${#missing[@]} missing)"
 }
 
 verify_defaults() {
-  [[ $(omarchy-default-browser) == "chromium" ]] || fail "Chromium is the default browser"
+  [[ $(magikos-default-browser) == "chromium" ]] || fail "Chromium is the default browser"
   pass "Chromium is the default browser"
 
-  [[ $(omarchy-default-terminal) == "foot" ]] || fail "Foot is the default terminal"
+  [[ $(magikos-default-terminal) == "foot" ]] || fail "Foot is the default terminal"
   pass "Foot is the default terminal"
 
-  [[ $(omarchy-default-editor) == "nvim" ]] || fail "Neovim is the default editor"
+  [[ $(magikos-default-editor) == "nvim" ]] || fail "Neovim is the default editor"
   pass "Neovim is the default editor"
 
-  [[ $(omarchy-theme-current) != "Unknown" ]] || fail "a current theme is configured"
+  [[ $(magikos-theme-current) != "Unknown" ]] || fail "a current theme is configured"
   pass "a current theme is configured"
 
-  [[ $(omarchy-theme-bg-current) != "Unknown" ]] || fail "a current background is configured"
+  [[ $(magikos-theme-bg-current) != "Unknown" ]] || fail "a current background is configured"
   pass "a current background is configured"
 
-  [[ -n $(omarchy-font-current) ]] || fail "a monospace font is configured"
+  [[ -n $(magikos-font-current) ]] || fail "a monospace font is configured"
   pass "a monospace font is configured"
 
   [[ $(xdg-mime query default x-scheme-handler/http) == "chromium.desktop" ]] || fail "HTTP MIME handling uses Chromium"
@@ -88,11 +88,11 @@ verify_user_setup() {
   done
   pass "XDG user directories exist"
 
-  [[ -e $HOME/.local/state/omarchy/current/theme ]] || fail "current theme state exists"
-  [[ -e $HOME/.local/state/omarchy/current/background ]] || fail "current background state exists"
-  [[ -s $HOME/.config/omarchy/shell.json ]] || fail "shell configuration exists"
-  jq empty "$HOME/.config/omarchy/shell.json" || fail "shell configuration is valid JSON"
-  pass "Omarchy user state and shell configuration exist"
+  [[ -e $HOME/.local/state/magikos/current/theme ]] || fail "current theme state exists"
+  [[ -e $HOME/.local/state/magikos/current/background ]] || fail "current background state exists"
+  [[ -s $HOME/.config/magikos/shell.json ]] || fail "shell configuration exists"
+  jq empty "$HOME/.config/magikos/shell.json" || fail "shell configuration is valid JSON"
+  pass "Magikos user state and shell configuration exist"
 }
 
 for check in verify_core_packages verify_defaults verify_services verify_runtime_tools verify_user_setup; do

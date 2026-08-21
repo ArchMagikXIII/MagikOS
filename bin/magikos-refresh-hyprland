@@ -1,0 +1,14 @@
+#!/bin/bash
+
+# magikos:summary=Overwrite all the user Hyprland Lua configs in ~/.config/hypr with the Magikos defaults.
+
+magikos-refresh-config hypr/.luarc.json
+magikos-refresh-config hypr/autostart.lua
+magikos-refresh-config hypr/bindings.lua
+magikos-refresh-config hypr/input.lua
+magikos-refresh-config hypr/looknfeel.lua
+magikos-refresh-config hypr/hyprland.lua
+magikos-refresh-config hypr/monitors.lua
+
+mkdir -p ~/.local/state/magikos/toggles/hypr
+cp "$MAGIKOS_PATH/default/hypr/toggles/flags.lua" ~/.local/state/magikos/toggles/hypr/

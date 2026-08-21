@@ -17,37 +17,37 @@ trap cleanup EXIT
 
 TMPDIR=$(mktemp -d)
 test_home="$TMPDIR/home"
-flag="$test_home/.local/state/omarchy/toggles/example"
-bar_flag="$test_home/.local/state/omarchy/toggles/bar-off"
+flag="$test_home/.local/state/magikos/toggles/example"
+bar_flag="$test_home/.local/state/magikos/toggles/bar-off"
 
-HOME="$test_home" omarchy-toggle example on
+HOME="$test_home" magikos-toggle example on
 [[ -f $flag ]] || fail "generic toggle enables explicit on state"
 pass "generic toggle enables explicit on state"
 
-HOME="$test_home" omarchy-toggle example on
+HOME="$test_home" magikos-toggle example on
 [[ -f $flag ]] || fail "generic toggle on is idempotent"
 pass "generic toggle on is idempotent"
 
-HOME="$test_home" omarchy-toggle example off
+HOME="$test_home" magikos-toggle example off
 [[ ! -f $flag ]] || fail "generic toggle disables explicit off state"
 pass "generic toggle disables explicit off state"
 
-HOME="$test_home" omarchy-toggle example
+HOME="$test_home" magikos-toggle example
 [[ -f $flag ]] || fail "generic toggle flips disabled state on"
 pass "generic toggle flips disabled state on"
 
-HOME="$test_home" omarchy-toggle example toggle
+HOME="$test_home" magikos-toggle example toggle
 [[ ! -f $flag ]] || fail "generic toggle flips enabled state off"
 pass "generic toggle flips enabled state off"
 
-HOME="$test_home" omarchy-toggle-bar on
+HOME="$test_home" magikos-toggle-bar on
 [[ -f $bar_flag ]] || fail "bar on enables bar-off toggle"
 pass "bar on enables bar-off toggle"
 
-HOME="$test_home" omarchy-toggle-bar on
+HOME="$test_home" magikos-toggle-bar on
 [[ -f $bar_flag ]] || fail "bar on is idempotent"
 pass "bar on is idempotent"
 
-HOME="$test_home" omarchy-toggle-bar off
+HOME="$test_home" magikos-toggle-bar off
 [[ ! -f $bar_flag ]] || fail "bar off disables bar-off toggle"
 pass "bar off disables bar-off toggle"

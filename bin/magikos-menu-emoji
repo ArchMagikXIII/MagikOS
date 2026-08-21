@@ -1,0 +1,6 @@
+#!/bin/bash
+# magikos:summary=Launch emojis
+# magikos:group=menu
+# magikos:examples=magikos menu emoji
+
+magikos-shell shell toggle magikos.emojis

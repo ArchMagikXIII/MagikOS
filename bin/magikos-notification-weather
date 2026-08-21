@@ -1,0 +1,5 @@
+#!/bin/bash
+
+# magikos:summary=Toggle the current weather panel
+
+magikos-shell shell toggle magikos.weather

@@ -1,10 +1,10 @@
 {
   "schemaVersion": 1,
-  "id": "omarchy.dev-gallery",
+  "id": "magikos.dev-gallery",
   "name": "Dev gallery",
   "version": "1.0.0",
-  "author": "Omarchy",
-  "description": "Visual reference for omarchy-shell common UI components. Summon with: omarchy-shell shell summon omarchy.dev-gallery '{}' (or run: omarchy dev ui-preview).",
+  "author": "Magikos",
+  "description": "Visual reference for magikos-shell common UI components. Summon with: magikos-shell shell summon magikos.dev-gallery '{}' (or run: magikos dev ui-preview).",
   "kinds": [
     "panel"
   ],

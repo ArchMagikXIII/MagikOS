@@ -1,0 +1,5 @@
+#!/bin/bash
+
+# magikos:summary=Show the current battery status notification
+
+magikos-notification-send -g 󰁹 -u low "$(magikos-battery-status)"

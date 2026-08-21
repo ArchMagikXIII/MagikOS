@@ -5,7 +5,7 @@ set -euo pipefail
 source "$(dirname "$0")/base-test.sh"
 
 unset GUM_STATUS
-unset OMARCHY_UPDATE_FORCE
+unset MAGIKOS_UPDATE_FORCE
 unset TEST_AVAILABLE_BYTES
 unset TEST_DF_INVALID
 
@@ -24,13 +24,13 @@ run_update() {
   XDG_RUNTIME_DIR="$runtime_dir" \
   PATH="$stub_bin:$ROOT/bin:$PATH" \
   LC_ALL=C \
-  OMARCHY_UPDATE_LOGGED=1 \
+  MAGIKOS_UPDATE_LOGGED=1 \
   TEST_AVAILABLE_BYTES=${TEST_AVAILABLE_BYTES:-$((9 * 1024 * 1024 * 1024))} \
   TEST_DF_INVALID=${TEST_DF_INVALID:-0} \
   SNAPSHOT_MARKER="$snapshot_marker" \
   GUM_MARKER="$gum_marker" \
   GUM_STATUS=${GUM_STATUS:-1} \
-    "$ROOT/bin/omarchy-update" "$@"
+    "$ROOT/bin/magikos-update" "$@"
 }
 
 write_stub() {
@@ -58,36 +58,36 @@ if [[ ${1:-} == "confirm" ]]; then
 fi
 exit 0'
 
-write_stub omarchy-snapshot '
+write_stub magikos-snapshot '
 touch "$SNAPSHOT_MARKER"
 exit 0'
 
 for command in \
-  omarchy-cmd-present \
-  omarchy-toggle-idle \
+  magikos-cmd-present \
+  magikos-toggle-idle \
   pkexec \
   systemd-inhibit \
-  omarchy-update-dev \
-  omarchy-update-pkg-prune \
-  omarchy-update-keyring \
-  omarchy-update-system-pkgs \
-  omarchy-migrate \
-  omarchy-update-aur-pkgs \
-  omarchy-update-mise \
-  omarchy-update-orphan-pkgs \
-  omarchy-hook \
-  omarchy-update-analyze-logs \
-  omarchy-shell \
-  omarchy-update-restart; do
+  magikos-update-dev \
+  magikos-update-pkg-prune \
+  magikos-update-keyring \
+  magikos-update-system-pkgs \
+  magikos-migrate \
+  magikos-update-aur-pkgs \
+  magikos-update-mise \
+  magikos-update-orphan-pkgs \
+  magikos-hook \
+  magikos-update-analyze-logs \
+  magikos-shell \
+  magikos-update-restart; do
   write_stub "$command" 'exit 0'
 done
-write_stub omarchy-update-available 'exit 1'
+write_stub magikos-update-available 'exit 1'
 write_stub pkexec 'exec "$@"'
 
 set +e
 TEST_AVAILABLE_BYTES=$((9 * 1024 * 1024 * 1024)) \
   PATH="$stub_bin:$ROOT/bin:$PATH" \
-  "$ROOT/bin/omarchy-update-requires-free-space" >/dev/null
+  "$ROOT/bin/magikos-update-requires-free-space" >/dev/null
 status=$?
 set -e
 (( status == 1 )) || fail "free-space helper exits non-zero when disk space is low"
@@ -98,7 +98,7 @@ output=$(run_update -y)
 status=$?
 set -e
 (( status == 1 )) || fail "non-interactive update exits non-zero with low disk space"
-[[ $output == *"You need at least 10 GiB free to safely update Omarchy."* ]] || fail "low disk space emits a warning"
+[[ $output == *"You need at least 10 GiB free to safely update Magikos."* ]] || fail "low disk space emits a warning"
 [[ ! -f $gum_marker ]] || fail "non-interactive update does not prompt for low disk space"
 [[ ! -f $snapshot_marker ]] || fail "non-interactive update stops before snapshotting with low disk space"
 pass "non-interactive update stops with low disk space"
@@ -109,13 +109,13 @@ output=$(run_update)
 status=$?
 set -e
 (( status == 1 )) || fail "interactive update exits non-zero with low disk space"
-[[ $output == *"You need at least 10 GiB free to safely update Omarchy."* ]] || fail "interactive low-space update explains the requirement"
+[[ $output == *"You need at least 10 GiB free to safely update Magikos."* ]] || fail "interactive low-space update explains the requirement"
 [[ ! -f $gum_marker ]] || fail "interactive update stops before confirmation with low disk space"
 [[ ! -f $snapshot_marker ]] || fail "interactive update stops before snapshotting with low disk space"
 pass "interactive update stops before confirmation with low disk space"
 
 rm -f "$snapshot_marker" "$gum_marker"
-output=$(OMARCHY_UPDATE_FORCE=1 run_update -y)
+output=$(MAGIKOS_UPDATE_FORCE=1 run_update -y)
 [[ -z $output ]] || fail "forced update does not emit the free-space warning"
 [[ ! -f $gum_marker ]] || fail "forced non-interactive update does not prompt"
 [[ -f $snapshot_marker ]] || fail "forced update continues with low disk space"

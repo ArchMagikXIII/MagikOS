@@ -29,14 +29,14 @@ chmod +x "$stub_bin/pacman" "$stub_bin/sudo"
 # The migration removes the /etc copy only once the drop-in that replaces it is
 # installed. Point that at a fixture so the result does not depend on whether
 # the machine running the tests happens to carry the real one.
-dropin="$TMPDIR/90-omarchy.conf"
+dropin="$TMPDIR/90-magikos.conf"
 : >"$dropin"
 
-# omarchy-migrate runs each migration with `bash -euo pipefail` and stops the
+# magikos-migrate runs each migration with `bash -euo pipefail` and stops the
 # whole chain on a non-zero exit, so match that invocation exactly.
 run_migration() {
   local conf="$1"
-  PATH="$stub_bin:$PATH" OMARCHY_ZRAM_CONF="$conf" OMARCHY_ZRAM_DROPIN="$dropin" \
+  PATH="$stub_bin:$PATH" MAGIKOS_ZRAM_CONF="$conf" MAGIKOS_ZRAM_DROPIN="$dropin" \
     bash -euo pipefail "$migration" >/dev/null ||
     fail "migration exits clean for $(basename "$conf")"
 }
@@ -80,7 +80,7 @@ pass "migration keeps a locally edited config"
 # them.
 conf="$TMPDIR/owned.conf"
 printf '[zram0]\ncompression-algorithm = zstd\n' >"$conf"
-PATH="$stub_bin:$PATH" PACMAN_OWNS=1 OMARCHY_ZRAM_CONF="$conf" OMARCHY_ZRAM_DROPIN="$dropin" \
+PATH="$stub_bin:$PATH" PACMAN_OWNS=1 MAGIKOS_ZRAM_CONF="$conf" MAGIKOS_ZRAM_DROPIN="$dropin" \
   bash -euo pipefail "$migration" >/dev/null ||
   fail "migration exits clean for a package-owned config"
 [[ -f $conf ]] || fail "migration keeps a package-owned config"
@@ -97,7 +97,7 @@ pass "migration no-ops when the config is already gone"
 # migration has to leave it alone and stay clean doing it.
 conf="$TMPDIR/no-dropin.conf"
 printf '[zram0]\ncompression-algorithm = zstd\n' >"$conf"
-PATH="$stub_bin:$PATH" OMARCHY_ZRAM_CONF="$conf" OMARCHY_ZRAM_DROPIN="$TMPDIR/absent-dropin.conf" \
+PATH="$stub_bin:$PATH" MAGIKOS_ZRAM_CONF="$conf" MAGIKOS_ZRAM_DROPIN="$TMPDIR/absent-dropin.conf" \
   bash -euo pipefail "$migration" >/dev/null ||
   fail "migration exits clean when the drop-in is missing"
 [[ -f $conf ]] || fail "migration keeps the config when the drop-in is missing"

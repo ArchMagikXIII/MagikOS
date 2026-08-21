@@ -2,7 +2,7 @@
 
 ## Alternative Editors
 
-Omarchy ships with [Neovim](https://neovim.io/) by default, but if you'd like something a bit more mainstream and familiar, you can run the Omarchy Menu (`Super + Space`) and see the options under _Install > Editor_. We have VSCode, Cursor, Zed, Sublime Text, Helix, Vim, and Emacs listed there. If you don't find what you're looking for, checkout _Install > Package_, and see if it isn't in an Arch package (and if not, try _Install > AUR_ to check the AUR).
+Magikos ships with [Neovim](https://neovim.io/) by default, but if you'd like something a bit more mainstream and familiar, you can run the Magikos Menu (`Super + Space`) and see the options under _Install > Editor_. We have VSCode, Cursor, Zed, Sublime Text, Helix, Vim, and Emacs listed there. If you don't find what you're looking for, checkout _Install > Package_, and see if it isn't in an Arch package (and if not, try _Install > AUR_ to check the AUR).
 
 Theme matching is offered for `VSCode`, `Cursor`, `VSCodium`, and `Helix`.
 
@@ -10,7 +10,7 @@ You can set the system-wide default editor under `Setup > Defaults > Editor`.
 
 ## Environment
 
-Omarchy supports setting up a whole host of development environments through the _Install > Development_ section of the Omarchy Menu (`Super + Space`). You'll of course find _Ruby on Rails_, but also all three major runtimes for JavaScript (Node.js, Bun, Deno), as well as popular PHP frameworks like Laravel and Symfony. Oh, and there's Go, Rust, Python, Java, Elixir (with Phoenix), .NET, OCaml, Zig, Clojure, and Scala too. It's a very broad selection!
+Magikos supports setting up a whole host of development environments through the _Install > Development_ section of the Magikos Menu (`Super + Space`). You'll of course find _Ruby on Rails_, but also all three major runtimes for JavaScript (Node.js, Bun, Deno), as well as popular PHP frameworks like Laravel and Symfony. Oh, and there's Go, Rust, Python, Java, Elixir (with Phoenix), .NET, OCaml, Zig, Clojure, and Scala too. It's a very broad selection!
 
 The majority of these environments are managed by [Mise](https://mise.jdx.dev/). It's a tool that lets you install and run multiple versions of a programming language on the same machine. It's like rbenv or rvm for Ruby or virtualenv for Python, but it works for a bunch of different environments.
 
@@ -18,11 +18,11 @@ To install, say, Ruby, you'd run `mise use -g ruby`, which will both install Rub
 
 ## Docker
 
-[Docker](https://www.docker.com/) hardly needs any introduction. It allows you to run isolated containers, and Omarchy installs everything needed to run it well. This includes Docker itself, [Docker Compose](https://docs.docker.com/compose/), and the user group changes needed for you to run Docker as the normal user and not as root.
+[Docker](https://www.docker.com/) hardly needs any introduction. It allows you to run isolated containers, and Magikos installs everything needed to run it well. This includes Docker itself, [Docker Compose](https://docs.docker.com/compose/), and the user group changes needed for you to run Docker as the normal user and not as root.
 
 Remember to checkout the Lazydocker command to manage your containers in a cool TUI using `Super + Shift + D`.
 
-You can setup the common databases for local development in Docker using _Install > Development > Docker DB_ in the Omarchy menu.
+You can setup the common databases for local development in Docker using _Install > Development > Docker DB_ in the Magikos menu.
 
 ## GitHub CLI
 
