@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "id": "magikos.sway",
+  "name": "Sway IPC Service",
+  "version": "1.0.0",
+  "author": "Magikos",
+  "description": "Sway compositor IPC integration for workspace and output management",
+  "kinds": [
+    "service"
+  ],
+  "entryPoints": {
+    "service": "Service.qml"
+  }
+}
