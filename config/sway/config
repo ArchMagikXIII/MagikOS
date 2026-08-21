@@ -1,0 +1,12 @@
+# ==============================================================================
+# MagikOS Sway Configuration
+# ==============================================================================
+
+set $mod Mod4
+
+include ~/.config/sway/environment.conf
+include ~/.config/sway/input.conf
+include ~/.config/sway/output.conf
+include ~/.config/sway/bindings.conf
+include ~/.config/sway/appearance.conf
+include ~/.config/sway/autostart.conf

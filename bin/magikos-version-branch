@@ -1,18 +1,8 @@
 #!/bin/bash
-
-# magikos:summary=Print the active Magikos dev-link git branch
-# magikos:hidden=true
-
-magikos_path=${MAGIKOS_PATH:-/usr/share/magikos}
-magikos_path=${magikos_path%/}
-
-[[ $magikos_path != "/usr/share/magikos" ]] || exit 1
-
+# magikos-version-branch — show current git branch
+magikos_path="${MAGIKOS_PATH:-/usr/share/magikos}"
+magikos_path="${magikos_path%/}"
+[[ "$magikos_path" != "/usr/share/magikos" ]] || exit 1
 branch=$(git -C "$magikos_path" branch --show-current 2>/dev/null || true)
-if [[ -z $branch ]]; then
-  hash=$(git -C "$magikos_path" rev-parse --short HEAD 2>/dev/null || true)
-  [[ -n $hash ]] || exit 1
-  branch="detached@$hash"
-fi
-
+[[ -n "$branch" ]] || { hash=$(git -C "$magikos_path" rev-parse --short HEAD 2>/dev/null || true); [[ -n "$hash" ]] || exit 1; branch="detached@$hash"; }
 echo "$branch"

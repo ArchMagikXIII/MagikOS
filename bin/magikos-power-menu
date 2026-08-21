@@ -1,0 +1,15 @@
+#!/bin/bash
+
+# magikos:summary=Power menu for Sway (lock, logout, reboot, shutdown)
+# magikos:hidden=true
+
+choice=$(printf 'Lock\nLogout\nReboot\nShutdown\nScreenshot' \
+    | fuzzel --dmenu --prompt='Power: ' --width=20)
+
+case "$choice" in
+    Lock)       swaylock -f -c 000000 ;;
+    Logout)     swaymsg exit ;;
+    Reboot)     systemctl reboot ;;
+    Shutdown)   systemctl poweroff ;;
+    Screenshot) flameshot full -c -p ~/Pictures ;;
+esac

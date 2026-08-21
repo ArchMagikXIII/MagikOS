@@ -1,28 +1,3 @@
 #!/bin/bash
-
-# magikos:summary=Edit, set, or reset About branding
-# magikos:group=branding
-# magikos:name=about
-# magikos:args=<image|text|reset>
-# magikos:examples=magikos branding about image | magikos branding about text | magikos branding about reset
-
-set -euo pipefail
-
-case "${1:-}" in
-image)
-  image=$(magikos-file-select --title "Pick PNG or SVG for About" --extensions "png svg")
-  if magikos-transcode-ascii "$image" ~/.config/magikos/branding/about.txt --width 54 --height 26; then
-    magikos-launch-about >/dev/null 2>&1
-  fi
-  ;;
-text)
-  magikos-launch-editor ~/.config/magikos/branding/about.txt >/dev/null 2>&1 && magikos-launch-about >/dev/null 2>&1
-  ;;
-reset)
-  cp "$MAGIKOS_PATH/icon.txt" ~/.config/magikos/branding/about.txt && magikos-launch-about >/dev/null 2>&1
-  ;;
-*)
-  echo "Usage: magikos-branding-about <image|text|reset>" >&2
-  exit 1
-  ;;
-esac
+# magikos-branding-about — show MagikOS ASCII art
+cat "$MAGIKOS_PATH/config/branding/about.txt" 2>/dev/null || echo "MagikOS"
