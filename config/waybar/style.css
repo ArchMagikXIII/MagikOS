@@ -1,0 +1,45 @@
+/* Magikos Waybar Styles */
+
+* {
+    font-family: "JetBrainsMono Nerd Font";
+    font-size: 14px;
+}
+
+window#waybar {
+    background: transparent;
+    color: #cdd6f4;
+}
+
+#workspaces button {
+    padding: 0 5px;
+    color: #6c7086;
+    background: transparent;
+    border: none;
+    border-radius: 0;
+}
+
+#workspaces button.focused {
+    color: #89b4fa;
+}
+
+#workspaces button.urgent {
+    color: #f38ba8;
+}
+
+#cpu,
+#memory,
+#network,
+#bluetooth,
+#pulseaudio,
+#battery {
+    padding: 0 8px;
+    margin: 4px 2px;
+    background: #1e1e2e;
+    border-radius: 12px;
+    color: #cdd6f4;
+}
+
+#clock {
+    padding: 0 12px;
+    color: #cdd6f4;
+}

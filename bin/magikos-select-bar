@@ -1,0 +1,177 @@
+#!/bin/bash
+
+# magikos:summary=Select bar for Sway (Waybar or QuickShell)
+# magikos:args=[waybar|quickshell]
+
+set -euo pipefail
+
+SWAY_AUTOSTART="$HOME/.config/sway/autostart.conf"
+MAGIKOS_PATH="${MAGIKOS_PATH:-/usr/share/magikos}"
+
+usage() {
+  cat <<USAGE
+Usage: magikos-select-bar [waybar|quickshell]
+
+Choose which bar to use in Sway. Without arguments, shows a prompt.
+Updates ~/.config/sway/autostart.conf to enable the selected bar.
+
+  magikos-select-bar              # interactive prompt
+  magikos-select-bar quickshell   # switch to QuickShell
+  magikos-select-bar waybar       # switch to Waybar
+USAGE
+}
+
+backup_autostart() {
+  local backup="$SWAY_AUTOSTART.bak.$(date +%s)"
+  if [[ -f $SWAY_AUTOSTART ]]; then
+    cp -f "$SWAY_AUTOSTART" "$backup"
+    echo "Backed up $SWAY_AUTOSTART to $backup"
+  fi
+}
+
+install_waybar_config() {
+  local waybar_dir="$HOME/.config/waybar"
+  mkdir -p "$waybar_dir"
+
+  # Copy default configs if they don't exist or are missing
+  for f in config.jsonc style.css; do
+    local src="$MAGIKOS_PATH/config/waybar/$f"
+    local dst="$waybar_dir/$f"
+    if [[ -f $src ]] && [[ ! -f $dst ]]; then
+      cp -f "$src" "$dst"
+      echo "Installed $dst"
+    fi
+  done
+}
+
+enable_quickshell() {
+  backup_autostart
+  mkdir -p "$(dirname "$SWAY_AUTOSTART")"
+
+  local tmp="${SWAY_AUTOSTART}.tmp"
+
+  if [[ -f $SWAY_AUTOSTART ]]; then
+    # Comment out waybar, uncomment quickshell
+    sed -E \
+      -e 's/^([[:space:]]*exec_always[[:space:]].*quickshell.*)/\1/' \
+      -e 's/^([[:space:]]*#[[:space:]]*exec_always[[:space:]].*quickshell.*)/\1/' \
+      -e 's/^([[:space:]]*exec_always[[:space:]].*waybar.*)/#\1/' \
+      -e 's/^([[:space:]]*#[[:space:]]*exec_always[[:space:]].*waybar.*)/#\1/' \
+      "$SWAY_AUTOSTART" >"$tmp"
+
+    # Ensure quickshell line is uncommented
+    if grep -qE '^[[:space:]]*#[[:space:]]*exec_always[[:space:]].*quickshell' "$tmp"; then
+      sed -i -E 's/^([[:space:]]*)#[[:space:]]*(exec_always[[:space:]].*quickshell.*)/\1\2/' "$tmp"
+    fi
+
+    # Ensure waybar line is commented
+    if grep -qE '^[[:space:]]*exec_always[[:space:]].*waybar' "$tmp"; then
+      sed -i -E 's/^([[:space:]]*exec_always[[:space:]].*waybar.*)/#\1/' "$tmp"
+    fi
+
+    mv -f "$tmp" "$SWAY_AUTOSTART"
+  else
+    cat >"$SWAY_AUTOSTART" <<'SWAY_EOF'
+# --- Bar: QuickShell (default) or Waybar (uncomment to switch) ---
+exec_always MAGIKOS_PATH="$HOME/Projects/magikos" PATH="$HOME/Projects/magikos/bin:$HOME/.local/bin:$PATH" /usr/bin/quickshell -p "$HOME/Projects/magikos/shell" &
+# exec_always   waybar&
+SWAY_EOF
+  fi
+
+  echo "Enabled QuickShell bar. Restart Sway to apply."
+}
+
+enable_waybar() {
+  backup_autostart
+  install_waybar_config
+  mkdir -p "$(dirname "$SWAY_AUTOSTART")"
+
+  local tmp="${SWAY_AUTOSTART}.tmp"
+
+  if [[ -f $SWAY_AUTOSTART ]]; then
+    # Comment out quickshell, uncomment waybar
+    sed -E \
+      -e 's/^([[:space:]]*exec_always[[:space:]].*waybar.*)/\1/' \
+      -e 's/^([[:space:]]*#[[:space:]]*exec_always[[:space:]].*waybar.*)/\1/' \
+      -e 's/^([[:space:]]*exec_always[[:space:]].*quickshell.*)/#\1/' \
+      -e 's/^([[:space:]]*#[[:space:]]*exec_always[[:space:]].*quickshell.*)/#\1/' \
+      "$SWAY_AUTOSTART" >"$tmp"
+
+    # Ensure waybar line is uncommented
+    if grep -qE '^[[:space:]]*#[[:space:]]*exec_always[[:space:]].*waybar' "$tmp"; then
+      sed -i -E 's/^([[:space:]]*)#[[:space:]]*(exec_always[[:space:]].*waybar.*)/\1\2/' "$tmp"
+    fi
+
+    # Ensure quickshell line is commented
+    if grep -qE '^[[:space:]]*exec_always[[:space:]].*quickshell' "$tmp"; then
+      sed -i -E 's/^([[:space:]]*exec_always[[:space:]].*quickshell.*)/#\1/' "$tmp"
+    fi
+
+    mv -f "$tmp" "$SWAY_AUTOSTART"
+  else
+    cat >"$SWAY_AUTOSTART" <<'SWAY_EOF'
+# --- Bar: QuickShell (default) or Waybar (uncomment to switch) ---
+# exec_always MAGIKOS_PATH="$HOME/Projects/magikos" PATH="$HOME/Projects/magikos/bin:$HOME/.local/bin:$PATH" /usr/bin/quickshell -p "$HOME/Projects/magikos/shell" &
+exec_always   waybar&
+SWAY_EOF
+  fi
+
+  echo "Enabled Waybar bar. Restart Sway to apply."
+}
+
+detect_current_bar() {
+  if [[ -f $SWAY_AUTOSTART ]]; then
+    # Check for uncommented quickshell line
+    if grep -qE '^[[:space:]]*exec_always[[:space:]].*quickshell' "$SWAY_AUTOSTART" &&
+      ! grep -qE '^[[:space:]]*#[[:space:]]*exec_always[[:space:]].*quickshell' "$SWAY_AUTOSTART"; then
+      echo "quickshell"
+      return
+    fi
+    # Check for uncommented waybar line
+    if grep -qE '^[[:space:]]*exec_always[[:space:]].*waybar' "$SWAY_AUTOSTART" &&
+      ! grep -qE '^[[:space:]]*#[[:space:]]*exec_always[[:space:]].*waybar' "$SWAY_AUTOSTART"; then
+      echo "waybar"
+      return
+    fi
+  fi
+  echo "unknown"
+}
+
+choice="${1:-}"
+
+if [[ -z $choice ]]; then
+  current=$(detect_current_bar)
+  echo "Current bar: $current"
+  echo ""
+  echo "Select bar for Sway:"
+  echo "  1) QuickShell (Magikos bar)"
+  echo "  2) Waybar"
+  echo ""
+  read -rp "Choice [1/2]: " selection
+
+  case "$selection" in
+  1) choice="quickshell" ;;
+  2) choice="waybar" ;;
+  *)
+    echo "Invalid choice." >&2
+    exit 1
+    ;;
+  esac
+fi
+
+case "$choice" in
+quickshell | qs)
+  enable_quickshell
+  ;;
+waybar | wb)
+  enable_waybar
+  ;;
+-h | --help)
+  usage
+  ;;
+*)
+  echo "Unknown bar: $choice (use 'quickshell' or 'waybar')" >&2
+  usage >&2
+  exit 1
+  ;;
+esac
