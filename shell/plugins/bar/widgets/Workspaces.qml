@@ -1,52 +1,75 @@
 import QtQuick
 import QtQuick.Layouts
-import Quickshell.Hyprland
 import qs.Commons
 import qs.Ui
 
 BarWidget {
   id: root
-  moduleName: "omarchy.workspaces"
+  moduleName: "magikos.workspaces"
+
+  property var swayService: null
+
+  readonly property var wsColors: [
+    "#89b4fa",
+    "#a6e3a1",
+    "#f5c2e7",
+    "#94e2d5",
+    "#f9e2af"
+  ]
+
+  Component.onCompleted: {
+    var svc = root.bar && root.bar.shell && root.bar.shell.firstPartyServiceFor
+      ? root.bar.shell.firstPartyServiceFor("magikos.sway") : null
+    if (svc) {
+      root.swayService = svc
+      swayServiceRetry.running = false
+    }
+  }
+
+  Timer {
+    id: swayServiceRetry
+    interval: 500
+    repeat: true
+    running: root.swayService === null
+    onTriggered: {
+      var svc = root.bar && root.bar.shell && root.bar.shell.firstPartyServiceFor
+        ? root.bar.shell.firstPartyServiceFor("magikos.sway") : null
+      if (svc) {
+        root.swayService = svc
+        running = false
+      }
+    }
+  }
 
   function workspaceById(id) {
-    var values = Hyprland.workspaces.values
-    for (var i = 0; i < values.length; i++) {
-      if (values[i].id === id) return values[i]
-    }
-
-    return null
+    if (!swayService) return null
+    return swayService.getWorkspaceById(id)
   }
 
   function workspaceIds() {
-    var ids = [1, 2, 3, 4, 5]
-    var values = Hyprland.workspaces.values
-
-    for (var i = 0; i < values.length; i++) {
-      var id = values[i].id
-      if (id > 0 && id <= 10 && ids.indexOf(id) === -1) ids.push(id)
-    }
-
-    ids.sort(function(left, right) { return left - right })
-    return ids
+    if (!swayService) return [1, 2, 3, 4, 5]
+    return swayService.getWorkspaceIds()
   }
 
   function focusWorkspace(id) {
-    if (!root.bar) return
-    root.bar.run("hyprctl dispatch " + Util.shellQuote("hl.dsp.focus({ workspace = \"" + id + "\" })"))
+    if (!swayService) return
+    swayService.switchWorkspace(id)
   }
 
-  readonly property real trailingGap: root.vertical ? 0 : Style.spaceReal(1.5)
+  function wsColor(index) {
+    var ci = (index - 1) % wsColors.length
+    return wsColors[ci < 0 ? 0 : ci]
+  }
 
-  implicitWidth: grid.implicitWidth + trailingGap
+  implicitWidth: grid.implicitWidth
   implicitHeight: grid.implicitHeight
 
   GridLayout {
     id: grid
     anchors.fill: parent
-    anchors.rightMargin: root.trailingGap
     columns: root.vertical ? 1 : root.workspaceIds().length
-    columnSpacing: root.vertical ? 0 : Style.space(1)
-    rowSpacing: root.vertical ? Style.space(2) : 0
+    columnSpacing: 0
+    rowSpacing: 0
 
     Repeater {
       model: root.workspaceIds()
@@ -55,15 +78,18 @@ BarWidget {
         required property int modelData
 
         readonly property var workspace: root.workspaceById(modelData)
-        readonly property bool occupied: workspace !== null && workspace.toplevels.values.length > 0
-        readonly property bool focused: Hyprland.focusedWorkspace !== null && Hyprland.focusedWorkspace.id === modelData
+        readonly property bool occupied: workspace !== null && workspace.windowCount > 0
+        readonly property bool focused: swayService && swayService.focusedWorkspaceId === modelData
+        readonly property color wsCol: wsColor(modelData)
 
         bar: root.bar
-        text: focused ? "\uDB85\uDCFB" : (modelData === 10 ? "0" : String(modelData))
-        opacity: occupied || focused ? 1 : 0.5
-        horizontalMargin: 6
-        verticalPadding: 6
-        fixedWidth: root.vertical ? root.barSize : Style.space(20)
+        text: focused ? "\uDB85\uDCFB" : (modelData === 1 ? "󰙯" : modelData === 2 ? "󰅴" : modelData === 3 ? "󰖟" : modelData === 4 ? "󰘐" : modelData === 5 ? "\uF1B6" : modelData === 10 ? "0" : String(modelData))
+        foreground: focused ? wsCol : (occupied ? Color.muted : Color.foreground)
+        useActiveColor: false
+        opacity: 1
+        horizontalMargin: 0
+        verticalPadding: 0
+        fixedWidth: root.vertical ? root.barSize : -1
         fixedHeight: root.barSize
         onPressed: function() { root.focusWorkspace(modelData) }
       }
