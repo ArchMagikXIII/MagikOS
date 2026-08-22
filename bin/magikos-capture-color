@@ -1,0 +1,45 @@
+#!/bin/bash
+
+# magikos:summary=Pick a pixel color from the screen and copy it to the clipboard
+# magikos:group=capture
+# magikos:name=color
+# magikos:examples=magikos capture color
+
+set -euo pipefail
+
+if magikos-cmd-present hyprpicker; then
+  pkill hyprpicker 2>/dev/null && exit 0
+  color=$(hyprpicker -a 2>/dev/null || true)
+  if [[ -n $color ]]; then
+    magikos-notification-send -g "󰃉" "Color copied" "$color"
+  fi
+  exit 0
+fi
+
+# Fallback for Sway / wlroots using slurp + grim + ImageMagick
+if ! magikos-cmd-present grim || ! magikos-cmd-present slurp; then
+  magikos-notification-send -g "󰃉" -u critical "Color picker failed" "grim and slurp are required"
+  exit 1
+fi
+
+pkill slurp 2>/dev/null && exit 0
+
+pos=$(slurp -p -b 00000000 -c ffffffff 2>/dev/null) || exit 0
+[[ -n $pos ]] || exit 0
+
+color=""
+if magikos-cmd-present magick; then
+  color=$(grim -g "$pos" -t ppm - 2>/dev/null | magick - -depth 8 -format '#%[hex:p{0,0}]' info: 2>/dev/null || true)
+elif magikos-cmd-present convert; then
+  color=$(grim -g "$pos" -t ppm - 2>/dev/null | convert - -depth 8 -format '#%[hex:p{0,0}]' info: 2>/dev/null || true)
+fi
+
+# Clean up format to #RRGGBB
+if [[ $color =~ ^#([0-9a-fA-F]{6}) ]]; then
+  color="#${BASH_REMATCH[1]}"
+fi
+
+if [[ -n $color ]]; then
+  printf '%s' "$color" | wl-copy --type text/plain
+  magikos-notification-send -g "󰃉" "Color copied" "$color"
+fi

@@ -1,0 +1,18 @@
+#!/bin/bash
+
+# magikos:summary=Overwrite all the user Sway configs in ~/.config/sway with the Magikos defaults and reload Sway.
+
+set -e
+
+magikos-refresh-config sway/appearance.conf
+magikos-refresh-config sway/autostart.conf
+magikos-refresh-config sway/bindings.conf
+magikos-refresh-config sway/config
+magikos-refresh-config sway/environment.conf
+magikos-refresh-config sway/input.conf
+magikos-refresh-config sway/output.conf
+
+if swaymsg -t get_version >/dev/null 2>&1; then
+  swaymsg reload >/dev/null 2>&1 || true
+  magikos-notification-send -g "" "Sway reloaded" "Configurations refreshed from Magikos defaults"
+fi
