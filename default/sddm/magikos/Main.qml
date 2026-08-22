@@ -3,8 +3,8 @@ import SddmComponents 2.0
 
 Rectangle {
   id: root
-  width: 640
-  height: 480
+  width: Screen.width
+  height: Screen.height
   color: "#1a1b26"
 
   property string currentUser: userModel.lastUser
@@ -12,7 +12,7 @@ Rectangle {
   property int sessionIndex: {
     for (var i = 0; i < sessionModel.rowCount(); i++) {
       var name = (sessionModel.data(sessionModel.index(i, 0), Qt.DisplayRole) || "").toString()
-      if (name.indexOf("uwsm") !== -1)
+      if (name.indexOf("sway") !== -1 || name.indexOf("hyprland") !== -1)
         return i
     }
     return sessionModel.lastIndex
@@ -37,7 +37,7 @@ Rectangle {
     Image {
       id: logo
       source: "logo.png"
-      width: Math.min(sourceSize.width, root.width * 0.8)
+      width: Math.min(sourceSize.width, root.width * 0.6)
       height: sourceSize.width > 0 ? Math.round(width * sourceSize.height / sourceSize.width) : 0
       fillMode: Image.PreserveAspectFit
       anchors.horizontalCenter: parent.horizontalCenter
