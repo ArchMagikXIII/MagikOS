@@ -7,7 +7,7 @@ TOGGLE="internal-monitor-mirror"
 TOGGLE_FLAG="$HOME/.local/state/magikos/toggles/hypr/$TOGGLE.lua"
 DISABLE_TOGGLE="internal-monitor-disable"
 
-INTERNAL=$(magikos-hyprland-monitor-laptop)
+INTERNAL=$(magikos-sway-monitor-laptop)
 # The first active external monitor
 EXTERNAL=$(hyprctl monitors -j | jq -r '.[] | select(.name | test("^(eDP|LVDS|DSI)-") | not).name' | head -n 1)
 
@@ -47,7 +47,7 @@ toggle() {
 }
 
 recover() {
-  if ! magikos-hyprland-monitor-external-active && magikos-hyprland-toggle-enabled $TOGGLE; then
+  if ! magikos-sway-monitor-external-active && magikos-hyprland-toggle-enabled $TOGGLE; then
     magikos-hyprland-toggle $TOGGLE off
   fi
 }

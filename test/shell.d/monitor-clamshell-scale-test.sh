@@ -46,12 +46,12 @@ cat >"$stub_bin/magikos-hyprland-monitor-internal-mirror" <<'SH'
 exit 0
 SH
 
-cat >"$stub_bin/magikos-hyprland-monitor-laptop" <<'SH'
+cat >"$stub_bin/magikos-sway-monitor-laptop" <<'SH'
 #!/bin/bash
 echo eDP-1
 SH
 
-cat >"$stub_bin/magikos-hyprland-monitor-external-active" <<'SH'
+cat >"$stub_bin/magikos-sway-monitor-external-active" <<'SH'
 #!/bin/bash
 [[ ${MAGIKOS_TEST_EXTERNAL_ACTIVE:-false} == "true" ]]
 SH

@@ -7,7 +7,7 @@ TOGGLE="internal-monitor-disable"
 TOGGLE_FLAG="$HOME/.local/state/magikos/toggles/hypr/$TOGGLE.lua"
 MIRROR_TOGGLE="internal-monitor-mirror"
 
-INTERNAL=$(magikos-hyprland-monitor-laptop)
+INTERNAL=$(magikos-sway-monitor-laptop)
 
 wake() {
   hyprctl dispatch 'hl.dsp.dpms({ action = "enable" })' >/dev/null 2>&1 || true
@@ -28,7 +28,7 @@ off() {
     exit 1
   fi
 
-  if ! magikos-hyprland-monitor-external-active; then
+  if ! magikos-sway-monitor-external-active; then
     magikos-notification-send -g 󰍹 "Can't disable the only active display"
     exit 1
   fi
@@ -44,7 +44,7 @@ recover() {
   # Runs from the clamshell watcher every few seconds, so it must be a no-op
   # unless it actually re-enables a display: an unconditional wake here undoes
   # lock-screen blanking and races the resume modeset into a visible flash.
-  magikos-hyprland-monitor-external-active && return 0
+  magikos-sway-monitor-external-active && return 0
   magikos-hyprland-toggle-enabled $TOGGLE || return 0
 
   magikos-hyprland-toggle $TOGGLE off

@@ -75,7 +75,7 @@ poll_clamshell_state() {
 # drift those binds can miss (e.g. across suspend/resume).
 poll_pid=""
 sync_poll_state() {
-  if magikos-hw-laptop && magikos-hyprland-monitor-external-active; then
+  if magikos-hw-laptop && magikos-sway-monitor-external-active; then
     if [[ -z $poll_pid ]] || ! kill -0 "$poll_pid" 2>/dev/null; then
       poll_clamshell_state &
       poll_pid=$!

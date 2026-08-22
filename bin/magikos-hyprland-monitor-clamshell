@@ -9,7 +9,7 @@ MANUAL_DISABLE_FLAG="$TOGGLES_DIR/internal-monitor-disable.lua"
 SCALE_STATE="$TOGGLES_DIR/internal-monitor-scale"
 MONITOR_LUA="$HOME/.config/hypr/monitors.lua"
 
-INTERNAL=$(magikos-hyprland-monitor-laptop)
+INTERNAL=$(magikos-sway-monitor-laptop)
 
 valid_scale() {
   [[ $1 =~ ^[0-9]+([.][0-9]+)?$ ]]
@@ -188,7 +188,7 @@ enable_internal() {
     hyprctl reload >/dev/null 2>&1 || true
   fi
 
-  [[ -f $MANUAL_DISABLE_FLAG ]] && magikos-hyprland-monitor-external-active && return 0
+  [[ -f $MANUAL_DISABLE_FLAG ]] && magikos-sway-monitor-external-active && return 0
   sync_internal_scale
 
   if (( changed )); then
@@ -215,7 +215,7 @@ disable_internal() {
 magikos-hyprland-monitor-internal recover >/dev/null 2>&1 || true
 magikos-hyprland-monitor-internal-mirror recover >/dev/null 2>&1 || true
 
-if magikos-hw-clamshell && magikos-hyprland-monitor-external-active; then
+if magikos-hw-clamshell && magikos-sway-monitor-external-active; then
   disable_internal
 else
   enable_internal
