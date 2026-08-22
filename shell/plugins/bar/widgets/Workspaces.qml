@@ -10,11 +10,11 @@ BarWidget {
   property var swayService: null
 
   readonly property var wsColors: [
-    "#89b4fa",
-    "#a6e3a1",
-    "#f5c2e7",
-    "#94e2d5",
-    "#f9e2af"
+    "#4d9fff",
+    "#3ddc84",
+    "#ff5fd7",
+    "#22e0cd",
+    "#ffd75e"
   ]
 
   Component.onCompleted: {
