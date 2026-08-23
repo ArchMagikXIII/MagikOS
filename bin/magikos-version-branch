@@ -1,5 +1,6 @@
 #!/bin/bash
 # magikos-version-branch — show current git branch
+# magikos:summary=Show the git branch of the installed MagikOS checkout
 magikos_path="${MAGIKOS_PATH:-/usr/share/magikos}"
 magikos_path="${magikos_path%/}"
 [[ "$magikos_path" != "/usr/share/magikos" ]] || exit 1

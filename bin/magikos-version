@@ -1,4 +1,5 @@
 #!/bin/bash
 # magikos-version — show MagikOS version for fastfetch
+# magikos:summary=Show the installed MagikOS package version for fastfetch
 pkg=$(pacman -Q magikos 2>/dev/null | awk '{print $2}')
 [[ -n "$pkg" ]] && echo "$pkg" || echo "MagikOS dev"
