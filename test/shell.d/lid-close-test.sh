@@ -27,12 +27,10 @@ SH
 #!/bin/bash
 exit $docked
 SH
-  for command in magikos-system-lock magikos-hyprland-monitor-clamshell; do
-    cat >"$mock_bin/$command" <<SH
+  cat >"$mock_bin/magikos-system-lock" <<SH
 #!/bin/bash
-echo $command >>"\$CALL_LOG"
+echo magikos-system-lock >>"\$CALL_LOG"
 SH
-  done
   chmod +x "$mock_bin"/*
 }
 
@@ -51,10 +49,6 @@ run_lid_close
   fail "undocked lid close locks before anything else" "calls: ${calls[*]}"
 pass "undocked lid close locks before anything else"
 
-[[ ${calls[1]} == "magikos-hyprland-monitor-clamshell" ]] ||
-  fail "undocked lid close still reconciles displays" "calls: ${calls[*]}"
-pass "undocked lid close still reconciles displays"
-
 # A docked lid close is clamshell mode: logind leaves the machine awake and the
 # session stays in use on the external display, so locking it would be wrong.
 setup_scenario docked 0 0
@@ -64,30 +58,10 @@ run_lid_close
   fail "docked lid close does not lock the session" "calls: ${calls[*]}"
 pass "docked lid close does not lock the session"
 
-[[ ${calls[0]} == "magikos-hyprland-monitor-clamshell" ]] ||
-  fail "docked lid close reconciles displays" "calls: ${calls[*]}"
-pass "docked lid close reconciles displays"
-
-# Hyprland can replay a switch binding when the lid is already open, and an
-# open lid must never lock the machine the user is sitting at.
+# An open lid must never lock the machine the user is sitting at.
 setup_scenario open 1 1
 run_lid_close
 
 [[ ${calls[*]} != *magikos-system-lock* ]] ||
   fail "an open lid never locks the session" "calls: ${calls[*]}"
 pass "an open lid never locks the session"
-
-# The lid handler runs from a Hyprland binding, so a lock that hangs or fails
-# must not stop the display reconciliation behind it.
-setup_scenario failing_lock 0 1
-cat >"$mock_bin/magikos-system-lock" <<'SH'
-#!/bin/bash
-echo magikos-system-lock >>"$CALL_LOG"
-exit 1
-SH
-chmod +x "$mock_bin/magikos-system-lock"
-run_lid_close
-
-[[ ${calls[1]} == "magikos-hyprland-monitor-clamshell" ]] ||
-  fail "a failing lock still reconciles displays" "calls: ${calls[*]}"
-pass "a failing lock still reconciles displays"

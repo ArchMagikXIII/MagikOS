@@ -264,8 +264,3 @@ shell_json=$(cd "$ROOT" && jq -r '[.bar.layout.center[].id] | join(",")' config/
 [[ $shell_json == *"magikos.clock"* ]] || fail "default bar layout includes the clock widget" "center: $shell_json"
 [[ $shell_json != *"magikos.calendar"* ]] || fail "clock hosts the calendar instead of a second bar pill" "center: $shell_json"
 pass "default bar layout includes the clock widget"
-
-grep -q 'o.bind("SUPER + CTRL + ALT + D", "Calendar", "magikos-shell shell toggle magikos.clock")' \
-  "$ROOT/default/hypr/bindings/utilities.lua" ||
-  fail "SUPER+CTRL+ALT+D toggles the calendar panel"
-pass "SUPER+CTRL+ALT+D toggles the calendar panel"

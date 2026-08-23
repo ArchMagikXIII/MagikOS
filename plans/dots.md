@@ -23,7 +23,7 @@ desktop."
 - **`git init ~/.config`**: dumping ground — Chromium profile, fcitx5 state,
   app tokens, machine churn. A `.git` there gets discovered by editors and
   prompts. Can't cover `~/.bashrc` or `~/.XCompose`.
-- **`~/.config/magikos` only**: too narrow; misses hypr, terminals, `.bashrc`.
+- **`~/.config/magikos` only**: too narrow; misses sway, terminals, `.bashrc`.
 - **Stow**: inverted model requiring file migration; organization, not history.
 - **chezmoi / yadm**: third-party DSLs we'd be wrapping; overkill.
 - **Raw git passthrough / lazygit over `$HOME`** (rejected in review):
@@ -63,7 +63,7 @@ a hand-audited file shipped with Magikos — explicitly **not** derived from
 `$MAGIKOS_PATH/config` (which ships Chromium Preferences, fcitx5,
 `opencode/opencode.json` where users put API keys, etc.):
 
-- Include: `.config/hypr/*.{lua,conf}`, `.config/magikos/shell.json`,
+- Include: `.config/sway/*.conf`, `.config/magikos/shell.json`,
   `.config/magikos/extensions/**`, `.config/magikos/hooks/**`,
   terminal configs (alacritty/foot/ghostty/kitty), `.config/btop/btop.conf`,
   `.config/starship.toml`, `.bashrc`, `.XCompose`.
@@ -74,7 +74,7 @@ a hand-audited file shipped with Magikos — explicitly **not** derived from
   Chromium/fcitx5/opencode/xournalpp.
 - **Two tiers**: every manifest path is history-tracked, but some are marked
   `local` — machine-specific files that sync must never touch. At minimum
-  `monitors.lua`; likely hardware quirks like `dell-haptic.conf`. This is the
+  the sway output config; likely hardware quirks like `dell-haptic.conf`. This is the
   lightweight answer to chezmoi's hostname templates: exclude, no DSL.
 - Once committed, a secret lives in the object store forever; "no remote" is
   not a secrets story. The manifest is the deny line — nothing outside it is
@@ -106,9 +106,9 @@ internal `magikos-dots-snapshot "<label>"`:
    `magikos-update` *and* the login-time migration path, and separates
    migration changes from prior user dirt — the "before" commit captures user
    edits, the "after" commit is purely what migrations did.
-3. **Batch refresh commands** (`magikos-refresh-hyprland` etc.): one pair per
-   command, not one commit per `magikos-refresh-config` call (hyprland calls
-   it seven times).
+3. **Batch refresh commands** (`magikos-refresh-sway` etc.): one pair per
+   command, not one commit per `magikos-refresh-config` call (the sway
+   refresh calls it seven times).
 4. **`magikos-reinstall-configs`**: a "before" snapshot — honestly labeled.
    This operation replays all of `/etc/skel`; a manifest repo does **not**
    make it reversible and we don't claim it does.
@@ -202,5 +202,5 @@ No raw git surface. No lazygit integration.
    in AGENTS.md) as part of this work or separately.
 4. Timer cadence (hourly vs daily) and whether the dirty-check should debounce
    against an active editing session.
-5. Whether `input.lua` is `local`-tier (keyboard layouts travel, trackpad
+5. Whether `input.conf` is `local`-tier (keyboard layouts travel, trackpad
    quirks don't).

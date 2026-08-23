@@ -74,7 +74,7 @@ cat >"$mock_bin/magikos-test-noop" <<'SH'
 exit 0
 SH
 
-for command in gum hyprctl magikos-webapp-remove-all magikos-tui-remove-all magikos-pkg-drop; do
+for command in gum magikos-webapp-remove-all magikos-tui-remove-all magikos-pkg-drop; do
   ln -s magikos-test-noop "$mock_bin/$command"
 done
 
@@ -266,11 +266,6 @@ source "$ROOT/default/bash/aliases"
 [[ $(alias a) == "alias a='magikos-agent --inline'" ]] ||
   fail "terminal alias launches the default agent inline"
 pass "terminal alias launches the default agent inline"
-
-grep -Fq 'o.bind("SUPER + SHIFT + CTRL + A", "Agent", "magikos-agent --pick")' \
-  "$ROOT/default/hypr/bindings/utilities.lua" ||
-  fail "agent launcher has a keyboard shortcut"
-pass "agent launcher has a keyboard shortcut"
 
 cat >"$mock_bin/magikos-agent" <<'SH'
 #!/bin/bash

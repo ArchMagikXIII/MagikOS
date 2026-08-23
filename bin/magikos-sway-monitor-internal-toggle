@@ -1,0 +1,9 @@
+#!/bin/bash
+
+# magikos:summary=Toggle the built-in laptop display on or off
+# magikos:examples=magikos sway monitor internal-toggle
+
+output=$(magikos-sway-monitor-laptop)
+[[ -n $output ]] || exit 0
+
+swaymsg output "$output" toggle >/dev/null

@@ -4,8 +4,8 @@
 
 # The size that hugs the About content depends on the terminal font and the user's
 # logo, so it can only be measured from inside the terminal. We remember the size
-# that fit and apply it as a window rule before launching, so the window opens at
-# it instead of resizing after the first paint. Bash defers WINCH traps while read
+# that fit and apply it again on the next launch, so the window opens at it
+# instead of resizing after the first paint. Bash defers WINCH traps while read
 # blocks, so poll for size changes and re-render fastfetch whenever it is resized.
 
 LOGO_FILE="$HOME/.config/magikos/branding/about.txt"
@@ -29,10 +29,9 @@ logo_dimensions() {
   printf '%s %s' "$(display_columns <"$LOGO_FILE")" "$(wc -l <"$LOGO_FILE")"
 }
 
-hypr_dispatch() {
-  local lua="$1"
-  shift
-  hyprctl dispatch "$lua" >/dev/null 2>&1 || hyprctl dispatch "$@" >/dev/null
+resize_and_center() {
+  swaymsg "[app_id=\"org.magikos.about\"] resize set width $1 px height $2 px" >/dev/null 2>&1
+  swaymsg "[app_id=\"org.magikos.about\"] move position center" >/dev/null 2>&1
 }
 
 remember_fit() {
@@ -44,38 +43,27 @@ remember_fit() {
   mv "$tmp" "$FIT_FILE"
 }
 
-# Replaces the rule from the last launch so a remembered size never outlives the
-# fit it came from. Called without one it only clears, leaving the float rule's
-# starting size — where a Hyprland without the Lua API stays too.
-apply_size_rule() {
-  local rule=""
-  (( $# == 2 )) && rule="magikos_about_size_rule = hl.window_rule({ match = { class = \"org.magikos.about\" }, size = { $1, $2 } })"
-
-  hyprctl eval "if magikos_about_size_rule then magikos_about_size_rule:set_enabled(false) end; magikos_about_size_rule = nil; $rule" >/dev/null 2>&1
-}
-
-# Sized before the terminal is spawned, so the window maps at its final size.
-presize_window() {
+# Applies the remembered fit from the last launch, since sway has no size rules
+# to land it before the first paint.
+apply_remembered_fit() {
   local logo_w logo_h fit_logo_w fit_logo_h fit_w fit_h
 
-  if ! custom_fastfetch_config && [[ -r $FIT_FILE ]]; then
-    read -r logo_w logo_h <<<"$(logo_dimensions)"
-    read -r fit_logo_w fit_logo_h fit_w fit_h <"$FIT_FILE"
+  custom_fastfetch_config && return 0
+  [[ -r $FIT_FILE ]] || return 0
 
-    # A different logo needs a different window, so leave that launch to the
-    # float rule and let the fit measure the new size.
-    if [[ -n ${logo_w:-} && $logo_w == "$fit_logo_w" && $logo_h == "$fit_logo_h" ]] &&
-      [[ $fit_w =~ ^[0-9]+$ && $fit_h =~ ^[0-9]+$ ]]; then
-      apply_size_rule "$fit_w" "$fit_h"
-      return
-    fi
+  read -r logo_w logo_h <<<"$(logo_dimensions)"
+  read -r fit_logo_w fit_logo_h fit_w fit_h <"$FIT_FILE"
+
+  # A different logo needs a different window, so leave that launch alone and
+  # let the fit measure the new size.
+  if [[ -n ${logo_w:-} && $logo_w == "$fit_logo_w" && $logo_h == "$fit_logo_h" ]] &&
+    [[ $fit_w =~ ^[0-9]+$ && $fit_h =~ ^[0-9]+$ ]]; then
+    resize_and_center "$fit_w" "$fit_h"
   fi
-
-  apply_size_rule
 }
 
-# Hyprland animates a resize and the terminal reflows to every step of it, so
-# wait for the grid to hold still before measuring it.
+# A resize reflows the terminal grid over several events, so wait for it to
+# hold still before measuring it.
 settle_grid() {
   local current previous="" held=0
 
@@ -112,11 +100,11 @@ fit_window() {
   local target_c=$(( 2 + logo_w + 6 + module_w + 2 ))
   local target_r=$(( (logo_h + 2 > module_h ? logo_h + 2 : module_h) + 1 ))
 
-  local nudges=0 rows cols address width height shift_w shift_h target_w target_h
+  local nudges=0 rows cols con_id width height shift_w shift_h target_w target_h
   while :; do
     read -r rows cols <<<"$(stty size)"
-    read -r address width height <<<"$(hyprctl clients -j | jq -r '.[] | select(.class == "org.magikos.about") | "\(.address) \(.size[0]) \(.size[1])"')"
-    [[ -n ${address:-} ]] || return 1
+    read -r con_id width height <<<"$(swaymsg -t get_tree 2>/dev/null | jq -r '.. | objects | select(.app_id? == "org.magikos.about") | "\(.id) \(.rect.width) \(.rect.height)"' | head -n1)"
+    [[ -n ${con_id:-} ]] || return 1
     (( cols > 0 && rows > 0 && width > 0 && height > 0 )) || return 1
 
     # A window has to land on the terminal's cell boundaries, so take a cell of
@@ -138,8 +126,8 @@ fit_window() {
     target_w=$(( width + (shift_w >= 0 ? (shift_w + cols - 1) / cols : shift_w / cols) ))
     target_h=$(( height + (shift_h >= 0 ? (shift_h + rows - 1) / rows : shift_h / rows) ))
 
-    hypr_dispatch "hl.dsp.window.resize({ window = \"address:$address\", x = $target_w, y = $target_h })" resizewindowpixel "exact $target_w $target_h,address:$address"
-    hypr_dispatch "hl.dsp.window.center({ window = \"address:$address\" })" centerwindow
+    swaymsg "[con_id=$con_id] resize set width $target_w px height $target_h px" >/dev/null 2>&1
+    swaymsg "[con_id=$con_id] move position center" >/dev/null 2>&1
     settle_grid
   done
 
@@ -149,7 +137,9 @@ fit_window() {
 if [[ ${1:-} == "--render" ]]; then
   printf '\e[?25l'
 
-  # Give the compositor a moment to apply the window rules before measuring cells.
+  apply_remembered_fit
+
+  # Give the compositor a moment to settle the window before measuring cells.
   settle_grid
 
   fitted=false
@@ -177,5 +167,4 @@ if [[ ${1:-} == "--render" ]]; then
   done
 fi
 
-presize_window
 exec magikos-launch-or-focus-tui --app-id=org.magikos.about magikos-launch-about --render

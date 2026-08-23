@@ -98,14 +98,6 @@ sudo env MAGIKOS_ALLOW_DIRECT_PACMAN=1 pacman -Syu
 The guard does not start `magikos update` itself because pacman is already in a
 transaction setup path; it only aborts with instructions.
 
-The `magikos` package also installs ALPM hooks for `magikos-settings` /
-`magikos-settings-dev` installs and upgrades. The pre-transaction hook runs
-`magikos-hyprland-reload-guard pause` to disable live Hyprland config reloads
-while `/usr/share/magikos/default/hypr/**` is replaced. The post-transaction
-hook runs `magikos-hyprland-reload-guard resume`, forces one `hyprctl reload`,
-and restores the session's previous `misc.disable_autoreload` and
-`debug.suppress_errors` values.
-
 ## Path 1: `magikos update`
 
 High-level flow:
@@ -285,7 +277,7 @@ scripts.
 | `magikos-update-mise` | Runs `MISE_MINIMUM_RELEASE_AGE=0 mise up` for mise-managed tools — the override of mise's release-age cooldown is the point. | **Keep.** Mise-managed tools are intentionally part of the blessed update path. |
 | `magikos-update-orphan-pkgs` | Lists orphans and prompts before removal; noninteractive mode never removes. | **Keep for now.** Safe because it is prompt-only. |
 | `magikos-update-analyze-logs` | Scans `/tmp/magikos-update.log` for known failure patterns, currently initramfs generation. | **Keep/expand.** Useful safety net; should grow only for high-signal checks. |
-| `magikos-update-restart` | Prompts for reboot after kernel/Hyprland updates, restarts components with `restart-*-required` markers, and always restarts the shell. | **Keep.** Important final step; may eventually include service-restart checks. |
+| `magikos-update-restart` | Prompts for reboot after kernel updates, restarts components with `restart-*-required` markers, and always restarts the shell. | **Keep.** Important final step; may eventually include service-restart checks. |
 | `magikos-update-firmware` | Manual firmware update command using fwupd. Not part of the normal update pipeline. | **Keep separate.** Firmware is not a routine system update step. |
 | `magikos-update-time` | Restarts `systemd-timesyncd`. | **Question.** Not really an update command. Consider renaming/moving under system/time maintenance. |
 

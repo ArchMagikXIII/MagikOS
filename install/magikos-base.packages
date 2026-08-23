@@ -51,9 +51,6 @@ gvfs-mtp
 gvfs-nfs
 gvfs-smb
 herdr
-hyprland
-hyprland-guiutils
-hyprland-preview-share-picker
 hyprpicker
 hyprsunset
 imagemagick
@@ -141,7 +138,6 @@ wl-clipboard
 wtype
 woff2-font-awesome
 xdg-desktop-portal-gtk
-xdg-desktop-portal-hyprland
 xdg-terminal-exec
 xournalpp
 yaru-icon-theme

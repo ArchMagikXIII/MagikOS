@@ -64,59 +64,84 @@ wait_until() {
 }
 
 window_present() {
-  hyprctl -j clients | jq -e --arg class "$1" '[.[] | select(.class | test($class))] | length > 0'
+  swaymsg -t get_tree | jq -e --arg class "$1" '
+    [.. | objects | select(
+      ((.app_id? // "") | test($class)) or
+      ((.window_properties.class? // "") | test($class))
+    )] | length > 0
+  '
 }
 
 window_absent() {
   ! window_present "$1"
 }
 
+# Sway's IPC exposes no layer surfaces, so layer visibility is checked with
+# pixels: compare the current screen against a reference captured while every
+# surface is hidden. The reference starts as whatever was on screen when the
+# suite booted and refreshes after every successful absence probe, so a clock
+# or wallpaper change cannot accumulate into a false "present". Namespace is
+# kept in the signature for readability; any visible difference counts.
+LAYER_DIFF_THRESHOLD=${MAGIKOS_ACCEPTANCE_LAYER_DIFF_PIXELS:-4000}
+
+refresh_absent_reference() {
+  timeout 10 grim "$ARTIFACTS/absent-screen-reference.png" 2>/dev/null || true
+}
+
+changed_pixels() {
+  local reference="$1" candidate="$2"
+
+  # AE prints the changed pixel count; a size mismatch prints an error, which
+  # reads as "everything changed" and fails the check that asked.
+  magick compare -metric AE -fuzz 10% "$reference" "$candidate" null: 2>&1 || true
+}
+
+screen_differs_from() {
+  local reference="$1"
+  local snapshot="/tmp/magikos-acceptance-compare-$$.png"
+  local diff
+
+  timeout 10 grim "$snapshot" 2>/dev/null || return 1
+  diff=$(changed_pixels "$reference" "$snapshot")
+  rm -f "$snapshot"
+
+  [[ ${diff%%[^0-9]*} =~ ^[0-9]+$ ]] || return 0
+  (( ${diff%%[^0-9]*} > LAYER_DIFF_THRESHOLD ))
+}
+
+screen_matches() {
+  ! screen_differs_from "$1"
+}
+
 layer_present() {
-  hyprctl -j layers | jq -e --arg ns "$1" '[.. | objects | select(.namespace? == $ns)] | length > 0'
+  [[ -s $ARTIFACTS/absent-screen-reference.png ]] || refresh_absent_reference
+  [[ -s $ARTIFACTS/absent-screen-reference.png ]] || return 1
+
+  screen_differs_from "$ARTIFACTS/absent-screen-reference.png"
 }
 
 layer_absent() {
-  ! layer_present "$1"
+  if layer_present "$1"; then
+    return 1
+  fi
+
+  refresh_absent_reference
 }
 
-# A layer can be mapped but parked off the monitor: the bar hides that way so
-# revealing it does not have to rebuild the surface. Assert on geometry when
-# what matters is that the user can actually see it. Layer boxes are local to
-# their monitor and in logical coordinates, so compare them with local bounds
-# derived from the monitor's scaled pixel size.
-layer_on_screen() {
-  local monitors
-  monitors=$(hyprctl -j monitors) || return 1
-
-  hyprctl -j layers | jq -e --arg ns "$1" --argjson monitors "$monitors" '
-    to_entries[]
-    | .key as $name
-    | .value as $levels
-    | ($monitors[] | select(.name == $name)) as $m
-    | (if ($m.transform // 0) % 2 == 1 then $m.height else $m.width end) / $m.scale | round as $width
-    | (if ($m.transform // 0) % 2 == 1 then $m.width else $m.height end) / $m.scale | round as $height
-    | [$levels | .. | objects | select(.namespace? == $ns)][]
-    | select(
-        .x + .w > 0 and .x < $width and
-        .y + .h > 0 and .y < $height
-      )
-  ' >/dev/null
-}
-
-layer_off_screen() {
-  ! layer_on_screen "$1"
-}
-
-# Close every window matching a class regex, by address so multi-window apps
-# are fully closed. Tries the quattro Lua dispatcher first, then classic.
+# Close every window matching a class regex, by container id so multi-window
+# apps are fully closed.
 close_windows() {
   local class="$1"
-  local addr
+  local con_id
 
-  while read -r addr; do
-    hyprctl dispatch "hl.dsp.window.close({ window = \"address:$addr\" })" >/dev/null 2>&1 ||
-      hyprctl dispatch closewindow "address:$addr" >/dev/null 2>&1 || true
-  done < <(hyprctl -j clients | jq -r --arg class "$class" '.[] | select(.class | test($class)) | .address')
+  while read -r con_id; do
+    swaymsg "[con_id=$con_id] kill" >/dev/null 2>&1 || true
+  done < <(swaymsg -t get_tree | jq -r --arg class "$class" '
+    [.. | objects | select(
+      ((.app_id? // "") | test($class)) or
+      ((.window_properties.class? // "") | test($class))
+    ) | .id]
+  ')
 }
 
 launch_app() {

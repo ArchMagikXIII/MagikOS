@@ -35,39 +35,29 @@ cat >"$mock_bin/systemd-run" <<'SH'
 #!/bin/bash
 printf '%s\n' "$*" >"$MAGIKOS_TEST_BROWSER_LAUNCH"
 SH
-cat >"$mock_bin/magikos-hyprland-focus-app" <<'SH'
-#!/bin/bash
-printf '%s\n' "$1" >"$MAGIKOS_TEST_BROWSER_FOCUS"
-SH
 chmod +x "$mock_bin"/*
 
 launch_log="$test_tmp/launch"
-focus_log="$test_tmp/focus"
 xdg_settings_browser="$test_tmp/xdg-settings-browser"
-HOME="$test_home" PATH="$mock_bin:$PATH" HYPRLAND_INSTANCE_SIGNATURE=test \
-  MAGIKOS_TEST_BROWSER_LAUNCH="$launch_log" MAGIKOS_TEST_BROWSER_FOCUS="$focus_log" \
+HOME="$test_home" PATH="$mock_bin:$PATH" \
+  MAGIKOS_TEST_BROWSER_LAUNCH="$launch_log" \
   bash "$ROOT/bin/magikos-launch-browser"
 
-[[ ! -e $focus_log ]] || fail "browser launcher leaves a new window on the current workspace"
-
-HOME="$test_home" PATH="$mock_bin:$PATH" HYPRLAND_INSTANCE_SIGNATURE=test \
-  MAGIKOS_TEST_BROWSER_LAUNCH="$launch_log" MAGIKOS_TEST_BROWSER_FOCUS="$focus_log" \
+HOME="$test_home" PATH="$mock_bin:$PATH" \
+  MAGIKOS_TEST_BROWSER_LAUNCH="$launch_log" \
   bash "$ROOT/bin/magikos-launch-browser" --private
 
-[[ ! -e $focus_log ]] || fail "private browser launcher leaves a new window on the current workspace"
-
-HOME="$test_home" PATH="$mock_bin:$PATH" HYPRLAND_INSTANCE_SIGNATURE=test \
-  MAGIKOS_TEST_BROWSER_LAUNCH="$launch_log" MAGIKOS_TEST_BROWSER_FOCUS="$focus_log" \
+HOME="$test_home" PATH="$mock_bin:$PATH" \
+  MAGIKOS_TEST_BROWSER_LAUNCH="$launch_log" \
   bash "$ROOT/bin/magikos-launch-browser" "https://example.test/authorize"
 
 grep -F 'https://example.test/authorize' "$launch_log" >/dev/null || fail "browser launcher passes through the URL"
-grep -Fx '^chromium.*$' "$focus_log" >/dev/null || fail "browser launcher focuses the default browser window"
 
-rm -f "$focus_log" "$xdg_settings_browser"
+rm -f "$xdg_settings_browser"
 
-HOME="$test_home" PATH="$mock_bin:$PATH" HYPRLAND_INSTANCE_SIGNATURE=test \
+HOME="$test_home" PATH="$mock_bin:$PATH" \
   BROWSER=magikos-launch-browser MAGIKOS_TEST_XDG_SETTINGS_EMPTY=1 \
-  MAGIKOS_TEST_BROWSER_LAUNCH="$launch_log" MAGIKOS_TEST_BROWSER_FOCUS="$focus_log" \
+  MAGIKOS_TEST_BROWSER_LAUNCH="$launch_log" \
   MAGIKOS_TEST_XDG_SETTINGS_BROWSER="$xdg_settings_browser" \
   bash "$ROOT/bin/magikos-launch-browser" "https://example.test/fallback"
 
@@ -75,7 +65,5 @@ grep -F 'https://example.test/fallback' "$launch_log" >/dev/null ||
   fail "browser launcher falls back to the HTTPS handler when xdg-settings is empty"
 [[ ! -e $xdg_settings_browser ]] ||
   fail "browser launcher unsets BROWSER before reading xdg-settings"
-grep -Fx '^chromium.*$' "$focus_log" >/dev/null ||
-  fail "browser launcher focuses the browser resolved from the HTTPS handler"
 
-pass "browser launcher follows opened links to the browser workspace"
+pass "browser launcher follows opened links to the default browser"

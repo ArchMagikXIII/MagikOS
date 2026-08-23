@@ -12,14 +12,15 @@ call_log="$test_tmp/calls"
 runtime_dir="$test_tmp/runtime"
 mkdir -p "$mock_bin" "$runtime_dir"
 
-cat >"$mock_bin/magikos-hyprland-monitor-focused-apple" <<'SH'
+cat >"$mock_bin/swaymsg" <<'SH'
 #!/bin/bash
-exit 1
+[[ $1 == "-t" && $2 == "get_outputs" ]] && printf '%s\n' "${SWAY_OUTPUTS:-[]}"
+exit 0
 SH
 
-cat >"$mock_bin/magikos-hyprland-monitor-focused" <<'SH'
+cat >"$mock_bin/magikos-brightness-display-apple" <<'SH'
 #!/bin/bash
-printf '%s\n' "${FOCUSED_MONITOR:-eDP-1}"
+printf 'apple %s\n' "$*" >>"$CALL_LOG"
 SH
 
 cat >"$mock_bin/magikos-hw-display" <<'SH'
@@ -86,7 +87,7 @@ grep -F 'brightnessctl -d mock_backlight -m' "$call_log" >/dev/null || \
   fail "internal monitor queries brightnessctl"
 pass "internal monitor uses the kernel backlight"
 
-brightness=$(FOCUSED_MONITOR=DP-1 run_brightness)
+brightness=$(SWAY_OUTPUTS='[{"name":"DP-1","focused":true},{"name":"eDP-1","focused":false}]' run_brightness)
 [[ $brightness == "50" ]] || fail "brightness follows the focused external monitor" "actual: $brightness"
 pass "brightness follows the focused external monitor"
 
@@ -129,18 +130,18 @@ grep -F 'ddcutil --bus 7 --skip-ddc-checks --noverify setvcp 10 5' "$call_log" >
   fail "external low brightness writes the one-percent target"
 pass "external low brightness uses a one-percent step"
 
-cat >"$mock_bin/hyprctl" <<'SH'
-#!/bin/bash
-printf '%s\n' '[
-  {"name":"DP-1","focused":true,"make":"HPN","model":"OMEN X 25f"},
-  {"name":"DP-2","focused":false,"make":"Apple Computer Inc","model":"StudioDisplay"}
-]'
-SH
-chmod +x "$mock_bin/hyprctl"
-
-PATH="$mock_bin:$PATH" "$ROOT/bin/magikos-hyprland-monitor-focused-apple" DP-2 || \
+apple_calls=$(grep -c '^apple ' "$call_log" || true)
+PATH="$mock_bin:$PATH" CALL_LOG="$call_log" \
+  SWAY_OUTPUTS='[{"name":"DP-2","focused":true,"make":"HPN","model":"OMEN X 25f"},{"name":"DP-3","focused":false,"make":"Apple Computer Inc","model":"StudioDisplay"}]' \
+  run_brightness --no-osd --monitor DP-3 30% >/dev/null
+(( $(grep -c '^apple ' "$call_log") == apple_calls + 1 )) || \
   fail "named Apple display is detected independently of focus"
-if PATH="$mock_bin:$PATH" "$ROOT/bin/magikos-hyprland-monitor-focused-apple"; then
-  fail "focused non-Apple display is not detected as Apple"
-fi
+
+# A focused non-Apple display goes to the DDC or backlight path instead; only
+# the Apple routing matters here.
+PATH="$mock_bin:$PATH" CALL_LOG="$call_log" \
+  SWAY_OUTPUTS='[{"name":"DP-2","focused":true,"make":"HPN","model":"OMEN X 25f"}]' \
+  run_brightness --no-osd --monitor DP-2 30% >/dev/null || true
+(( $(grep -c '^apple ' "$call_log") == apple_calls + 1 )) || \
+  fail "focused non-Apple display is not routed to the Apple backend"
 pass "named Apple display is detected independently of focus"

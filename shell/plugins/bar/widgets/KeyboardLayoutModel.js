@@ -2,7 +2,7 @@
 // tested under node (test/shell.d/keyboard-layout-test.sh).
 
 // xkbcli list prints YAML, and every layout and variant block pairs a brief with
-// the description hyprctl reports as the active keymap:
+// the description reported for the active keymap:
 //
 //   - layout: 'us'
 //     variant: ''

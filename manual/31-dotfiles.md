@@ -8,12 +8,12 @@ Here's a list of the key files in `~/.config` and what they control:
 
 | File                  | Purpose              |
 | ----------------------- | --------------------- |
-| `~/.config/hypr/hyprland.lua` | The main Hyprland config. Loads the Magikos defaults plus your override files below. [Learn more about Hyprland configs](https://wiki.hypr.land/Configuring/).  |
-| `~/.config/hypr/bindings.lua` | Your own keybindings and overrides of the defaults. |
-| `~/.config/hypr/monitors.lua` | Controls your monitors, resolution, and position. |
-| `~/.config/hypr/input.lua` | Controls your keyboard layout, mouse, and trackpad settings. |
-| `~/.config/hypr/looknfeel.lua` | Controls gaps, borders, animations, and the rest of the look. |
-| `~/.config/hypr/autostart.lua` | Controls extra processes started with the session. |
+| `~/.config/sway/config` | The main Sway config. Pulls in the override files below with `include`.  |
+| `~/.config/sway/bindings.conf` | Your own keybindings and overrides of the defaults. |
+| `~/.config/sway/output.conf` | Controls your monitors, resolution, and position. |
+| `~/.config/sway/input.conf` | Controls your keyboard layout, mouse, and trackpad settings. |
+| `~/.config/sway/appearance.conf` | Controls gaps, borders, and the rest of the look. |
+| `~/.config/sway/autostart.conf` | Controls extra processes started with the session. |
 | `~/.config/magikos/shell.json` | Controls the Magikos shell: bar position, layout, and widgets, plus screensaver, lock, and idle timings. |
 | `~/.config/foot/foot.ini` | Controls your terminal (foot is the default). |
 | `~/.XCompose` | Defines your quick-access emoji and name/email autocomplete. Make sure to run `magikos-restart-xcompose` after making changes. |
@@ -22,10 +22,10 @@ If you end up making a lot of changes to tweak your own setup, it's a good idea 
 
 ### Starting your own apps with the session
 
-If you want something to run every time you log in — a sync daemon, a chat app, your own script — put it in `~/.config/hypr/autostart.lua`:
+If you want something to run every time you log in — a sync daemon, a chat app, your own script — put it in `~/.config/sway/autostart.conf`:
 
-```lua
-o.launch_on_start("my-service")
+```
+exec my-service
 ```
 
 That starts the command as part of the session, so it's properly cleaned up when you log out again.
@@ -64,11 +64,11 @@ Magikos ships with a bunch of ergonomic aliases and helpful functions, but it's 
 
 Look, this is your computer. You can do whatever you want with it, but I would advise against making changes to the files in `/usr/share/magikos` directly. They belong to the Magikos pacman package, so your changes will simply be overwritten on the next update. You're better off just overwriting any default values you don't like in the `~/.config/*` folder instead.
 
-You can change just about everything that way, like the default keybindings. Just edit `~/.config/hypr/bindings.lua` to, say, replace [Obsidian](https://obsidian.md/) with [Joplin](https://joplinapp.org/) (install with `magikos-pkg-add joplin-bin`):
+You can change just about everything that way, like the default keybindings. Just edit `~/.config/sway/bindings.conf` to, say, replace [Obsidian](https://obsidian.md/) with [Joplin](https://joplinapp.org/) (install with `magikos-pkg-add joplin-bin`):
 
 ```
-hl.unbind("SUPER + SHIFT + O")
-o.bind("SUPER + SHIFT + O", "Joplin", "joplin-desktop")
+unbindsym $mod+Shift+o
+bindsym $mod+Shift+o exec joplin-desktop
 ```
 
 If you insist on hacking on the internal Magikos files, switch to the dev channel via _Update > Channel > Dev_. That links Magikos to a git checkout of the source code in `~/magikos`, which you're free to change to your heart's content. Ain't nobody here to tell you what to do!

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# magikos:summary=Print the detected Hyprland touchpad or trackpad device name
+# magikos:summary=Print the detected touchpad or trackpad device name
 
-device=$(hyprctl devices -j | jq -r '[.mice[] | .name | select(test("touchpad|trackpad"; "i"))] | first // empty')
+device=$(swaymsg -t get_seats -r | jq -r '[.[].devices[] | select(.type == "pointer") | .name | select(test("touchpad|trackpad"; "i"))] | first // empty')
 [[ -n $device ]] && echo "$device"

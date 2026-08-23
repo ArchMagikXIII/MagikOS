@@ -32,22 +32,22 @@ if [[ -z ${LANG:-} ]]; then
   export LANG="${locale_name:-C.UTF-8}"
 fi
 
-# First boot may still be settling; wait for Hyprland to come up.
+# First boot may still be settling; wait for Sway to come up.
 boot_deadline=$((SECONDS + ${MAGIKOS_ACCEPTANCE_BOOT_TIMEOUT:-300}))
 
 wait_for_session() {
-  local signature
+  local socket
 
   while true; do
-    signature=$(ls -t "$XDG_RUNTIME_DIR/hypr" 2>/dev/null | head -1)
+    socket=$(ls -t "$XDG_RUNTIME_DIR"/sway-ipc.*.sock 2>/dev/null | head -1)
 
-    if [[ -n $signature ]]; then
-      export HYPRLAND_INSTANCE_SIGNATURE="$signature"
-      hyprctl -j monitors >/dev/null 2>&1 && return 0
+    if [[ -n $socket ]]; then
+      export SWAY_SOCK="$socket"
+      swaymsg -t get_version >/dev/null 2>&1 && return 0
     fi
 
     if ((SECONDS >= boot_deadline)); then
-      echo "not ok - Hyprland session never came up" >&2
+      echo "not ok - Sway session never came up" >&2
       exit 1
     fi
 
@@ -56,7 +56,11 @@ wait_for_session() {
 }
 
 wait_for_session
-printf 'ok - Hyprland session is up (signature %s)\n' "$HYPRLAND_INSTANCE_SIGNATURE"
+printf 'ok - Sway session is up (socket %s)\n' "$SWAY_SOCK"
+
+# The pixel-diff layer checks compare against a reference of the empty screen,
+# so seed it as soon as the session is answering.
+timeout 10 grim "$ARTIFACTS/absent-screen-reference.png" 2>/dev/null || true
 
 if [[ -z ${WAYLAND_DISPLAY:-} ]]; then
   display=$(find "$XDG_RUNTIME_DIR" -maxdepth 1 -name "wayland-*" ! -name "*.lock" -printf '%f\n' 2>/dev/null | head -1)

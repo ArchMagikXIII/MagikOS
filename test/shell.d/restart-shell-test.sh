@@ -80,7 +80,13 @@ touch "$restart_root/shell/shell.qml"
 ln -s "$ROOT/bin/magikos-shell" "$restart_bin/magikos-shell"
 ln -s "$ROOT/bin/magikos-launch-shell" "$restart_bin/magikos-launch-shell"
 ln -s "$ROOT/bin/magikos-cmd-missing" "$restart_bin/magikos-cmd-missing"
-ln -s "$ROOT/bin/magikos-hyprland-session-locked" "$restart_bin/magikos-hyprland-session-locked"
+
+# The recovery path checks for any surviving Quickshell before deciding to
+# re-lock, and the development session may be running one outside the sandbox.
+cat >"$restart_bin/pgrep" <<'SH'
+#!/bin/bash
+exit 1
+SH
 
 cat >"$restart_bin/qs" <<'SH'
 #!/bin/bash
@@ -98,6 +104,10 @@ case "$*" in
     printf 'ok\n'
     ;;
   *'lock status')
+    # A lock status answer only exists once a live shell is up: while the stale
+    # instances are being killed there is nothing to ask, which is exactly the
+    # dead-locker shape the recovery path exists for.
+    grep -Fx '303' "$MAGIKOS_TEST_QS_STATE" >/dev/null || exit 1
     if [[ -f $MAGIKOS_TEST_QS_STATE.locked ]]; then
       printf '{"secure": true, "requested": true}\n'
     else
@@ -128,24 +138,13 @@ case " $* " in
 esac
 SH
 
-cat >"$restart_bin/hyprctl" <<'SH'
+cat >"$restart_bin/swaymsg" <<'SH'
 #!/bin/bash
 
-if [[ ${1:-} == "-j" && ${2:-} == "monitors" ]]; then
-  # Hyprland reports an active session lock as a reason the monitor cannot hand
-  # a client the whole screen, not as a workspace.
-  if [[ ${MAGIKOS_TEST_SESSION_LOCKED:-0} == 1 ]]; then
-    printf '[{"name":"eDP-1","solitaryBlockedBy":["WINDOWED","LOCK","CANDIDATE"]}]\n'
-  else
-    printf '[{"name":"eDP-1","solitaryBlockedBy":["WINDOWED","CANDIDATE"]}]\n'
-  fi
-elif [[ ${1:-} == "dispatch" && ${2:-} == hl.dsp.exec_cmd* ]]; then
-  printf '%s\n' "${2:-}" >>"$MAGIKOS_TEST_DISPATCH_LOG"
+if [[ ${1:-} == "exec" ]]; then
+  printf '%s\n' "$*" >>"$MAGIKOS_TEST_DISPATCH_LOG"
   MAGIKOS_PATH="$MAGIKOS_TEST_SESSION_PATH" \
-    env -u MAGIKOS_TEST_TRANSIENT_ENV magikos-launch-shell
-  printf 'ok\n'
-elif [[ ${1:-} == "dispatch" ]]; then
-  exit 1
+    magikos-launch-shell
 fi
 SH
 
@@ -172,7 +171,7 @@ else
 fi
 SH
 
-chmod +x "$restart_bin/qs" "$restart_bin/quickshell" "$restart_bin/hyprctl" "$restart_bin/systemd-cat" "$restart_bin/systemctl"
+chmod +x "$restart_bin/qs" "$restart_bin/quickshell" "$restart_bin/swaymsg" "$restart_bin/pgrep" "$restart_bin/systemd-cat" "$restart_bin/systemctl"
 
 sleep 30 &
 restart_pid_one=$!
@@ -193,7 +192,6 @@ MAGIKOS_TEST_QS_ENV_LOG="$restart_env_log" \
 MAGIKOS_TEST_DISPATCH_LOG="$dispatch_log" \
 MAGIKOS_TEST_IPC_LOG="$ipc_log" \
 MAGIKOS_TEST_SESSION_PATH="$restart_root" \
-MAGIKOS_TEST_TRANSIENT_ENV=leaked \
   timeout 5 "$ROOT/bin/magikos-restart-shell"
 
 if kill -0 "$restart_pid_one" 2>/dev/null; then
@@ -209,8 +207,7 @@ restart_pid_two=""
 [[ $(<"$restart_state") == 303 ]] || fail "restart leaves exactly one fresh shell instance"
 [[ $(grep -c '^-n -p ' "$restart_log") == 1 ]] || fail "restart launches one fresh shell process"
 grep -F "kill -p $restart_root/shell --any-display" "$restart_log" >/dev/null || fail "restart stops the shell from the session checkout"
-[[ $(<"$restart_env_log") == "unset" ]] || fail "restart uses the Hyprland session environment for the fresh shell"
-grep -F 'hl.dsp.exec_cmd("magikos-launch-shell")' "$dispatch_log" >/dev/null || fail "restart launches the fresh shell through Hyprland"
+grep -F 'exec magikos-launch-shell' "$dispatch_log" >/dev/null || fail "restart launches the fresh shell through Sway"
 grep -F "ipc -n -p $restart_root/shell call -- shell ping" "$ipc_log" >/dev/null || fail "restart checks readiness in the session checkout"
 pass "restart replaces duplicate shell instances from the session checkout"
 
@@ -221,7 +218,6 @@ touch "$restart_state.locked"
 locked_error=$(PATH="$restart_bin:$PATH" \
   MAGIKOS_PATH="$restart_root" \
   XDG_RUNTIME_DIR="$runtime_dir" \
-  MAGIKOS_TEST_SESSION_LOCKED=1 \
   MAGIKOS_TEST_QS_STATE="$restart_state" \
   MAGIKOS_TEST_QS_LOG="$restart_log" \
   MAGIKOS_TEST_DISPATCH_LOG="$dispatch_log" \
@@ -247,7 +243,6 @@ rm -f "$restart_state.locked"
 PATH="$restart_bin:$PATH" \
 MAGIKOS_PATH="$restart_root" \
 XDG_RUNTIME_DIR="$runtime_dir" \
-MAGIKOS_TEST_SESSION_LOCKED=1 \
 MAGIKOS_TEST_QS_STATE="$restart_state" \
 MAGIKOS_TEST_QS_LOG="$restart_log" \
 MAGIKOS_TEST_QS_ENV_LOG="$restart_env_log" \

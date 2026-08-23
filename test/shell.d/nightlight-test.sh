@@ -22,19 +22,16 @@ mkdir -p "$TMPDIR/bin"
 STATE="$TMPDIR/hyprsunset-temp"
 SHELL_LOG="$TMPDIR/magikos-shell-log"
 
-cat >"$TMPDIR/bin/hyprctl" <<'SH'
+cat >"$TMPDIR/bin/hyprsunset" <<'SH'
 #!/bin/bash
 
-if [[ ${1:-} == "hyprsunset" && ${2:-} == "temperature" ]]; then
-  if [[ -n ${3:-} ]]; then
-    printf '%s\n' "$3" >"$HYPRSUNSET_STATE"
-  else
-    cat "$HYPRSUNSET_STATE" 2>/dev/null || exit 1
-  fi
-  exit 0
+if [[ ${1:-} == "-g" ]]; then
+  cat "$HYPRSUNSET_STATE" 2>/dev/null || exit 1
+elif [[ ${1:-} == "-t" && -n ${2:-} ]]; then
+  printf '%s\n' "$2" >"$HYPRSUNSET_STATE"
+else
+  exit 1
 fi
-
-exit 1
 SH
 
 cat >"$TMPDIR/bin/pgrep" <<'SH'
@@ -47,7 +44,7 @@ cat >"$TMPDIR/bin/magikos-shell" <<'SH'
 printf '%s\n' "$*" >>"$MAGIKOS_SHELL_LOG"
 SH
 
-chmod +x "$TMPDIR/bin/hyprctl" "$TMPDIR/bin/pgrep" "$TMPDIR/bin/magikos-shell"
+chmod +x "$TMPDIR/bin/hyprsunset" "$TMPDIR/bin/pgrep" "$TMPDIR/bin/magikos-shell"
 
 nightlight_cli() {
   PATH="$TMPDIR/bin:$PATH" \

@@ -131,7 +131,6 @@ package_defaults = [
   ("default/uwsm/default", None, "uwsm/default"),
   ("default/environment.d/10-magikos-fcitx.conf", "/usr/lib/environment.d/10-magikos-fcitx.conf", "environment.d/fcitx.conf"),
   ("default/fontconfig/conf.avail/50-magikos.conf", "/usr/share/fontconfig/conf.avail/50-magikos.conf", "fontconfig/fonts.conf"),
-  ("default/xdg-terminal-exec/hyprland-xdg-terminals.list", "/usr/share/xdg-terminal-exec/hyprland-xdg-terminals.list", "xdg-terminals.list"),
   ("default/applications/mimeapps.list", "/usr/share/applications/mimeapps.list", "mimeapps.list"),
   ("etc/fastfetch/config.jsonc", "/etc/fastfetch/config.jsonc", "fastfetch/config.jsonc"),
   ("default/systemd/user/bt-agent.service", "/usr/lib/systemd/user/bt-agent.service", "systemd/user/bt-agent.service"),
@@ -166,8 +165,6 @@ if notify_alias not in pkgbuild:
 
 alpm_hooks = [
   "00-magikos-update-guard.hook",
-  "10-magikos-hyprland-reload-pause.hook",
-  "90-magikos-hyprland-reload-resume.hook",
 ]
 for hook in alpm_hooks:
   source = f"default/libalpm/hooks/{hook}"
@@ -182,29 +179,6 @@ if errors:
   sys.exit(1)
 PY
 pass "package-owned defaults live outside config"
-
-grep -F 'dofile((os.getenv("MAGIKOS_PATH") or "/usr/share/magikos") .. "/default/hypr/bootstrap.lua")' "$ROOT/config/hypr/hyprland.lua" >/dev/null
-grep -F 'require("default.hypr.magikos")' "$ROOT/config/hypr/hyprland.lua" >/dev/null
-grep -F 'package.path = home' "$ROOT/default/hypr/bootstrap.lua" >/dev/null
-grep -F '/.local/state/?.lua;' "$ROOT/default/hypr/bootstrap.lua" >/dev/null
-pass "Hyprland user entrypoint keeps package and state path bootstrap in defaults"
-
-MAGIKOS_PATH="$ROOT" lua <<'LUA'
-package.loaded["default.hypr.magikos"] = true
-package.loaded["default.hypr.require_optional"] = true
-package.loaded["hypr.looknfeel"] = true
-package.loaded["magikos.current.theme.hyprland"] = true
-package.loaded["unrelated.module"] = true
-
-dofile(os.getenv("MAGIKOS_PATH") .. "/default/hypr/bootstrap.lua")
-
-assert(package.loaded["default.hypr.magikos"] == nil)
-assert(package.loaded["default.hypr.require_optional"] == nil)
-assert(package.loaded["hypr.looknfeel"] == nil)
-assert(package.loaded["magikos.current.theme.hyprland"] == nil)
-assert(package.loaded["unrelated.module"] == true)
-LUA
-pass "Hyprland bootstrap reloads cached Magikos config modules"
 
 TMPDIR=$(mktemp -d)
 mkdir -p "$TMPDIR/home/.config/magikos"

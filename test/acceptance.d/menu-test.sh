@@ -30,26 +30,45 @@ restore_bar_config() {
 
 trap restore_bar_config EXIT
 
+# Sway's IPC exposes no layer surfaces, so bar orientation comes from the
+# shell's own geometry report: the bar is vertical when its visible slots
+# stack taller than they spread wide.
+bar_geometry() {
+  magikos-shell shell debugBarGeometry 2>/dev/null
+}
+
 bar_is_vertical() {
-  local width height
+  local geometry
 
-  read -r width height < <(hyprctl -j layers | jq -r '
-    [.. | objects | select(.namespace? == "magikos-bar")][0]
-    | [.w, .h] | @tsv
-  ')
+  geometry=$(bar_geometry) || return 1
 
-  [[ $width =~ ^[0-9]+$ && $height =~ ^[0-9]+$ ]] && ((width < height))
+  jq -e '
+    ([.[] | select(.visible and .width > 0 and .height > 0)] | length > 0) and
+    (
+      ([.[] | select(.visible) | .x + .width] | max) -
+      ([.[] | select(.visible) | .x] | min)
+    ) < (
+      ([.[] | select(.visible) | .y + .height] | max) -
+      ([.[] | select(.visible) | .y] | min)
+    )
+  ' <<<"$geometry" >/dev/null
 }
 
 bar_is_horizontal() {
-  local width height
+  local geometry
 
-  read -r width height < <(hyprctl -j layers | jq -r '
-    [.. | objects | select(.namespace? == "magikos-bar")][0]
-    | [.w, .h] | @tsv
-  ')
+  geometry=$(bar_geometry) || return 1
 
-  [[ $width =~ ^[0-9]+$ && $height =~ ^[0-9]+$ ]] && ((width > height))
+  jq -e '
+    ([.[] | select(.visible and .width > 0 and .height > 0)] | length > 0) and
+    (
+      ([.[] | select(.visible) | .x + .width] | max) -
+      ([.[] | select(.visible) | .x] | min)
+    ) > (
+      ([.[] | select(.visible) | .y + .height] | max) -
+      ([.[] | select(.visible) | .y] | min)
+    )
+  ' <<<"$geometry" >/dev/null
 }
 
 bar_position_is() {

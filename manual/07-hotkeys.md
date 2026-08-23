@@ -1,6 +1,6 @@
 # Hotkeys
 
-You can see all the main keyboard bindings with `Super + K` (Tmux bindings with `Super + Alt + K` and Herdr bindings with `Super + Ctrl + K`).
+You can see all the main keyboard bindings with `Super + K` (Tmux bindings with `Super + Alt + K`).
 
 ## Navigating
 
@@ -124,7 +124,7 @@ You can see all the main keyboard bindings with `Super + K` (Tmux bindings with 
 | `Super + Shift + Alt + X`           | X Compose |
 | `Super + Shift + Y`           | YouTube |
 
-Change/add bindings in `~/.config/hypr/bindings.lua`.
+Change/add bindings in `~/.config/sway/bindings.conf`.
 
 ## Universal clipboard
 

@@ -2,7 +2,7 @@
 
 Everything in Magikos happens via the keyboard — _EVERYTHING!_ When the system first starts, you literally can't do a thing with the mouse alone. But you can hit `Super + Space` to reveal the Magikos Menu and from here you to do just about everything.
 
-But the Magikos menu is not even intended to be the main way to operate the system most of the time. We can get faster than that! All the most important applications are bound directly to individual hotkeys. You start the terminal with `Super + Return` and a browser with `Super + Shift + Return`. Try doing one after the other, and you'll see the magic of Hyprland's tiling in action:
+But the Magikos menu is not even intended to be the main way to operate the system most of the time. We can get faster than that! All the most important applications are bound directly to individual hotkeys. You start the terminal with `Super + Return` and a browser with `Super + Shift + Return`. Try doing one after the other, and you'll see the magic of tiling in action:
 
  ![navigation-browser-terminal](images/navigation-browser-terminal.webp)
 
@@ -37,16 +37,6 @@ But you can also choose to turn a workspace into the scrolling layout where wind
  ![navigation-scrolling-layout](images/navigation-scrolling-layout.webp)
 
 The choice is per workspace, and it sticks. So you can keep workspace 1 on dwindle for browsing and workspace 2 on scrolling for code, and they'll come back that way after a restart. (The same toggle is under _Trigger > Toggle > Workspace Layout_ in the Magikos menu).
-
-If you wish to use the scrolling layout as the default, you can set that in `~/.config/hypr/looknfeel.lua`:
-
-```lua
-hl.config({
-  general = {
-    layout = "scrolling",
-  },
-})
-```
 
 ### Grouping windows
 

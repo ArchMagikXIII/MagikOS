@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# magikos:summary=Lock and reconcile displays when the laptop lid closes
+# magikos:summary=Lock the session when the laptop lid closes on an undocked machine
 # magikos:group=system
 # magikos:hidden=true
 
@@ -16,5 +16,3 @@
 if magikos-hw-laptop-closed && ! magikos-hw-external-monitors; then
   magikos-system-lock >/dev/null 2>&1 || true
 fi
-
-magikos-hyprland-monitor-clamshell

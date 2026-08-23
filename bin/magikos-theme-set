@@ -189,7 +189,6 @@ flock -u 9
 
 post_theme_commands=(
   magikos-restart-terminal
-  magikos-restart-hyprctl
   magikos-restart-btop
   magikos-restart-opencode
   magikos-restart-helix

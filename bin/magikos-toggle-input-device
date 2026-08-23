@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# magikos:summary=Enable, disable, or toggle a Hyprland input device
+# magikos:summary=Enable, disable, or toggle an input device
 # magikos:args=<touchpad|touchscreen> [on|off|toggle]
 # magikos:hidden=true
 
@@ -16,8 +16,8 @@ case "$KIND" in
     ;;
 esac
 
-# Hyprland sources this directory on reload, so the disabled state survives restarts
-STATE_FILE="$HOME/.local/state/magikos/toggles/hypr/$KIND-disabled.lua"
+# Flag file records the disabled state so it survives restarts
+STATE_FILE="$HOME/.local/state/magikos/toggles/$KIND-disabled"
 
 device="$("magikos-hw-$KIND")"
 
@@ -27,15 +27,15 @@ if [[ -z $device ]]; then
 fi
 
 enable() {
-  hyprctl eval "hl.device({ name = \"$device\", enabled = true })" >/dev/null
+  swaymsg input "$device" events enabled >/dev/null
   rm -f "$STATE_FILE"
   magikos-osd -i "$ICON" -m "$LABEL enabled"
 }
 
 disable() {
-  hyprctl eval "hl.device({ name = \"$device\", enabled = false })" >/dev/null
+  swaymsg input "$device" events disabled >/dev/null
   mkdir -p "$(dirname "$STATE_FILE")"
-  printf 'hl.device({ name = "%s", enabled = false })\n' "$device" >"$STATE_FILE"
+  printf '%s\n' "$device" >"$STATE_FILE"
   magikos-osd -i "$ICON" -m "$LABEL disabled"
 }
 

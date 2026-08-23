@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# magikos:summary=Print the detected Hyprland touchscreen or tablet device name
+# magikos:summary=Print the detected touchscreen or tablet device name
 
-device=$(hyprctl devices -j | jq -r '[.touch[]?.name, .tablets[]?.name] | first // empty')
+device=$(swaymsg -t get_seats -r | jq -r '[.[].devices[] | select(.type == "touch" or .type == "tablet_tool") | .name] | first // empty')
 [[ -n $device ]] && echo "$device"

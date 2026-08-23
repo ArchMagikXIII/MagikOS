@@ -13,7 +13,7 @@ marker="$test_home/.local/state/magikos/preinstalls-removed"
 pkg_log="$test_tmp/packages"
 mkdir -p "$mock_bin" "$test_home/.local/state/magikos"
 
-for command in magikos-webapp-remove-all magikos-tui-remove-all magikos-refresh-applications hyprctl; do
+for command in magikos-webapp-remove-all magikos-tui-remove-all magikos-refresh-applications; do
   printf '#!/bin/bash\nexit 0\n' >"$mock_bin/$command"
 done
 

@@ -3,8 +3,4 @@
 # magikos:summary=Returns true when the compositor has an active external monitor
 # magikos:hidden=true
 
-if swaymsg -t get_version >/dev/null 2>&1; then
-  swaymsg -t get_outputs -r 2>/dev/null | jq -e '.[] | select(.name | test("^(eDP|LVDS|DSI)-") | not) | select(.active == true)' >/dev/null 2>&1
-elif magikos-cmd-present hyprctl; then
-  hyprctl monitors all -j 2>/dev/null | jq -e '.[] | select(.name | test("^(eDP|LVDS|DSI)-") | not) | select(.disabled == false)' >/dev/null 2>&1
-fi
+swaymsg -t get_outputs -r 2>/dev/null | jq -e '.[] | select(.name | test("^(eDP|LVDS|DSI)-") | not) | select(.active == true)' >/dev/null 2>&1

@@ -11,7 +11,7 @@
 state_file = "auto"
 
 [hotkey]
-# Hotkey is configured in Hyprland. Default is Super + Ctrl + X
+# Hotkey is bound in the compositor keybinds. Default is Super + Ctrl + X
 enabled = false
 
 [audio]

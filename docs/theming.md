@@ -28,8 +28,7 @@ Beyond `colors.toml` and hand-written config overrides, a theme can ship
 
 Template rendering only happens when the staged theme has `colors.toml`.
 Existing files are never overwritten by a template, so a hand-written
-`themes/<name>/shell.toml` or `hyprland.lua` wins over
-`default/themed/shell.toml.tpl` or `hyprland.lua.tpl`.
+`themes/<name>/shell.toml` wins over `default/themed/shell.toml.tpl`.
 
 User templates in `~/.config/magikos/themed/*.tpl` are processed before the
 built-in templates. If a user template has the same output filename as a
@@ -37,7 +36,7 @@ built-in template, the built-in output is skipped.
 
 After activation, `magikos-theme-set` fires the `theme-set` hook
 (`~/.config/magikos/hooks/theme-set*`, theme name in `$1`) and dispatches a
-parallel retint of running apps — terminals, Hyprland, btop, browser, editors,
+parallel retint of running apps — terminals, btop, browser, editors,
 and the rest of the `post_theme_commands` list in `bin/magikos-theme-set`.
 Making a new app follow theme changes means adding its restart/retint command
 to that list. Runs serialize on a `flock`, so scripted theme changes queue
@@ -134,7 +133,7 @@ percentage:
 
 ### Gradient helpers
 
-Some theme keys can be either a solid color or a Hyprland-style gradient:
+Some theme keys can be either a solid color or a gradient:
 
 ```toml
 hyprland_active_border = "rgba(33ccffee) rgba(00ff99ee) 45deg"
@@ -144,7 +143,6 @@ Gradient helper placeholders understand those values:
 
 | Helper | Use | Example output |
 |--------|-----|----------------|
-| `{{ hypr_gradient hyprland_active_border accent }}` | Hyprland Lua config | `{ colors = { "rgba(33ccffee)", "rgba(00ff99ee)" }, angle = 45 }` |
 | `{{ shell_gradient hyprland_active_border accent }}` | shell border tokens | `rgba(33ccffee) rgba(00ff99ee) 45deg` |
 | `{{ gradient_start hyprland_active_border accent }}` | flat-color-only consumers | `#33ccff` |
 
@@ -326,28 +324,6 @@ for shell theme tokens (the optional `alphaKey` names the alpha token, e.g.
 shared controls, and `Border.flat(color, width)` for a deliberate local border
 that should not be overridden by the active theme. `Color.<section>.border` is the
 flat first-stop color for consumers that cannot render full border specs.
-
-## Hyprland templates
-
-Hyprland theme output is generated from `default/themed/hyprland.lua.tpl`.
-Use `hypr_gradient` for border values because Hyprland's Lua config wants a
-Lua string for solid colors and a Lua table for gradients:
-
-```lua
-local active_border_color = {{ hypr_gradient hyprland_active_border accent }}
-```
-
-For a solid fallback this renders:
-
-```lua
-local active_border_color = "#7aa2f7"
-```
-
-For a gradient it renders:
-
-```lua
-local active_border_color = { colors = { "rgba(33ccffee)", "rgba(00ff99ee)" }, angle = 45 }
-```
 
 ## Adding or overriding theme files
 

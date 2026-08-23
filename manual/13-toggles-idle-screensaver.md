@@ -21,7 +21,7 @@ From the terminal, the same switches are `magikos toggle <thing>`. Run `magikos 
 | Suspend | — | `magikos toggle suspend` |
 | Hybrid GPU | — | `magikos toggle hybrid gpu` |
 
-The touchpad, touchscreen, and hybrid GPU switches live under _Trigger > Hardware_ (`Super + Ctrl + H`) rather than under Toggle, since they only show up when you actually have that hardware. The touchpad and touchscreen ones survive a Hyprland reload — the disabled state is written back out as a small Lua file that Hyprland sources on startup.
+The touchpad, touchscreen, and hybrid GPU switches live under _Trigger > Hardware_ (`Super + Ctrl + H`) rather than under Toggle, since they only show up when you actually have that hardware.
 
 The Toggle menu also carries a few things that aren't `magikos toggle` commands but behave the same: battery percentage in the bar, workspace layout (`Super + L`), window gaps (`Super + Shift + Backspace`), and the 1-window square aspect (`Super + Ctrl + Backspace`).
 
@@ -43,16 +43,7 @@ Inactive indicators are hidden. Hover the area around them and they fade in dimm
 
 `Super + Ctrl + N` warms the screen to 4000K, and hitting it again puts it back to 6500K. It's driven by hyprsunset, which the toggle starts for you if it isn't already running.
 
-By default hyprsunset does nothing to your screen at all. `~/.config/hypr/hyprsunset.conf` ships with an identity profile precisely so the display stays untouched until you ask for warmth. If you'd rather have it switch by the clock, replace that with a time profile:
-
-```
-profile {
-    time = 20:00
-    temperature = 4000
-}
-```
-
-Then start hyprsunset at login by adding `o.launch_on_start("hyprsunset")` to `~/.config/hypr/autostart.lua`. The 4000K/6500K pair used by the toggle is fixed, so the config file is where you go if you want a different temperature.
+The 4000K/6500K pair used by the toggle is fixed. If you want a different warmth, run hyprsunset yourself with the temperature of your choosing — say `hyprsunset -t 3000` — and to have it come up at every login, add an exec line for it to `~/.config/sway/autostart.conf`.
 
 ### Do not disturb
 

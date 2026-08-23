@@ -1,6 +1,0 @@
-#!/bin/bash
-
-# magikos:summary=Check if a Hyprland toggle is currently enabled.
-# magikos:args=<flag-name>
-
-[[ -f "$HOME/.local/state/magikos/toggles/hypr/$1.lua" ]]

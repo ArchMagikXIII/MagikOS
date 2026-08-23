@@ -103,10 +103,6 @@ wait_until "keyboard-navigated panel closes" 15 layer_absent "magikos-keyboard-p
 # OnDemand behavior, which would leave Escape in the previously focused app.
 magikos-shell shell summon magikos.bluetooth >/dev/null
 wait_until "focus-prime panel opens" 15 layer_present "magikos-keyboard-panel"
-if (( $(hyprctl -j monitors | jq length) == 1 )); then
-  layer_absent "magikos-keyboard-panel-dismiss" || fail "single-monitor panel has no dismissal twin"
-  pass "single-monitor panel has no dismissal twin"
-fi
 magikos-shell shell hide magikos.bluetooth >/dev/null
 magikos-shell shell summon magikos.bluetooth >/dev/null
 wait_until "focus-prime panel reopens" 15 layer_present "magikos-keyboard-panel"

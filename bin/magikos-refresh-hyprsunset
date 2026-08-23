@@ -1,6 +1,0 @@
-#!/bin/bash
-
-# magikos:summary=Overwrite the user config for hyprsunset with the Magikos default and restart the service.
-
-magikos-refresh-config hypr/hyprsunset.conf
-magikos-restart-hyprsunset

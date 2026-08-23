@@ -78,7 +78,7 @@ pass "commands --check passes"
 "$CLI" commands --all >/dev/null
 pass "commands --all does not crash"
 
-"$CLI" commands --all --json | jq -e '.commands[] | select(.route == "magikos hyprland window gaps toggle" and .summary != "undocumented")' >/dev/null
+"$CLI" commands --all --json | jq -e '.commands[] | select(.route == "magikos restart wifi" and .summary != "undocumented")' >/dev/null
 pass "fallback commands are inferred and documented"
 
 "$CLI" commands --all --json | jq -e '.commands[] | select(.route == "magikos dev benchmark cli")' >/dev/null
@@ -298,10 +298,8 @@ rgb={{ mix_rgb background foreground 50% }}
 EOF
 
 cat >"$USER_THEMED/gradient-test.txt.tpl" <<'EOF'
-hypr={{ hypr_gradient hyprland_active_border accent }}
 shell={{ gradient_start hyprland_active_border accent }}
 shell-gradient={{ shell_gradient hyprland_active_border accent }}
-fallback-hypr={{ hypr_gradient missing accent }}
 fallback-shell={{ gradient_start missing accent }}
 fallback-shell-gradient={{ shell_gradient missing accent }}
 EOF
@@ -447,10 +445,8 @@ if rg -q '^cursor\s*=' "$ROOT/themes" -g'colors.toml'; then
 fi
 pass "built-in colors.toml files omit cursor token"
 
-grep -qx 'hypr={ colors = { "rgba(010203ee)", "rgba(040506ee)" }, angle = 45 }' "$NEXT_THEME/gradient-test.txt" || fail "theme template hypr_gradient helper works"
 grep -qx 'shell=#010203' "$NEXT_THEME/gradient-test.txt" || fail "theme template gradient_start helper works"
 grep -qx 'shell-gradient=rgba(010203ee) rgba(040506ee) 45deg' "$NEXT_THEME/gradient-test.txt" || fail "theme template shell_gradient helper works"
-grep -qx 'fallback-hypr="#336699"' "$NEXT_THEME/gradient-test.txt" || fail "theme template hypr_gradient fallback works"
 grep -qx 'fallback-shell=#336699' "$NEXT_THEME/gradient-test.txt" || fail "theme template gradient_start fallback works"
 grep -qx 'fallback-shell-gradient=#336699' "$NEXT_THEME/gradient-test.txt" || fail "theme template shell_gradient fallback works"
 pass "theme template gradient helpers work"

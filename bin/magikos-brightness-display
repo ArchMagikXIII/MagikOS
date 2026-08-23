@@ -30,11 +30,7 @@ backlight_brightness() {
 }
 
 if [[ -z $monitor ]]; then
-  if [[ -n $SWAYSOCK ]]; then
-    monitor="$(swaymsg -t get_outputs -r 2>/dev/null | jq -r '.[] | select(.focused == true) | .name' 2>/dev/null || true)"
-  else
-    monitor="$(magikos-hyprland-monitor-focused 2>/dev/null || true)"
-  fi
+  monitor="$(swaymsg -t get_outputs -r 2>/dev/null | jq -r '.[] | select(.focused == true) | .name' 2>/dev/null || true)"
 fi
 
 monitor_is_internal() {
@@ -42,7 +38,11 @@ monitor_is_internal() {
 }
 
 use_apple_display() {
-  [[ -z $SWAYSOCK ]] && magikos-hyprland-monitor-focused-apple "$monitor"
+  swaymsg -t get_outputs -r 2>/dev/null | jq -e --arg monitor "$monitor" '
+    .[]
+    | select(if $monitor == "" then .focused == true else .name == $monitor end)
+    | select(.make == "Apple Computer Inc" and (.model | test("StudioDisplay|ProDisplayXDR|Studio XDR")))
+  ' >/dev/null 2>&1
 }
 
 use_ddc_display() {
@@ -66,19 +66,10 @@ fi
 step="$1"
 
 if [[ $step == "off" ]]; then
-  if [[ -n $SWAYSOCK ]]; then
-    swaymsg output "$monitor" dpms off >/dev/null 2>&1
-  else
-    hyprctl dispatch 'hl.dsp.dpms({ action = "disable" })' >/dev/null 2>&1
-  fi
+  swaymsg output "$monitor" dpms off >/dev/null 2>&1
   exit 0
 elif [[ $step == "on" ]]; then
-  if [[ -n $SWAYSOCK ]]; then
-    swaymsg output "$monitor" dpms on >/dev/null 2>&1
-  else
-    hyprctl monitors -j 2>/dev/null | jq -e '[.[] | select(.disabled == false)] | length > 0 and all(.dpmsStatus)' >/dev/null 2>&1 && exit 0
-    hyprctl dispatch 'hl.dsp.dpms({ action = "enable" })' >/dev/null 2>&1
-  fi
+  swaymsg output "$monitor" dpms on >/dev/null 2>&1
   exit 0
 fi
 

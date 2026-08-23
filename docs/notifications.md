@@ -87,8 +87,8 @@ keeps with the popup, which the persistence files preserve: a restored toast
 clicks through exactly like a live one, and oneshot senders can exit
 immediately. For third-party clients the click falls back to the libnotify
 `default` action while the sender is alive, then to focusing the sender's
-window by class via `magikos-hyprland-focus-app` — chat apps rarely register
-an action and just expect click-to-jump.
+window by app id — chat apps rarely register an action and just expect
+click-to-jump.
 
 ## Helper commands
 
@@ -102,7 +102,7 @@ an action and just expect click-to-jump.
 - `magikos-notification-weather` — despite the name, not a sender: it toggles
   the `magikos.weather` shell panel.
 
-Keybindings live in `default/hypr/bindings/utilities.lua`: `Super+comma`
+Keybindings live in `config/sway/bindings.conf`: `Super+comma`
 variants map to the IPC methods `dismissOne`, `dismissAll`, `invokeLast`,
 `showHistory`, and the silencing toggle.
 

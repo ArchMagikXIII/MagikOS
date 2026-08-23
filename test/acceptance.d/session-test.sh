@@ -5,7 +5,7 @@ set -euo pipefail
 source "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/base-test.sh"
 
 # The compositor reports at least one monitor
-monitors=$(hyprctl -j monitors | jq 'length')
+monitors=$(swaymsg -t get_outputs -r | jq '[.[] | select(.active)] | length')
 (( monitors >= 1 )) || fail "compositor reports a monitor"
 pass "compositor reports a monitor"
 
@@ -23,24 +23,29 @@ for plugin in \
   pass "shell plugin is loaded: $plugin"
 done
 
-# The bar and background are actually on screen
-wait_until "bar layer is on screen" 30 layer_on_screen "magikos-bar"
-wait_until "background layer is on screen" 30 layer_on_screen "magikos-background"
+# Sway's IPC exposes no layer surfaces, so rendering is verified with pixels:
+# once the shell is up, the screen must differ from the empty reference the
+# runner captured at boot. The bar and background are what draw there.
+[[ -s $ARTIFACTS/absent-screen-reference.png ]] || refresh_absent_reference
+wait_until "bar and background render on screen" 30 screen_differs_from "$ARTIFACTS/absent-screen-reference.png"
 
-# Hiding parks the bar off-screen without unmapping its layer surface, and
-# revealing brings that same surface back on-screen.
+# Hiding parks the bar without unmapping its surface, and revealing brings
+# that same surface back: hiding must move the screen away from the revealed
+# baseline, and revealing must return it.
 restore_bar_visibility() {
   magikos-toggle-bar off >/dev/null 2>&1 || true
 }
 trap restore_bar_visibility EXIT
 
+baseline="$ARTIFACTS/bar-revealed-baseline.png"
+timeout 10 grim "$baseline" 2>/dev/null || fail "captured the revealed bar baseline"
+
 magikos-toggle-bar on
-wait_until "hidden bar layer stays mapped" 15 layer_present "magikos-bar"
-wait_until "hidden bar layer parks off screen" 15 layer_off_screen "magikos-bar"
+wait_until "hidden bar leaves the revealed baseline" 15 screen_differs_from "$baseline"
 screenshot "success-bar-hidden"
 
 magikos-toggle-bar off
-wait_until "revealed bar layer returns on screen" 15 layer_on_screen "magikos-bar"
+wait_until "revealed bar returns to its baseline" 15 screen_matches "$baseline"
 screenshot "success-bar-revealed"
 trap - EXIT
 

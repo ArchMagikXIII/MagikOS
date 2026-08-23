@@ -351,9 +351,9 @@ To stop: magikos-windows-vm stop"
   fi
   export KRB5_CONFIG="$KRB5_CONF"
 
-  # Detect display scale from Hyprland
-  HYPR_SCALE=$(hyprctl monitors -j | jq -r '.[] | select (.focused == true) | .scale')
-  SCALE_PERCENT=$(echo "$HYPR_SCALE" | awk '{print int($1 * 100)}')
+  # Detect display scale from the focused output
+  SCALE=$(swaymsg -t get_outputs -r 2>/dev/null | jq -r '.[] | select(.focused == true) | .scale')
+  SCALE_PERCENT=$(echo "$SCALE" | awk '{print int($1 * 100)}')
 
   RDP_SCALE=""
   if (( SCALE_PERCENT >= 170 )); then

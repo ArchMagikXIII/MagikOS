@@ -38,7 +38,6 @@ Item {
   // copy lives and dies with the JSON file whose stem it carries.
   readonly property string imagesDir: popupStateDir + "images/"
   // Corner radius is shared with the menu and shell panels.
-  // It mirrors Hyprland's current decoration:rounding value.
   readonly property int cornerRadius: Style.cornerRadius
   // Toasts are fixed to the top-right corner. They only clear the magikos bar
   // when the bar occupies the top or right edge, so left/bottom bars do not
@@ -371,42 +370,22 @@ Item {
     // Restored rows have no live actions, and looking up liveRefs by their
     // old-generation id could fire an unrelated fresh notification's action.
     var ref = entry && !isRestoredRow(entry) ? liveRefs[entry.originalId] : null
-    var invoked = false
     try {
       if (ref && ref.actions) {
         for (var i = 0; i < ref.actions.length; i++) {
           var action = ref.actions[i]
           if (action && action.identifier === "default") {
             action.invoke()
-            invoked = true
             break
           }
         }
       }
     } catch (e) {
-      // Notification already torn down by the server — fall through to focus.
+      // Notification already torn down by the server — just dismiss.
       console.warn("invoke default failed:", e)
     }
-    // Chat apps (Slack, Discord, Vesktop, etc.) rarely register a "default"
-    // libnotify action — they just expect clicking the notification to
-    // focus their window. Fall back to focusing the sending app by class so
-    // that click-to-jump actually works.
-    if (!invoked) focusApp(entry)
     dismissPopup(index)
   }
-
-  // Try to focus an existing Hyprland window matching the notification's
-  // sender. The helper handles case-insensitive class matching.
-  function focusApp(entry) {
-    if (!entry || !entry.app) return
-    focusAppProc.command = [
-      service.magikosPath + "/bin/magikos-hyprland-focus-app",
-      String(entry.app)
-    ]
-    focusAppProc.running = true
-  }
-
-  Process { id: focusAppProc; running: false }
 
   Process {
     id: ensureDirsProc

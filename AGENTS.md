@@ -125,9 +125,9 @@ tests; follow [`agents/skills/visual-verification.md`](agents/skills/visual-veri
 To copy a default config to user config with automatic backup:
 
 ```bash
-magikos-refresh-config hypr/hyprland.lua
+magikos-refresh-config sway/input.conf
 ```
 
-This copies `$MAGIKOS_PATH/config/hypr/hyprland.lua` to `~/.config/hypr/hyprland.lua`. The argument
+This copies `$MAGIKOS_PATH/config/sway/input.conf` to `~/.config/sway/input.conf`. The argument
 is interpolated into both paths and only checked with `[[ -e ]]`, so pass a plain relative path: a
 name containing `..` resolves and copies, landing outside `~/.config` rather than being rejected.

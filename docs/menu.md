@@ -149,8 +149,8 @@ underscores normalized to dashes. An exact id beats any alias; empty input,
 so a misspelling still attempts to open that id. Summoning a route that
 resolves to an action — an alias for a leaf, like `screenrecord-stop` — runs
 the action directly instead of opening an action with no children, and a
-link is followed to its target. The default Hyprland bindings in
-`default/hypr/bindings/utilities.lua` all go through this surface
+link is followed to its target. The default bindings in
+`config/sway/bindings.conf` all go through this surface
 (SUPER+SPACE toggles root, SUPER+ESCAPE the system menu, and so on).
 
 ## Select and input modes

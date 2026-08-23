@@ -53,7 +53,7 @@ BarWidget {
     refresh()
   }
 
-  // Sway doesn't have raw events like Hyprland, so we poll periodically
+  // Sway offers no raw layout-change events, so we poll periodically
   // The keyboard layout changes are detected via the query
 
   Process {

@@ -68,7 +68,7 @@ file.
 
 ## Compositor-dependent tests
 
-Some tests launch Quickshell or query Hyprland, but the suite must stay green
+Some tests launch Quickshell or query Sway, but the suite must stay green
 on headless machines. `require_compositor "description"` handles this: when no
 compositor answers it prints `ok - no Wayland compositor; skipping ...` and
 exits 0 — a skip is a passing test — and otherwise returns so the file
@@ -79,8 +79,7 @@ proves the variable was inherited. Sandboxes pass the environment through
 while blocking `$XDG_RUNTIME_DIR`, so Quickshell clears a bare variable check
 and then aborts inside QGuiApplication — a core dump per launch where a skip
 belonged. So `compositor_reachable` checks the socket actually exists, then
-asks Hyprland itself (`hyprctl -j monitors`, retried, and only when
-`HYPRLAND_INSTANCE_SIGNATURE` makes it askable), since a compositor that died
+asks Sway itself (`swaymsg -t get_outputs`, retried), since a compositor that died
 mid-session leaves its socket behind. When the compositor is reachable,
 `require_compositor` also sets `ulimit -c 0`: Quickshell leaves through
 `qFatal()` if its connection drops mid-run, and the test should fail without

@@ -11,7 +11,7 @@ mock_bin="$tmpdir/bin"
 call_log="$tmpdir/calls"
 mkdir -p "$mock_bin"
 
-for command in magikos-shell hyprctl pkill timeout; do
+for command in magikos-shell swaymsg pkill timeout; do
   cat >"$mock_bin/$command" <<'SH'
 #!/bin/bash
 printf '%s %s\n' "$(basename "$0")" "$*" >>"$CALL_LOG"

@@ -286,7 +286,7 @@ pass "direct panel IPC opens and closes default panels"
 # the shape duplicate component loads produced, where a sync pass that ran
 # while a widget's asynchronous load was still in flight started a second one.
 # Checked before the reload below, which rebuilds widgets by design.
-screens=$(hyprctl -j monitors 2>/dev/null | jq 'length' 2>/dev/null || true)
+screens=$(swaymsg -t get_outputs -r 2>/dev/null | jq '[.[] | select(.active)] | length' 2>/dev/null || true)
 [[ $screens =~ ^[0-9]+$ ]] && (( screens > 0 )) || screens=1
 # No matches is the good case, and pipefail would otherwise abort the run.
 worst=$(grep -oE "another handler is registered for target [a-z.-]+" "$log" |

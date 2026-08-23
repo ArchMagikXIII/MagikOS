@@ -17,8 +17,6 @@ if lspci | grep -qi 'nvidia'; then
 
   magikos-pkg-add "${PACKAGES[@]}"
 
-  # Per-session Hyprland NVIDIA env vars are handled by default/hypr/nvidia.lua.
-
   # Configure modprobe for early KMS
   mkdir -p /etc/modprobe.d
   cat > /etc/modprobe.d/nvidia.conf <<'EOF'

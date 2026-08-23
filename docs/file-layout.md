@@ -112,8 +112,6 @@ default/**                     ──►  magikos-settings    /usr/share/magikos
   │                                                       (sourced by every shell/session entry point; see "Env bootstrap")
   ├─ bashrc                                             /usr/share/magikos/etc-overrides/dot.bashrc
   │                                                       → /etc/skel/.bashrc (post_install cp -f)
-  ├─ hypr/toggles/*.lua (flags,
-  │    single-window-aspect-ratio, window-no-gaps)      /etc/skel/.local/state/magikos/toggles/hypr/
   ├─ nautilus-python/extensions/*.py                    /etc/skel/.local/share/nautilus-python/extensions/
   ├─ tensaku/state.toml                                 /etc/skel/.local/state/tensaku/state.toml
   ├─ uwsm/env.d/10-magikos                              /usr/share/uwsm/env.d/
@@ -129,8 +127,6 @@ default/**                     ──►  magikos-settings    /usr/share/magikos
   ├─ systemd/zram-generator.conf.d/90-magikos.conf      /usr/lib/systemd/zram-generator.conf.d/
   ├─ fonts/magikos/magikos.ttf                          /usr/share/fonts/magikos/
   ├─ sddm/magikos/                                      /usr/share/sddm/themes/magikos/
-  ├─ sddm/hyprland.lua                                  /usr/share/sddm/hyprland.lua
-  ├─ wayland-sessions/magikos.desktop                   /usr/local/share/wayland-sessions/
   └─ plymouth/                                          /usr/share/plymouth/themes/magikos/
 
 logo.{txt,svg}, icon.{txt,png}  ──► magikos-settings    /usr/share/magikos/  (resync source)
@@ -173,7 +169,7 @@ Sourced by every entry point that needs the env set:
 ```
 /etc/profile.d/magikos.sh                      (system login shells)
 /etc/skel/.bashrc                              (interactive shells)
-/usr/share/uwsm/env.d/10-magikos               (Hyprland session via uwsm)
+/usr/share/uwsm/env.d/10-magikos               (Sway session via uwsm)
 /usr/share/magikos/default/bash/envs           (SSH / non-login bash)
 ```
 
@@ -195,7 +191,7 @@ with `visudo -c` before install and removed by `magikos-dev-unlink`; unlike
 ## Runtime finalization (`magikos-provision-user`)
 
 Runs once per user. It does **not** copy `~/.config/**`, `~/.bashrc`,
-`flags.lua`, or the nautilus extensions — `/etc/skel` already seeded those.
+or the nautilus extensions — `/etc/skel` already seeded those.
 It only does the things `/etc/skel` can't:
 
 - Skill symlinks `~/.{agents,claude,codex,pi/agent}/skills/<name>` →
@@ -205,8 +201,6 @@ It only does the things `/etc/skel` can't:
   checkout repoints them correctly.
 - `xdg-user-dirs-update` (Templates/Public/Desktop folded back into `$HOME`)
   and `~/.config/gtk-3.0/bookmarks` (needs `$HOME` expansion).
-- Hyprland's package-owned default input reads `XKBLAYOUT` / `XKBVARIANT`
-  from `/etc/vconsole.conf`; no per-user Hyprland config rewrite is needed.
 - `xdg-settings set default-web-browser chromium.desktop` and
   `xdg-mime default HEY.desktop x-scheme-handler/mailto` (XDG-aware paths).
 - `magikos-refresh-applications` (composes generated `.desktop` launchers).
@@ -329,7 +323,7 @@ When an existing user wants to reset to shipped defaults:
 
 Replaying `/etc/skel` over `$HOME` is exactly what `useradd -m` does for a
 brand-new user, so this one copy resyncs `.bashrc`, `.config/**`,
-`.local/share/applications/`, the nautilus-python extensions, hypr toggles,
+`.local/share/applications/`, the nautilus-python extensions,
 branding files, and the shipped migration markers in a single pass.
 
 Then it runs `magikos-refresh-limine`, `magikos-refresh-plymouth`, and the

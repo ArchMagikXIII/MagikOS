@@ -2,8 +2,8 @@
 
 A single long-running [Quickshell](https://quickshell.org/) instance
 that hosts the Magikos desktop. The bar, panels, overlays, menus, and
-services all run inside as plugins. Hyprland autostart launches the
-shell via `magikos-launch-shell`; restart it with `magikos-restart-shell`.
+services all run inside as plugins. Sway autostart launches the
+shell; restart it with `magikos-restart-shell`.
 IPC is the canonical way for CLIs to talk to a running shell —
 `magikos-shell` forwards a call and fails when the shell is not running
 (`-q` makes it quiet best-effort; `MAGIKOS_SHELL_IPC_TIMEOUT` bounds the
@@ -295,10 +295,9 @@ QML components should prefer semantic tokens where possible:
 | `Style.spacing.panelGap` / `panelPadding` | Panel section spacing and interior padding |
 | `Style.spacing.popupPadding` | Popout interior padding |
 
-Popout placement deliberately follows Hyprland's `general:gaps_out`
-(`Style.gapsOut`) so panels align with tiled windows. Use a theme's
-`hyprland.lua` to change that outer alignment; `[spacing]` controls the
-interior breathing room.
+Popout placement deliberately follows the outer gaps from your Sway
+config (`Style.gapsOut`) so panels align with tiled windows;
+`[spacing]` controls the interior breathing room.
 
 For one-off proportional constants, use `Style.space(px)` to preserve the
 old default at scale `1.0` and `base-size = 12` while still responding to

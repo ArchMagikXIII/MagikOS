@@ -198,7 +198,7 @@ Item {
 
       // Fingerprint hint pinned inside the field's right edge when a sensor is
       // enrolled, so the user knows they can touch to unlock instead of typing.
-      // Matches hyprlock, which draws its fingerprint icon in the same spot.
+      // Matches other lock screens, which draw their fingerprint icon in the same spot.
       Text {
         id: fingerprintIcon
         objectName: "fingerprintIndicator"

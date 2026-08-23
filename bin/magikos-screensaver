@@ -3,11 +3,10 @@
 # magikos:summary=Run the Magikos screensaver using random effects from TTE.
 
 screensaver_in_focus() {
-  hyprctl activewindow -j | jq -e '.class == "org.magikos.screensaver"' >/dev/null 2>&1
+  swaymsg -t get_tree | jq -e '.. | objects | select(.focused? == true) | .app_id? == "org.magikos.screensaver"' >/dev/null 2>&1
 }
 
 exit_screensaver() {
-  hyprctl eval 'hl.config({ cursor = { invisible = false } })' &>/dev/null || hyprctl keyword cursor:invisible false &>/dev/null || true
   pkill -x ttfx 2>/dev/null
   pkill -f '[o]rg.magikos.screensaver' 2>/dev/null
   exit 0
@@ -17,8 +16,6 @@ exit_screensaver() {
 trap exit_screensaver SIGINT SIGTERM SIGHUP SIGQUIT
 
 printf '\033]11;rgb:00/00/00\007'  # Set background color to black
-
-hyprctl eval 'hl.config({ cursor = { invisible = true } })' &>/dev/null || hyprctl keyword cursor:invisible true &>/dev/null
 
 tty=$(tty 2>/dev/null)
 

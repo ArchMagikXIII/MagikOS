@@ -20,15 +20,3 @@ fi
 systemd-run --user --quiet --collect --unit="magikos-browser-$(date +%s%N)" \
   --property=StandardOutput=null --property=StandardError=null \
   uwsm-app -- "$browser_exec" "${@/--private/$private_flag}"
-
-url=""
-for argument in "$@"; do
-  if [[ $argument != "--private" ]]; then
-    url=$argument
-    break
-  fi
-done
-
-if [[ -n $url && -n ${HYPRLAND_INSTANCE_SIGNATURE:-} ]]; then
-  magikos-hyprland-focus-app "^$(basename "$browser_exec" -stable).*$" || true
-fi

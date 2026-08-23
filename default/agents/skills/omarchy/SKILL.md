@@ -2,18 +2,18 @@
 name: magikos
 description: >
   REQUIRED for end-user customization of Linux desktop, window manager, or system config.
-  Use when editing ~/.config/hypr/, ~/.config/magikos/,
+  Use when editing ~/.config/sway/, ~/.config/magikos/,
   ~/.config/alacritty/, ~/.config/foot/, ~/.config/kitty/, or ~/.config/ghostty/.
-  Triggers: Hyprland, window rules, animations, keybindings, monitors, gaps, borders,
+  Triggers: Sway, window rules, keybindings, monitors, gaps, borders,
   blur, opacity, magikos-shell, bar, terminal config, themes, background,
-  night light, idle, lock screen, screenshots, reminders, layer rules, workspace
-  settings, display config, and user-facing magikos commands. Excludes Magikos
+  night light, idle, lock screen, screenshots, reminders, output config,
+  workspace settings, display config, and user-facing magikos commands. Excludes Magikos
   source development through `magikos dev link` workflows.
 ---
 
 # Magikos Skill
 
-Manage [Magikos](https://magikos.org/) Linux systems - a beautiful, modern, opinionated Arch Linux distribution with Hyprland.
+Manage [Magikos](https://magikos.org/) Linux systems - a beautiful, modern, opinionated Arch Linux distribution with Sway.
 
 This skill is for end-user customization on installed systems.
 It is not for contributing to Magikos source code.
@@ -22,12 +22,12 @@ It is not for contributing to Magikos source code.
 
 **ALWAYS invoke this skill for end-user requests involving ANY of these:**
 
-- Editing ANY file in `~/.config/hypr/` (window rules, animations, keybindings, monitors, etc.)
+- Editing ANY file in `~/.config/sway/` (keybindings, outputs, input devices, etc.)
 - Editing `~/.config/magikos/shell.json` (status bar layout, widgets)
 - Editing terminal configs (alacritty, foot, kitty, ghostty)
 - Editing ANY file in `~/.config/magikos/`
-- Window behavior, animations, opacity, blur, gaps, borders
-- Layer rules, workspace settings, display/monitor configuration
+- Window behavior, opacity, blur, gaps, borders
+- Window rules, workspace settings, display/output configuration
 - Themes, backgrounds, fonts, appearance changes
 - User-facing `magikos` commands (`magikos theme ...`, `magikos refresh ...`, `magikos restart ...`, etc.)
 - Screenshots, screen recording, reminders, night light, idle behavior, lock screen
@@ -41,7 +41,6 @@ It is not for contributing to Magikos source code.
 Deeper instructions for common areas live next to this file. Read the
 matching guide before starting:
 
-- [`hyprland.md`](hyprland.md) - keybindings, monitors, window rules, and other Hyprland config
 - [`plugins.md`](plugins.md) - the Magikos shell: bar layout, widgets, plugins, idle behavior
 - [`theming.md`](theming.md) - themes, backgrounds, and fonts
 - [`hooks.md`](hooks.md) - automation hooks that run on system events
@@ -71,8 +70,8 @@ overwritten on the next `magikos update`.
 **Reading `/usr/share/magikos/` is SAFE and useful** - do it freely to:
 - Understand how magikos commands work: `magikos theme set --help` or `cat $(which magikos-theme-set)`
 - See default configs before customizing: `cat "$MAGIKOS_PATH/config/magikos/shell.json"`
+- Reference default Sway settings: `cat "$MAGIKOS_PATH"/config/sway/*.conf`
 - Check stock theme files to copy for customization
-- Reference default hyprland settings: `cat /usr/share/magikos/default/hypr/*`
 
 **Always use these safe locations instead:**
 - `~/.config/` - User configuration (safe to edit)
@@ -100,7 +99,7 @@ Magikos is built on:
 | Component | Purpose | Config Location |
 |-----------|---------|-----------------|
 | **Arch Linux** | Base OS | `/etc/`, `~/.config/` |
-| **Hyprland** | Wayland compositor/WM | `~/.config/hypr/` |
+| **Sway** | Wayland compositor/WM | `~/.config/sway/` |
 | **Magikos shell** | Status bar + notifications (Quickshell) | `~/.config/magikos/shell.json` |
 | **Launcher/menus** | Quickshell menu | `~/.config/magikos/extensions/magikos-menu.jsonc` |
 | **Alacritty/Foot/Kitty/Ghostty** | Terminals | `~/.config/<terminal>/` |
@@ -152,7 +151,8 @@ Run `magikos --help` for the full list. The most common groups:
 
 ## Configuration Locations
 
-Hyprland config lives in `~/.config/hypr/` — see [`hyprland.md`](hyprland.md).
+Sway config lives in `~/.config/sway/` (`bindings.conf`, `input.conf`,
+`output.conf`, and friends).
 The Magikos shell (bar, notifications, plugins, idle) is configured in
 `~/.config/magikos/shell.json` — see [`plugins.md`](plugins.md).
 
@@ -185,15 +185,15 @@ For simple changes, edit files in `~/.config/`:
 
 ```bash
 # 1. Read current config
-cat ~/.config/hypr/bindings.lua
+cat ~/.config/sway/bindings.conf
 
 # 2. Backup before changes
-cp ~/.config/hypr/bindings.lua ~/.config/hypr/bindings.lua.bak.$(date +%s)
+cp ~/.config/sway/bindings.conf ~/.config/sway/bindings.conf.bak.$(date +%s)
 
 # 3. Make changes with Edit tool
 
 # 4. Apply changes
-# - Hyprland: auto-reloads on save, but MUST validate with `hyprctl reload` and `hyprctl configerrors`
+# - Sway: auto-reloads configs on save, but MUST validate with `swaymsg reload`
 # - Magikos shell: shell.json and user plugin code under ~/.config/magikos/plugins/ hot-reload on save
 # - Menus/launcher: ~/.config/magikos/extensions/magikos-menu.jsonc hot-reloads on save
 # - Terminals: apply with `magikos restart terminal` (reloads running terminals; foot picks changes up in new windows)
@@ -206,7 +206,7 @@ When customizations go wrong:
 ```bash
 # Reset specific config (creates backup automatically)
 magikos refresh shell
-magikos refresh hyprland
+magikos refresh sway
 
 # The refresh command:
 # 1. Backs up current config with timestamp
@@ -238,7 +238,7 @@ magikos refresh <app>
 
 # Refresh specific config file
 # config-file path is relative to ~/.config/
-# eg. `magikos refresh config hypr/hyprland.lua` will refresh ~/.config/hypr/hyprland.lua
+# eg. `magikos refresh config sway/bindings.conf` will refresh ~/.config/sway/bindings.conf
 magikos refresh config <config-file>
 
 # Full reinstall of configs (nuclear option)
@@ -278,10 +278,10 @@ This skill intentionally does not cover Magikos source development. Do not use t
 ## Example Requests
 
 - "Change my theme to catppuccin" -> `magikos theme set catppuccin`
-- "Add a keybinding for Super+E to open file manager" -> Check existing bindings first, call `hl.unbind` if needed, then `o.bind` in `~/.config/hypr/bindings.lua`
-- "Configure my external monitor" -> Edit `~/.config/hypr/monitors.lua`
-- "Make the window gaps smaller" -> Edit `~/.config/hypr/looknfeel.lua`
-- "Turn on night light" -> `magikos toggle nightlight` (for time-based schedules, edit `~/.config/hypr/hyprsunset.conf` profiles, then `magikos restart hyprsunset`)
+- "Add a keybinding for Super+E to open file manager" -> Check existing bindings first, then add a `bindsym` line in `~/.config/sway/bindings.conf`
+- "Configure my external monitor" -> Edit `~/.config/sway/output.conf`
+- "Make the window gaps smaller" -> Edit `~/.config/sway/appearance.conf`
+- "Turn on night light" -> `magikos toggle nightlight`
 - "Set a reminder to pickup jack in 15 minutes" -> `magikos reminder 15 "Pickup Jack"`
 - "Show my reminders" -> `magikos reminder show`
 - "Clear all reminders" -> `magikos reminder clear`

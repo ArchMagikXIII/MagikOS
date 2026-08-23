@@ -23,28 +23,16 @@ else
   socket_bound=0
 fi
 
-attempts_log="$test_dir/hyprctl-attempts"
+attempts_log="$test_dir/swaymsg-attempts"
 
-stub_hyprctl() {
+stub_swaymsg() {
   : >"$attempts_log"
-  cat >"$stub_bin/hyprctl" <<STUB
+  cat >"$stub_bin/swaymsg" <<STUB
 #!/bin/bash
 echo asked >>"$attempts_log"
 exit $1
 STUB
-  chmod +x "$stub_bin/hyprctl"
-}
-
-# Answers only from the second query on, the way Hyprland behaves while it is
-# busy reconfiguring outputs.
-stub_flaky_hyprctl() {
-  : >"$attempts_log"
-  cat >"$stub_bin/hyprctl" <<STUB
-#!/bin/bash
-echo asked >>"$attempts_log"
-(( \$(grep -c asked "$attempts_log") > 1 ))
-STUB
-  chmod +x "$stub_bin/hyprctl"
+  chmod +x "$stub_bin/swaymsg"
 }
 
 attempts() {
@@ -80,34 +68,29 @@ if (( ! socket_bound )); then
   exit 0
 fi
 
-# Hyprland can miss a single query mid-reconfigure, so only a compositor that
-# stays silent counts as gone.
-stub_hyprctl 1
-output=$(run_guard WAYLAND_DISPLAY=wayland-1 XDG_RUNTIME_DIR="$runtime_dir" HYPRLAND_INSTANCE_SIGNATURE=test)
+# A silent compositor is gone: one failed probe decides, so the guard never
+# waits on a corpse.
+stub_swaymsg 1
+output=$(run_guard WAYLAND_DISPLAY=wayland-1 XDG_RUNTIME_DIR="$runtime_dir" SWAYSOCK="$runtime_dir/sway-ipc.test.sock")
 [[ $output == "$skipped" ]] || fail "guard skips when the compositor stopped answering" "$output"
 pass "guard skips when the compositor stopped answering"
 
-[[ $(attempts) == 3 ]] || fail "guard retries a silent compositor before giving up" "asked $(attempts) times"
-pass "guard retries a silent compositor before giving up"
+[[ $(attempts) == 1 ]] || fail "guard probes the compositor exactly once" "asked $(attempts) times"
+pass "guard probes the compositor exactly once"
 
-stub_flaky_hyprctl
-output=$(run_guard WAYLAND_DISPLAY=wayland-1 XDG_RUNTIME_DIR="$runtime_dir" HYPRLAND_INSTANCE_SIGNATURE=test)
-[[ $output == "launched with core limit 0" ]] || fail "guard rides out a missed query" "$output"
-pass "guard rides out a missed query"
-
-# Without a signature there is nothing to ask, and a live socket is all the
+# Without a socket path there is nothing to ask, and a live socket is all the
 # evidence there is: run rather than skip real coverage.
-stub_hyprctl 1
-output=$(run_guard -u HYPRLAND_INSTANCE_SIGNATURE WAYLAND_DISPLAY=wayland-1 XDG_RUNTIME_DIR="$runtime_dir")
-[[ $output == "launched with core limit 0" ]] || fail "guard runs when hyprctl cannot be asked" "$output"
-pass "guard runs when hyprctl cannot be asked"
+stub_swaymsg 1
+output=$(run_guard -u SWAYSOCK -u I3SOCK WAYLAND_DISPLAY=wayland-1 XDG_RUNTIME_DIR="$runtime_dir")
+[[ $output == "launched with core limit 0" ]] || fail "guard runs when swaymsg cannot be asked" "$output"
+pass "guard runs when swaymsg cannot be asked"
 
-[[ $(attempts) == 0 ]] || fail "guard leaves hyprctl alone without a signature" "asked $(attempts) times"
-pass "guard leaves hyprctl alone without a signature"
+[[ $(attempts) == 0 ]] || fail "guard leaves swaymsg alone without a socket path" "asked $(attempts) times"
+pass "guard leaves swaymsg alone without a socket path"
 
 # Quickshell aborts if the compositor disappears mid-run, so the tests it is
 # about to launch must not be able to dump core.
-stub_hyprctl 0
-output=$(run_guard WAYLAND_DISPLAY=wayland-1 XDG_RUNTIME_DIR="$runtime_dir" HYPRLAND_INSTANCE_SIGNATURE=test)
+stub_swaymsg 0
+output=$(run_guard WAYLAND_DISPLAY=wayland-1 XDG_RUNTIME_DIR="$runtime_dir" SWAYSOCK="$runtime_dir/sway-ipc.test.sock")
 [[ $output == "launched with core limit 0" ]] || fail "guard runs with core dumps disabled" "$output"
 pass "guard runs with core dumps disabled"

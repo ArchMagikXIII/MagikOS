@@ -2,7 +2,7 @@
 
 # magikos:summary=Open a config file in the user's editor and surface a toast
 # magikos:args=<path>
-# magikos:examples=magikos launch config-editor ~/.config/hypr/hyprland.lua
+# magikos:examples=magikos launch config-editor ~/.config/sway/config
 
 path="${1-}"
 

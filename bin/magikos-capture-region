@@ -23,34 +23,27 @@
 FULLSCREEN_MARKER="${XDG_RUNTIME_DIR:-/tmp}/magikos-capture-region-fullscreen"
 WINDOW_MARKER="${XDG_RUNTIME_DIR:-/tmp}/magikos-capture-region-window"
 
-# accounting for portrait/transformed displays
+# sway reports output rects in logical layout coordinates, so no scale or
+# transform math is needed.
 JQ_MONITOR_GEO='
   def format_geo:
-    .x as $x | .y as $y |
-    (.width / .scale | floor) as $w |
-    (.height / .scale | floor) as $h |
-    .transform as $t |
-    if $t == 1 or $t == 3 then
-      "\($x),\($y) \($h)x\($w)"
-    else
-      "\($x),\($y) \($w)x\($h)"
-    end;
+    "\(.rect.x),\(.rect.y) \(.rect.width)x\(.rect.height)";
 '
 
 active_workspace() {
-  hyprctl monitors -j | jq -r '.[] | select(.focused == true) | .activeWorkspace.id'
+  swaymsg -t get_workspaces -r | jq -r '.[] | select(.focused == true) | .id'
 }
 
 # Hidden group members and windows stacked at identical geometry collapse to
 # one rectangle: slurp cannot tell them apart, and duplicates would stall the
 # Tab cycle on the first copy.
 window_rects() {
-  hyprctl clients -j | jq -r --arg ws "$(active_workspace)" \
-    '[.[] | select(.workspace.id == ($ws | tonumber) and .hidden != true) | "\(.at[0]),\(.at[1]) \(.size[0])x\(.size[1])"] | unique[]'
+  swaymsg -t get_tree -r | jq -r --argjson ws "$(active_workspace)" \
+    '[.. | objects | select(.id? == $ws) | .. | objects | select(.type? == "con" and .nodes? == [] and .floating_nodes? == [] and .visible? != false) | "\(.rect.x),\(.rect.y) \(.rect.width)x\(.rect.height)"] | unique[]'
 }
 
 monitor_rects() {
-  hyprctl monitors -j | jq -r --arg ws "$(active_workspace)" "${JQ_MONITOR_GEO} .[] | select(.activeWorkspace.id == (\$ws | tonumber)) | format_geo"
+  swaymsg -t get_tree -r | jq -r --argjson ws "$(active_workspace)" "${JQ_MONITOR_GEO} .. | objects | select(.type? == \"output\" and .name? != \"__i3\" and any(.. | objects; .id? == \$ws)) | format_geo"
 }
 
 get_rectangles() {
@@ -59,7 +52,7 @@ get_rectangles() {
 }
 
 focused_monitor_geo() {
-  hyprctl monitors -j | jq -r "${JQ_MONITOR_GEO} .[] | select(.focused == true) | format_geo"
+  swaymsg -t get_outputs -r | jq -r "${JQ_MONITOR_GEO} .[] | select(.focused == true) | format_geo"
 }
 
 # slurp highlights the smallest box containing the point and keeps the first
@@ -120,19 +113,19 @@ warp_point_in() {
 # well as window rects, so a cursor in a gap or over the bar highlights the
 # monitor rather than any window.
 geo_at_cursor() {
-  local pos=$(hyprctl cursorpos)
-  local x=${pos%,*}
-  local y=${pos#*, }
+  # Sway exposes no pointer coordinates over IPC, so the focused window stands
+  # in for whichever rectangle the cursor hovers.
+  local rect=$(swaymsg -t get_tree -r 2>/dev/null | jq -r '.. | objects | select(.focused? == true and .type? == "con") | "\(.rect.x),\(.rect.y) \(.rect.width)x\(.rect.height)"')
 
-  if resolve_rect_at "$x" "$y" < <(window_rects) || resolve_rect_at "$x" "$y" < <(monitor_rects); then
-    echo "$RESOLVED_RECT"
+  if [[ -n $rect ]]; then
+    echo "$rect"
   else
     focused_monitor_geo
   fi
 }
 
 # Keyboard control while slurp is open: binds scoped to slurp's layer
-# surface (default/hypr/bindings/utilities.lua) invoke these modes. The
+# surface invoke these modes. The
 # --take-* modes flag the intent with a marker file and dismiss slurp.
 if [[ ${1:-} == "--take-fullscreen" ]]; then
   pgrep -x slurp >/dev/null || exit 0
@@ -152,11 +145,12 @@ fi
 # highlight tracks the selection.
 if [[ ${1:-} == "--select-window" ]]; then
   pgrep -x slurp >/dev/null || exit 0
+  seat=$(swaymsg -t get_seats -r 2>/dev/null | jq -r '.[0].name')
 
   direction=${2:-}
-  pos=$(hyprctl cursorpos)
-  origin_x=${pos%,*}
-  origin_y=${pos#*, }
+  pos=$(swaymsg -t get_tree -r 2>/dev/null | jq -r '.. | objects | select(.focused? == true and .type? == "con") | "\(.rect.x + .rect.width / 2) \(.rect.y + .rect.height / 2)"')
+  origin_x=${pos% *}
+  origin_y=${pos#* }
 
   candidates=$(window_rects)
 
@@ -266,7 +260,7 @@ if [[ ${1:-} == "--select-window" ]]; then
 
   if [[ -n $target && -n ${warp_points[$target]} ]]; then
     read -r target_x target_y <<<"${warp_points[$target]}"
-    hyprctl eval "hl.dispatch(hl.dsp.cursor.move({ x = $target_x, y = $target_y }))" >/dev/null
+    swaymsg "seat ${seat:-seat0} cursor set $target_x $target_y" >/dev/null
   fi
   exit 0
 fi
@@ -334,7 +328,7 @@ smart | *)
 
   # A bare click (area < 20px^2) snaps to whichever rectangle it landed in,
   # so users don't end up with accidental 2px captures. X and Y can be
-  # negative (Hyprland monitor positions in multi-display layouts).
+  # negative (monitors placed left of or above the layout origin).
   if [[ $SELECTION =~ ^(-?[0-9]+),(-?[0-9]+)[[:space:]]([0-9]+)x([0-9]+)$ ]] && ((BASH_REMATCH[3] * BASH_REMATCH[4] < 20)); then
     click_x=${BASH_REMATCH[1]}
     click_y=${BASH_REMATCH[2]}
@@ -360,7 +354,7 @@ esac
 [[ -n $SELECTION ]] || exit 1
 
 if [[ $MATCH_MONITOR == true ]]; then
-  monitor=$(hyprctl monitors -j | jq -r --arg geo "$SELECTION" "${JQ_MONITOR_GEO} .[] | select(format_geo == \$geo) | .name" | head -1)
+  monitor=$(swaymsg -t get_tree -r | jq -r --arg geo "$SELECTION" "${JQ_MONITOR_GEO} .. | objects | select(.type? == \"output\" and .name? != \"__i3\") | select(format_geo == \$geo) | .name" | head -1)
   if [[ -n $monitor ]]; then
     echo "monitor:$monitor"
     exit 0

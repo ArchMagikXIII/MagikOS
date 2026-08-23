@@ -84,8 +84,6 @@ grep -F 'pkill -x fcitx5' "$ROOT/bin/magikos-restart-xcompose" >/dev/null ||
 
 grep -F 'magikos-fcitx5.service' "$first_run_units" >/dev/null ||
   fail "first-run does not enable the input method, so ~/.XCompose sequences never resolve"
-grep -F 'fcitx5' "$ROOT/default/hypr/autostart.lua" >/dev/null &&
-  fail "fcitx5 is autostarted from Hyprland; an unsupervised launch dies silently and takes every compose sequence with it"
 pass "fcitx5 runs supervised, so a lost input method comes back instead of killing XCompose until logout"
 
 oomd_slice="$ROOT/default/systemd/user/app.slice.d/10-oomd.conf"
@@ -94,7 +92,7 @@ grep -Fx 'ManagedOOMMemoryPressure=kill' "$oomd_slice" >/dev/null ||
 grep -Fx 'ManagedOOMSwap=kill' "$oomd_slice" >/dev/null ||
   fail "no swap backstop for the slower shape of the same failure"
 
-# Hyprland lives in session.slice/wayland-wm@hyprland.desktop.service. Marking
+# The compositor lives in session.slice via its own unit. Marking
 # any ancestor of that as a kill candidate puts the compositor back in the
 # victim pool, which is the crash this whole thing exists to prevent.
 candidates=$(grep -rlE '^ManagedOOM(MemoryPressure|Swap)=kill' "$ROOT/default/systemd" "$ROOT/etc/systemd" 2>/dev/null || true)

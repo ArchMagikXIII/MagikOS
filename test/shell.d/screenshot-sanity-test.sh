@@ -30,7 +30,6 @@ if pgrep -x slurp >/dev/null 2>&1; then
   exit 0
 fi
 
-require_command hyprctl
 require_command grim
 require_command jq
 require_command python3

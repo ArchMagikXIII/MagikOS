@@ -149,26 +149,6 @@ QtObject {
     }
   }
 
-  function hyprlandActiveSpec(fallbackColor, fallbackWidth) {
-    var raw = value("hyprland", "active-border")
-    var opacity = alpha("hyprland", "active-border-alpha", 1.0)
-
-    // Existing generated themes predate [hyprland] and already keep the active
-    // border under [notifications]. Use it as the compatibility source until
-    // the next theme refresh writes the shared token.
-    if (String(raw).length === 0) {
-      raw = value("notifications", "border")
-      opacity = alpha("notifications", "border-alpha", opacity)
-    }
-
-    var resolved = borderValue(resolveValueRef(raw), fallbackColor, opacity, "")
-    return {
-      color: resolved.color,
-      widths: Geometry.parseWidthSpec(value("hyprland", "active-border-width"), fallbackWidth),
-      gradient: resolved.gradient,
-    }
-  }
-
   function controlPrefix(state) {
     if (state === "hover" || state === "hot") return "hover-cursor"
     return state || "normal"
