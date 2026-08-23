@@ -6,10 +6,6 @@ Read more at [magikos.org](https://magikos.org).
 
 ## The Magikos Manual
 
-The manual lives in [`manual/`](manual/), which is its authoritative source. It's
-mirrored to [learn.omacom.io](https://learn.omacom.io/2/the-magikos-manual), where
-its screenshots are also hosted.
-
 - [Welcome to Magikos!](manual/01-welcome-to-magikos.md)
 
 **The Basics**
