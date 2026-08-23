@@ -4,7 +4,7 @@ set -euo pipefail
 
 ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 tests=(
-  "$ROOT/test/cli"
+  "$ROOT/test/magikos-cli"
   "$ROOT/test/shell"
 )
 

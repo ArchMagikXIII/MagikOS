@@ -11,6 +11,9 @@
     "layout": {
       "left": [
         {
+          "id": "magikos.menu"
+        },
+        {
           "id": "magikos.workspaces"
         }
       ],
