@@ -1,0 +1,7 @@
+[font]
+base-size = 10
+font-family = "JetBrainsMono Nerd Font"
+
+[bar]
+size-horizontal = 16
+scale-with-font = false
