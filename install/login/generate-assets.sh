@@ -8,6 +8,7 @@ BG="#0d0e14"
 ACCENT="#5b3f9e"
 TEXT="#ffffff"
 ERROR="#f44336"
+GREEN="#549e6a"
 ENTRY_BG="#1a1b26"
 PROGRESS_BG="#282a3a"
 
@@ -38,6 +39,19 @@ if [[ -z "$FONT" ]]; then
 else
     FONT_PATH="font:${FONT}"
 fi
+
+# Monospace font for the ASCII art logo (box drawing needs aligned glyphs)
+MONO_FONT=""
+for f in \
+    "/usr/share/fonts/TTF/JetBrainsMonoNerdFontMono-Regular.ttf" \
+    "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf" \
+    "/usr/share/fonts/TTF/DejaVuSansMono.ttf" \
+    "/usr/share/fonts/dejavu/DejaVuSansMono.ttf"; do
+    if [[ -f "$f" ]]; then
+        MONO_FONT="$f"
+        break
+    fi
+done
 
 # -------------------------------- SDDM Assets --------------------------------
 
@@ -93,12 +107,28 @@ magick -size 7x7 xc:transparent \
 
 echo "  Creating Plymouth assets in $PLYMOUTH_DIR"
 
-# Logo (500x120)
-magick -size 500x120 xc:transparent \
-    -font "$FONT" -pointsize 72 \
-    -fill black -annotate +152+62 "MagikOS" \
-    -fill "$TEXT" -annotate +150+60 "MagikOS" \
-    "$PLYMOUTH_DIR/logo.png"
+# Logo: render the MagikOS ASCII art (same art fastfetch shows) onto a
+# transparent canvas. Falls back to the copy vendored in the repo.
+ASCII_ART="$HOME/Pictures/ASCII/MagikOS.txt"
+if [[ ! -f "$ASCII_ART" ]]; then
+    ASCII_ART="$MAGIKOS_PATH/config/branding/about.txt"
+fi
+if [[ ! -f "$ASCII_ART" ]]; then
+    echo "Error: no ASCII art found at $HOME/Pictures/ASCII/MagikOS.txt or $MAGIKOS_PATH/config/branding/about.txt" >&2
+    exit 1
+fi
+
+if [[ -n "$MONO_FONT" ]]; then
+    magick -background none \
+        -font "$MONO_FONT" -pointsize 16 \
+        -fill "$GREEN" label:@"$ASCII_ART" \
+        "$PLYMOUTH_DIR/logo.png"
+else
+    echo "Warning: No monospace font found, ASCII logo may be misaligned"
+    magick -background none -pointsize 16 \
+        -fill "$GREEN" label:@"$ASCII_ART" \
+        "$PLYMOUTH_DIR/logo.png"
+fi
 
 # Lock icon (34x38)
 magick -size 34x38 xc:transparent \
