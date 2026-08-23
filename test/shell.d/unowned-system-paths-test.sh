@@ -42,10 +42,6 @@ allowed = {
   "/usr/lib/chromium/initial_preferences",
 }
 
-# One-time 3.x upgrade. It runs before this rule existed and cannot be made to
-# retroactively matter for machines that already ran it.
-skip_scripts = {"bin/magikos-upgrade-to-quattro"}
-
 pkgs_candidates = [
   root.parent / "magikos-pkgs/pkgbuilds",
   root.parent.parent / "magikos-pkgs/pkgbuilds",

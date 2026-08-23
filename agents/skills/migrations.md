@@ -161,7 +161,3 @@ To rerun a migration locally, remove its marker and run the migrator:
 rm ~/.local/state/magikos/migrations/<migration>.sh
 magikos-migrate
 ```
-
-Magikos 4.0 is upgraded through `bin/magikos-upgrade-to-quattro`, not through the
-normal migration runner. Do not add compatibility migrations for old installer
-layouts; put pre-4 package-layout transition work in the upgrade command instead.
