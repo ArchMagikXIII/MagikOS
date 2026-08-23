@@ -7,11 +7,11 @@ multiple_gpus() {
 }
 
 if magikos-cmd-present supergfxctl; then
-  # A wedged supergfxd blocks its clients forever, and this gate runs while
-  # the menu renders. Bound the query, and treat a daemon that cannot answer
-  # like a machine without supergfxctl: count GPUs instead of hiding hardware
-  # that is really there.
-  modes=$(timeout --kill-after=1s 1s supergfxctl -s 2>/dev/null)
+  # A wedged or slow supergfxd blocks its clients indefinitely, and this gate
+  # runs while the menu renders. Bound the query tightly -- a daemon that
+  # cannot answer within 150ms gets treated like no daemon at all: count GPUs
+  # instead of hiding hardware that is really there.
+  modes=$(timeout --kill-after=100ms 150ms supergfxctl -s 2>/dev/null)
   status=$?
 
   if ((status == 124 || status == 137)); then

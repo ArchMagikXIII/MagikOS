@@ -23,7 +23,7 @@ SH
 }
 
 run_orphan_checker() {
-  HOME="$test_home" PATH="$stub_bin:$PATH" "$ROOT/bin/magikos-update-orphan-pkgs"
+  HOME="$test_home" PATH="$stub_bin:$ROOT/bin:$PATH" "$ROOT/bin/magikos-update-orphan-pkgs"
 }
 
 write_stub pacman 'if [[ $1 == "-Qtdq" ]]; then printf "old-lib\nunused-tool\n"; exit 0; fi; exit 1'

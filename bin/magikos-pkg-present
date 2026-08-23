@@ -3,8 +3,8 @@
 # magikos:summary=Returns true if all of the named packages are installed on the system (or false if any of them are missing).
 # magikos:args=<packages...>
 
-for pkg in "$@"; do
-  pacman -Q "$pkg" &>/dev/null || exit 1
-done
+source magikos-pkg-backend
+
+pkg_installed "$@" || exit 1
 
 exit 0

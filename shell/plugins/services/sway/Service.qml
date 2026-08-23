@@ -90,14 +90,55 @@ Item {
     }
   }
 
+  // Sway emits one JSON line per state change on this subscription. Reacting
+  // to events keeps the bar's workspace highlight in step with the switch
+  // itself instead of up to a poll interval behind it, and replaces the two
+  // process spawns a fast poll would need every tick.
+  Process {
+    id: eventStream
+    command: ["sh", "-c", root.swayCmdPrefix + "swaymsg -m -t subscribe '[\"workspace\",\"output\"]'"]
+    stdout: SplitParser {
+      onRead: function(line) { root.handleEventLine(line) }
+    }
+    // A compositor reload or crash ends the stream; revive it promptly.
+    onExited: eventStreamRestart.restart()
+  }
+
   Timer {
-    interval: 500
+    id: eventStreamRestart
+    interval: 1000
+    onTriggered: if (!eventStream.running) eventStream.running = true
+  }
+
+  function handleEventLine(line) {
+    var trimmed = String(line).trim()
+    if (trimmed.length === 0) return
+    var evt
+    try { evt = JSON.parse(trimmed) } catch (e) { return }
+    if (evt.output !== undefined && evt.change !== undefined) {
+      root.refreshOutputs()
+      return
+    }
+    // A focus event already names the newly focused workspace, so the
+    // highlight moves immediately; the follow-up query refreshes window
+    // counts and visibility with authoritative state.
+    if (evt.current !== undefined) {
+      if (evt.change === "focus" && evt.current.num > 0) root.focusedWorkspaceId = evt.current.num
+      root.refreshWorkspaces()
+    }
+  }
+
+  // Safety net: catches state the event stream missed (a dropped connection
+  // between exit and revival) and revives the subscription after failures.
+  Timer {
+    interval: 5000
     running: true
     repeat: true
     triggeredOnStart: true
     onTriggered: {
       root.refreshWorkspaces()
       root.refreshOutputs()
+      if (!eventStream.running) eventStream.running = true
     }
   }
 

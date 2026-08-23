@@ -3,6 +3,13 @@
 # magikos:summary=Show a fuzzy-finder TUI for picking new AUR packages to install.
 # magikos:requires-sudo=true
 
+
+source magikos-pkg-backend
+
+if ! backend_is_pacman; then
+  echo "Error: AUR packages are Arch-only; this system uses $MAGIKOS_PKG_BACKEND." >&2
+  exit 1
+fi
 fzf_args=(
   --multi
   --preview 'yay -Siia {1}'

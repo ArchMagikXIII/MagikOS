@@ -3,6 +3,13 @@
 # magikos:summary=Add the named packages to the system from the AUR if they're missing. Returns false if it couldn't be done.
 # magikos:args=<packages...>
 
+
+source magikos-pkg-backend
+
+if ! backend_is_pacman; then
+  echo "Error: AUR packages are Arch-only; this system uses $MAGIKOS_PKG_BACKEND." >&2
+  exit 1
+fi
 if magikos-pkg-missing "$@"; then
   yay -S --noconfirm --needed "$@" || exit 1
 fi

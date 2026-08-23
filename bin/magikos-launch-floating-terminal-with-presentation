@@ -10,4 +10,4 @@ source magikos-restart-gum
 cmd="$*"
 presentation_script="magikos-show-logo; $cmd; if (( \$? != 130 )); then magikos-show-done; fi"
 
-exec setsid uwsm-app -- xdg-terminal-exec --app-id=org.magikos.terminal --title=Magikos -e bash -c "$presentation_script"
+exec setsid uwsm-app -- xdg-terminal-exec --app-id=org.magikos.terminal --title=Magikos -- bash -c "$presentation_script"

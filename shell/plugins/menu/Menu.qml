@@ -344,7 +344,7 @@ Item {
     providerProc.providerKey = entry.provider
     providerProc.revision = root.providerRevision
     providerProc.collected = ""
-    providerProc.command = ["bash", "-lc", spec.script]
+    providerProc.command = ["bash", "-c", spec.script]
     providerProc.running = true
   }
 
@@ -1014,7 +1014,11 @@ Item {
       return
     }
     guardProc.collected = ""
-    guardProc.command = ["bash", "-lc", script]
+    // A non-login shell: guards run on every menu open, and a login shell
+    // pays for full profile sourcing (mise activation alone can cost
+    // hundreds of ms) before the first expression evaluates. Everything a
+    // guard needs arrives via the inherited environment.
+    guardProc.command = ["bash", "-c", script]
     guardProc.running = true
   }
 
@@ -1053,10 +1057,19 @@ Item {
         else if (tag === "c") nextChecked[id] = value
         else if (tag === "d") nextDisabled[id] = value
       }
-      root.whenResults = nextWhen
-      root.checkedResults = nextChecked
-      root.disabledResults = nextDisabled
-      if (root.opened) root.rebuildDisplay()
+      // Reassigning identical results re-runs every row binding for nothing.
+      // The visible "settle" a menu does right after opening is usually
+      // exactly that: guards confirming what was already on screen. Only an
+      // actual flip in visibility, checks, or dimming is worth a rebuild.
+      var changed = JSON.stringify(nextWhen) !== JSON.stringify(root.whenResults)
+        || JSON.stringify(nextChecked) !== JSON.stringify(root.checkedResults)
+        || JSON.stringify(nextDisabled) !== JSON.stringify(root.disabledResults)
+      if (changed) {
+        root.whenResults = nextWhen
+        root.checkedResults = nextChecked
+        root.disabledResults = nextDisabled
+        if (root.opened) root.rebuildDisplay()
+      }
       // Run the evaluation that had to stand aside. Deferred by a turn so the
       // process is settled before its command is set again.
       if (root.guardsPending) Qt.callLater(function() { root.evaluateGuards() })

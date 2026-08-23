@@ -72,7 +72,7 @@ if [[ $exec_line =~ magikos-launch-webapp|magikos-webapp-handler ]]; then
   exit 0
 fi
 
-if [[ $exec_line =~ (^|[[:space:]])(\$TERMINAL|xdg-terminal-exec)[[:space:]].*-e([[:space:]]|$) ]]; then
+if [[ $exec_line =~ (^|[[:space:]])(\$TERMINAL|xdg-terminal-exec)[[:space:]].*(-e([[:space:]]|$)|--app-id=TUI\.) ]]; then
   MAGIKOS_REMOVE_NOTIFY=false magikos-tui-remove "$desktop_name"
   exit 0
 fi

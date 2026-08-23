@@ -83,7 +83,11 @@ BarWidget {
         readonly property color wsCol: wsColor(modelData)
 
         bar: root.bar
-        text: focused ? "\uDB85\uDCFB" : (modelData === 1 ? "󰙯" : modelData === 2 ? "󰅴" : modelData === 3 ? "󰖟" : modelData === 4 ? "󰘐" : modelData === 5 ? "\uF1B6" : modelData === 10 ? "0" : String(modelData))
+        // Each workspace keeps its own glyph at all times. The previous
+        // focus-state swapped in a second glyph, which rendered as a stray
+        // box over the icon whenever that codepoint was missing from the
+        // active font -- focus is already expressed by coloring the icon.
+        text: modelData === 1 ? "󰙯" : modelData === 2 ? "󰅴" : modelData === 3 ? "󰖟" : modelData === 4 ? "󰘐" : modelData === 5 ? "\uF1B6" : String(modelData)
         foreground: focused ? wsCol : (occupied ? Color.muted : Color.foreground)
         useActiveColor: false
         opacity: 1

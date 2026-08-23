@@ -3,9 +3,16 @@
 # magikos:summary=Show a fuzzy-finder TUI for picking packages installed on the system to be removed.
 # magikos:requires-sudo=true
 
+source magikos-pkg-backend
+
+case $MAGIKOS_PKG_BACKEND in
+  pacman) preview_cmd='pacman -Qi {1}' ;;
+  dnf) preview_cmd='dnf info {1}' ;;
+esac
+
 fzf_args=(
   --multi
-  --preview 'yay -Qi {1}'
+  --preview "$preview_cmd"
   --preview-label='alt-p: toggle description, alt-j/k: scroll, tab: multi-select'
   --preview-label-pos='bottom'
   --preview-window 'down:65%:wrap'
@@ -15,10 +22,10 @@ fzf_args=(
   --color 'pointer:red,marker:red'
 )
 
-pkg_names=$(yay -Qqe | fzf "${fzf_args[@]}")
+pkg_names=$(pkg_list_explicit | fzf "${fzf_args[@]}")
 
 if [[ -n $pkg_names ]]; then
-  # Convert newline-separated selections to space-separated for yay
-  echo "$pkg_names" | tr '\n' ' ' | xargs sudo pacman -Rns --noconfirm
+  # Convert newline-separated selections to space-separated for the backend
+  echo "$pkg_names" | tr '\n' ' ' | xargs sudo "${PKG_REMOVE_CMD[@]}"
   magikos-show-done
 fi

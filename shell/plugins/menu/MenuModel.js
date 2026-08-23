@@ -420,11 +420,14 @@ var GUARD_READERS = [
 // parser follows the indented lines rather than reading the first one and
 // dropping half of what is installed.
 function guardHelpers() {
+  // One pacman pass yields both installed names and what they provide;
+  // spawning -Qq separately doubles the batch's largest fixed cost.
   return 'declare -A __magikos_pkgs=()\n'
-    + 'mapfile -t __magikos_pkg_names < <({ pacman -Qq; LC_ALL=C pacman -Qi'
-    + " | awk '/^[A-Za-z]/ { provides = ($0 ~ /^Provides/); sub(/^[^:]*: /, \"\") }"
+    + 'mapfile -t __magikos_pkg_names < <(LC_ALL=C pacman -Qi'
+    + " | awk '/^[A-Za-z]/ { name = ($0 ~ /^Name/); provides = ($0 ~ /^Provides/); sub(/^[^:]*: /, \"\") }"
+    + ' name { print $0 }'
     + ' provides && $0 != "None" { n = split($0, p, " ");'
-    + ' for (i = 1; i <= n; i++) { sub(/[<>=].*/, "", p[i]); print p[i] } }\'; } 2>/dev/null)\n'
+    + ' for (i = 1; i <= n; i++) { sub(/[<>=].*/, "", p[i]); print p[i] } }\' 2>/dev/null)\n'
     + 'for __magikos_pkg in "${__magikos_pkg_names[@]}"; do __magikos_pkgs[$__magikos_pkg]=1; done\n'
     + '__magikos_pkg_has() { [[ -n ${__magikos_pkgs[$1]-} ]] && return 0; '
     + '[[ $1 == *[\\<\\>=]* ]] && { pacman -Q "$1" &>/dev/null; return; }; return 1; }\n'

@@ -1,21 +1,23 @@
 #!/bin/bash
 
-# magikos:summary=Install Arch packages if they are missing
+# magikos:summary=Install packages if they are missing
 # magikos:args=<packages...>
 # magikos:examples=magikos pkg add jq ripgrep
 # magikos:requires-sudo=true
 
+source magikos-pkg-backend
+
 if magikos-pkg-missing "$@"; then
   if (( EUID == 0 )); then
-    pacman -S --noconfirm --needed "$@" || exit 1
+    "${PKG_INSTALL_CMD[@]}" "$@" || exit 1
   else
-    sudo pacman -S --noconfirm --needed "$@" || exit 1
+    sudo "${PKG_INSTALL_CMD[@]}" "$@" || exit 1
   fi
 fi
 
 for pkg in "$@"; do
-  # Secondary check to handle states where pacman doesn't actually register an error
-  if ! pacman -Q "$pkg" &>/dev/null; then
+  # Secondary check to handle states where the backend doesn't actually register an error
+  if ! pkg_installed "$pkg"; then
     echo -e "\033[31mError: Package '$pkg' did not install\033[0m" >&2
     exit 1
   fi

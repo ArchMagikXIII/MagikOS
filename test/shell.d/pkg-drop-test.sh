@@ -24,7 +24,7 @@ EOF
 
 chmod +x "$mock_path/pacman" "$mock_path/sudo"
 
-PATH="$mock_path:$PATH" TEST_TMP="$test_tmp" \
+PATH="$mock_path:$ROOT/bin:$PATH" TEST_TMP="$test_tmp" \
   "$ROOT/bin/magikos-pkg-drop" exact-package virtual-package provider-package exact-package
 
 [[ $(<"$test_tmp/pkg-drop-command") == "pacman -Rns --noconfirm exact-package provider-package" ]] ||

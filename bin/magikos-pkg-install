@@ -1,11 +1,18 @@
 #!/bin/bash
 
-# magikos:summary=Show a fuzzy-finder TUI for picking new Arch and OPR packages to install.
+# magikos:summary=Show a fuzzy-finder TUI for picking new packages to install.
 # magikos:requires-sudo=true
+
+source magikos-pkg-backend
+
+case $MAGIKOS_PKG_BACKEND in
+  pacman) preview_cmd='pacman -Sii {1}' ;;
+  dnf) preview_cmd='dnf info {1}' ;;
+esac
 
 fzf_args=(
   --multi
-  --preview 'pacman -Sii {1}'
+  --preview "$preview_cmd"
   --preview-label='alt-p: toggle description, alt-j/k: scroll, tab: multi-select'
   --preview-label-pos='bottom'
   --preview-window 'down:65%:wrap'
@@ -15,12 +22,12 @@ fzf_args=(
   --color 'pointer:green,marker:green'
 )
 
-pkg_names=$(pacman -Slq | fzf "${fzf_args[@]}")
+pkg_names=$(pkg_list_available | fzf "${fzf_args[@]}")
 
 if [[ -n $pkg_names ]]; then
   source magikos-sudo-keepalive
 
-  # Convert newline-separated selections to space-separated for pacman
-  echo "$pkg_names" | tr '\n' ' ' | xargs sudo pacman -S --noconfirm
+  # Convert newline-separated selections to space-separated for the backend
+  echo "$pkg_names" | tr '\n' ' ' | xargs sudo "${PKG_INSTALL_CMD[@]}"
   magikos-show-done
 fi
