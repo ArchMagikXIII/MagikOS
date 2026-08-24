@@ -111,10 +111,13 @@ echo "  Creating Plymouth assets in $PLYMOUTH_DIR"
 # transparent canvas. Falls back to the copy vendored in the repo.
 ASCII_ART="$HOME/Pictures/ASCII/MagikOS.txt"
 if [[ ! -f "$ASCII_ART" ]]; then
+    ASCII_ART="$MAGIKOS_PATH/config/fastfetch/MagikOS.txt"
+fi
+if [[ ! -f "$ASCII_ART" ]]; then
     ASCII_ART="$MAGIKOS_PATH/config/branding/about.txt"
 fi
 if [[ ! -f "$ASCII_ART" ]]; then
-    echo "Error: no ASCII art found at $HOME/Pictures/ASCII/MagikOS.txt or $MAGIKOS_PATH/config/branding/about.txt" >&2
+    echo "Error: no ASCII art found at \$HOME/Pictures/ASCII/MagikOS.txt, $MAGIKOS_PATH/config/fastfetch/MagikOS.txt, or $MAGIKOS_PATH/config/branding/about.txt" >&2
     exit 1
 fi
 

@@ -8,6 +8,11 @@
 # (don't mess with these directly, just overwrite them here!)
 source "$MAGIKOS_PATH/default/bash/rc"
 
+# Greet interactive shells with the system summary and ASCII art
+if [[ -r $HOME/.config/fastfetch/MagikOS.txt ]] && command -v fastfetch >/dev/null 2>&1; then
+  fastfetch
+fi
+
 # Add your own exports, aliases, and functions here.
 #
 # Make an alias for invoking commands you use constantly
