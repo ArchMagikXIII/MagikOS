@@ -148,7 +148,9 @@ translate_one() {
     if [[ ${DNF_MAP[$pkg]} == "-" ]]; then
       return 0
     fi
-    printf '%s\n' "${DNF_MAP[$pkg]//,/ }"
+    local specs
+    IFS=',' read -ra specs <<<"${DNF_MAP[$pkg]}"
+    printf '%s\n' "${specs[@]}"
   else
     printf '%s\n' "$pkg"
   fi
@@ -585,6 +587,24 @@ install_packages_host() {
     # is not fatal here; the rpm audit below reports what did not land.
     load_dnf_map
     translate_packages "${packages[@]}"
+
+    # power-profiles-daemon and tuned-ppd both provide ppd-service; whichever
+    # already owns it wins, or the transaction aborts on the conflict.
+    PPD_HELD_BY_TUNED=0
+    if (( ! DRY_RUN )) && rpm -q tuned-ppd >/dev/null 2>&1; then
+      PPD_HELD_BY_TUNED=1
+      log "tuned-ppd already provides ppd-service; skipping power-profiles-daemon"
+    fi
+    local ppd_filtered=()
+    local dnf_spec
+    for dnf_spec in "${TRANSLATED_PACKAGES[@]}"; do
+      if [[ $dnf_spec == "power-profiles-daemon" ]] && (( PPD_HELD_BY_TUNED )); then
+        continue
+      fi
+      ppd_filtered+=("$dnf_spec")
+    done
+    TRANSLATED_PACKAGES=("${ppd_filtered[@]}")
+
     if ! run dnf -y --setopt=install_weak_deps=False install --skip-broken "${TRANSLATED_PACKAGES[@]}"; then
       warn "Batch dnf transaction failed; the audit below lists what is missing."
     fi
@@ -592,6 +612,9 @@ install_packages_host() {
       local pkg spec installed
       for pkg in "${packages[@]}"; do
         if [[ ${DNF_MAP[$pkg]+set} && ${DNF_MAP[$pkg]} == "-" ]]; then
+          continue
+        fi
+        if [[ $pkg == "power-profiles-daemon" ]] && (( PPD_HELD_BY_TUNED )); then
           continue
         fi
         installed=1

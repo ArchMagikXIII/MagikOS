@@ -22,6 +22,12 @@ tesseract-data-eng|tesseract-langpack-eng
 ttf-jetbrains-mono-nerd-basic|jetbrains-mono-fonts
 woff2-font-awesome|fontawesome-fonts
 
+# Reported absent from current Fedora repositories; revisit as repos change.
+gnome-themes-extra|-
+libvips|-
+starship|-
+uwsm|-
+
 # Not carried by the Fedora repositories at all: Arch-only tooling,
 # COPR/AUR-only apps, and Magikos-custom commands awaiting magikos-pkgs.
 aether|-
@@ -53,6 +59,7 @@ pamixer|-
 quickshell-git|-
 tensaku|-
 tobi-try|-
+ttfx|-
 tree-sitter-cli|-
 ttf-ia-writer|-
 tzupdate|-

@@ -54,7 +54,7 @@ while read -r pkg; do
     skipped+=("$pkg")
   fi
 done < <(grep -v '^#' "$package_list" | grep -v '^$')
-if ((${#skipped[@]} > 40)); then
+if ((${#skipped[@]} > 60)); then
   fail "dnf.map skips an implausible number of packages (${#skipped[@]})"
 fi
 pass "dnf.map skips a plausible subset (${#skipped[@]} of $(grep -cv -e '^#' -e '^$' "$package_list"))"
