@@ -131,13 +131,14 @@ require_tools() {
 declare -A DNF_MAP
 
 # quickshell only ships for Fedora through COPR; the repo file is written
-# directly so the dnf copr plugin is not a dependency.
+# directly so the dnf copr plugin is not a dependency. skip_if_unavailable
+# keeps releases without COPR chroots from poisoning every transaction.
 QUICKSHELL_COPR_REPO=$(cat <<'REPO'
 [errornointernet-quickshell]
 name=Copr repo for quickshell owned by errornointernet
 baseurl=https://download.copr.fedorainfracloud.org/results/errornointernet/quickshell/fedora-$releasever/
 type=rpm-md
-skip_if_unavailable=False
+skip_if_unavailable=True
 repo_gpgcheck=0
 enabled=1
 enabled_metadata=1
