@@ -467,6 +467,10 @@ assemble_skeleton() {
   if [[ -d $ROOT/applications ]]; then
     run cp -a "$ROOT/applications/." "$skel/.local/share/applications/"
   fi
+  # Magikos always launches the shell with an explicit path, but a bare
+  # `quickshell` should still find it; point the default config at the tree.
+  run mkdir -p "$skel/.config/quickshell"
+  run ln -sfn "$PLANTED/shell" "$skel/.config/quickshell/default"
 }
 
 install_app_icons() {
@@ -598,6 +602,7 @@ finish() {
 # --- live host; no chroot, no partitioning, no bootloader changes.
 
 PLANTED="/usr/share/magikos"
+NERD_FONTS_VERSION="v3.5.0"
 
 # A previous installer version copied default/ flat into /etc/skel; none of
 # those entries belong there (default/** lives under /usr/share/magikos).
@@ -791,12 +796,46 @@ finish_existing() {
   fi
 }
 
+# Fedora ships no Nerd Font packaging, so fetch the pinned upstream archive
+# for the glyphs the shell's workspaces, network, bluetooth and battery
+# widgets rely on. Arch installs the same glyphs via ttf-jetbrains-mono-nerd.
+install_nerd_fonts_host() {
+  if [[ $BACKEND == pacman ]]; then
+    return 0
+  fi
+
+  local font_dir="/usr/local/share/fonts/JetBrainsMono-Nerd"
+  if [[ -d $font_dir ]]; then
+    log "JetBrainsMono Nerd Font already present at $font_dir"
+    return 0
+  fi
+
+  local archive_url="https://github.com/ryanoasis/nerd-fonts/releases/download/$NERD_FONTS_VERSION/JetBrainsMono.tar.xz"
+  log "Fetching JetBrainsMono Nerd Font $NERD_FONTS_VERSION"
+  local tmp
+  tmp=$(mktemp -d)
+  if ! run curl -fsSL "$archive_url" -o "$tmp/JetBrainsMono.tar.xz"; then
+    warn "Could not download JetBrainsMono Nerd Font; shell icons will fall back to text."
+    rm -rf "$tmp"
+    return 0
+  fi
+  run mkdir -p "$font_dir"
+  if ! run tar -xJf "$tmp/JetBrainsMono.tar.xz" -C "$font_dir"; then
+    warn "Could not unpack JetBrainsMono Nerd Font; shell icons will fall back to text."
+  fi
+  rm -rf "$tmp"
+  if (( ! DRY_RUN )); then
+    fc-cache -f "$font_dir" >>"$LOG_FILE" 2>&1 || true
+  fi
+}
+
 main() {
   preflight
 
   if (( EXISTING_MODE )); then
     plant_magikos_host
     install_packages_host
+    install_nerd_fonts_host
     adopt_user
     run_apply_system_host
     seed_user_home
