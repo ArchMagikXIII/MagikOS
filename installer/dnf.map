@@ -1,0 +1,62 @@
+# Maps Arch package names from install/magikos-base.packages onto dnf specs.
+#
+#   arch-name|spec[,spec...]   install these dnf specs instead
+#   arch-name|-                never attempt this name on dnf
+#
+# Unlisted names are passed through unchanged.
+
+# Renames: same software, different Fedora packaging names.
+bluez-utils|bluez
+fd|fd-find
+imagemagick|ImageMagick
+libreoffice-fresh|libreoffice
+networkmanager|NetworkManager
+noto-fonts|google-noto-sans-fonts,google-noto-serif-fonts,google-noto-mono-fonts
+noto-fonts-cjk|google-noto-sans-cjk-ttc-fonts
+noto-fonts-emoji|google-noto-emoji-fonts
+postgresql-libs|libpq
+python-gobject|python3-gobject
+qemu-user-static-binfmt|qemu-user-static,qemu-user-binfmt
+qt6-imageformats|qt6-qtimageformats
+tesseract-data-eng|tesseract-langpack-eng
+ttf-jetbrains-mono-nerd-basic|jetbrains-mono-fonts
+woff2-font-awesome|fontawesome-fonts
+
+# Not carried by the Fedora repositories at all: Arch-only tooling,
+# COPR/AUR-only apps, and Magikos-custom commands awaiting magikos-pkgs.
+aether|-
+asdcontrol|-
+bluez-tools|-
+cliamp|-
+dotnet-runtime|-
+expac|-
+gpu-screen-recorder|-
+herdr|-
+hyprpicker|-
+hyprsunset|-
+inetutils|-
+kernel-modules-hook|-
+lazydocker|-
+lazygit|-
+localsend|-
+lua51|-
+mariadb-libs|-
+mise-bin|-
+magikos-nvim|-
+moonlight-qt|-
+obsidian|-
+omacalc|-
+omacut|-
+omawrite|-
+pacman-contrib|-
+pamixer|-
+quickshell-git|-
+tensaku|-
+tobi-try|-
+tree-sitter-cli|-
+ttf-ia-writer|-
+tzupdate|-
+ufw-docker|-
+usage|-
+yaru-icon-theme|-
+yay|-

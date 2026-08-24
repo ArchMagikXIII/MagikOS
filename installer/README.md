@@ -52,13 +52,14 @@ Every action is logged to `$MAGIKOS_INSTALL_LOG_FILE` (default `/tmp/magikos-ins
 
 - **Not yet exercised end-to-end.** The script is written to the contracts above but has not completed a real-disk install; do a `--dry-run` first and expect the first real run in a disposable VM.
 - **Arch package set assumes a CachyOS-flavored live media** — `limine-entry-tool`, `pacstrap`, and AUR-adjacent names in `install/magikos-base.packages` resolve there. A stock Arch ISO will report failures for names that are not in the main repos.
-- **Fedora path is beta**: `install/magikos-base.packages` uses Arch package names; the dnf transaction installs a curated core set plus whatever names happen to match (`--skip-broken` keeps one unmapped name from killing the install) and reports everything that did not land. A proper Arch↔Fedora name map is the next piece of work.
+- **Fedora path is beta**: `install/magikos-base.packages` uses Arch package names; the dnf path translates them through `installer/dnf.map` (renames like `imagemagick`→`ImageMagick`, multi-spec expansions, and an exclusion list for software Fedora does not carry). Names missing from the map still pass through unchanged and are reported by the post-install audit. Extending the map is the main lever for improving Fedora support.
+- **Nerd Font caveat on Fedora**: the map substitutes plain `jetbrains-mono-fonts`; official Fedora repos carry no Nerd Font variant, so terminal glyph coverage in the bar may need a manual font install.
 - **`--existing` leaves the bootloader alone** by design; a system booting GRUB or plain systemd-boot gets all userspace setup but keeps its current boot path until you run `magikos setup direct-boot`.
 - Unattended installs (the `cidata` contract documented in manual/52) are not implemented here yet; flags cover the same fields interactively.
 
 ## Roadmap
 
 1. First end-to-end install in a VM (Arch/CachyOS backend), then Fedora backend.
-2. Package-name mapping table so both `.packages` files speak both dialects.
+2. Grow `installer/dnf.map` coverage as Fedora-side gaps surface.
 3. `cidata` unattended support reading `user_configuration.json` / `user_credentials.json`.
 4. Free-space (dual boot) mode alongside full-disk wipe.

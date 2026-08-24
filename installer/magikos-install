@@ -126,6 +126,46 @@ require_tools() {
   fi
 }
 
+# --- Arch -> dnf name translation (installer/dnf.map) ---
+
+declare -A DNF_MAP
+
+load_dnf_map() {
+  local line arch specs
+  while IFS= read -r line; do
+    [[ $line =~ ^[^#[:space:]] ]] || continue
+    arch=${line%%|*}
+    specs=${line#*|}
+    DNF_MAP[$arch]=$specs
+  done <"$ROOT/installer/dnf.map"
+}
+
+# Prints the dnf specs to attempt for one Arch name: its mapping expanded,
+# nothing when mapped away, or the name itself when unmapped.
+translate_one() {
+  local pkg="$1"
+  if [[ ${DNF_MAP[$pkg]+set} ]]; then
+    if [[ ${DNF_MAP[$pkg]} == "-" ]]; then
+      return 0
+    fi
+    printf '%s\n' "${DNF_MAP[$pkg]//,/ }"
+  else
+    printf '%s\n' "$pkg"
+  fi
+}
+
+# Fills TRANSLATED_PACKAGES with the dnf specs for the given Arch names.
+translate_packages() {
+  TRANSLATED_PACKAGES=()
+  local pkg spec
+  while read -r pkg; do
+    [[ -n $pkg ]] || continue
+    while read -r spec; do
+      TRANSLATED_PACKAGES+=("$spec")
+    done < <(translate_one "$pkg")
+  done < <(printf '%s\n' "$@")
+}
+
 ask_confirm() {
   if (( ASSUME_YES || DRY_RUN )); then
     return 0
@@ -360,21 +400,29 @@ bootstrap_fedora() {
   # --skip-broken keeps one unmapped name from killing the transaction; the
   # audit afterwards reports exactly what did not land. It sits after the
   # subcommand because dnf5 only accepts it there.
+  local core_specs=(
+    @core kernel kernel-modules kernel-modules-extra dracut systemd-ukify
+    sudo git btrfs-progs dosfstools NetworkManager sddm sway uwsm foot
+    polkit gnome-keyring pipewire pipewire-pulse wireplumber plymouth
+    ufw gum rsync jq openssh-server
+  )
+  mapfile -t packages < <(grep -v '^#' "$ROOT/install/magikos-base.packages" | grep -v '^$')
+  load_dnf_map
+  translate_packages "${packages[@]}"
   run dnf -y --installroot="$TARGET" --releasever="$releasever" \
     --setopt=install_weak_deps=False \
     install --skip-broken \
-    @core kernel kernel-modules kernel-modules-extra dracut systemd-ukify \
-    sudo git btrfs-progs dosfstools NetworkManager sddm sway uwsm foot \
-    polkit gnome-keyring pipewire pipewire-pulse wireplumber plymouth \
-    ufw gum rsync jq openssh-server \
-    $(grep -v '^#' "$ROOT/install/magikos-base.packages" | grep -v '^$')
+    "${core_specs[@]}" "${TRANSLATED_PACKAGES[@]}"
 
   if (( ! DRY_RUN )); then
     local pkg installed
     while read -r pkg; do
       [[ -n $pkg ]] || continue
-      installed=$(chroot "$TARGET" rpm -q --qf '%{NAME}\n' "$pkg" 2>/dev/null || true)
-      if [[ -z $installed ]]; then
+      installed=1
+      while read -r spec; do
+        chroot "$TARGET" rpm -q --qf '%{NAME}\n' "$spec" >/dev/null 2>&1 || installed=0
+      done < <(translate_one "$pkg")
+      if (( ! installed )); then
         PKG_FAILURES+=("$pkg")
       fi
     done < <(grep -v '^#' "$ROOT/install/magikos-base.packages" | grep -v '^$')
@@ -535,14 +583,22 @@ install_packages_host() {
   else
     # --skip-broken must follow the subcommand on dnf5. A failed transaction
     # is not fatal here; the rpm audit below reports what did not land.
-    if ! run dnf -y --setopt=install_weak_deps=False install --skip-broken "${packages[@]}"; then
+    load_dnf_map
+    translate_packages "${packages[@]}"
+    if ! run dnf -y --setopt=install_weak_deps=False install --skip-broken "${TRANSLATED_PACKAGES[@]}"; then
       warn "Batch dnf transaction failed; the audit below lists what is missing."
     fi
     if (( ! DRY_RUN )); then
-      local pkg installed
+      local pkg spec installed
       for pkg in "${packages[@]}"; do
-        installed=$(rpm -q --qf '%{NAME}\n' "$pkg" 2>/dev/null || true)
-        if [[ -z $installed ]]; then
+        if [[ ${DNF_MAP[$pkg]+set} && ${DNF_MAP[$pkg]} == "-" ]]; then
+          continue
+        fi
+        installed=1
+        while read -r spec; do
+          rpm -q --qf '%{NAME}\n' "$spec" >/dev/null 2>&1 || installed=0
+        done < <(translate_one "$pkg")
+        if (( ! installed )); then
           PKG_FAILURES+=("$pkg")
         fi
       done
