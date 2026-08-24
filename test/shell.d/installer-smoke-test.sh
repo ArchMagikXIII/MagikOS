@@ -15,6 +15,7 @@ pass "installer parses cleanly"
 usage=$("$installer" --help 2>&1) || fail "--help exits zero"
 grep -q -- "--disk DEVICE" <<<"$usage" || fail "--help documents --disk" "$usage"
 grep -q -- "--backend BE" <<<"$usage" || fail "--help documents --backend" "$usage"
+grep -q -- "--existing" <<<"$usage" || fail "--help documents --existing" "$usage"
 pass "--help prints the option contract"
 
 if "$installer" --bogus >/dev/null 2>&1; then

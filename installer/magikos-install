@@ -1,10 +1,17 @@
 #!/bin/bash
 
-# Magikos in-repo installer. Runs from any live media with network access,
-# installs Magikos onto a disk, and hands off to the same target-side setup
-# the packaged ISO uses (magikos-apply-system in the target chroot).
+# Magikos in-repo installer. Two modes:
+#
+#   Full-disk install: boots from any live media with network access, wipes a
+#   disk, installs Magikos onto it, and hands off to the same target-side
+#   setup the packaged ISO uses (magikos-apply-system in the target chroot).
+#
+#   Existing-system adoption (--existing): applies Magikos onto the currently
+#   running system — plants the tree, best-effort packages, then
+#   magikos-apply-system directly. No partitioning, no bootloader changes.
 #
 # Usage: sudo ./installer/magikos-install --disk /dev/sdX --user alice [options]
+#        sudo ./installer/magikos-install --existing [options]
 # See installer/README.md for the full contract and current limitations.
 
 set -euo pipefail
@@ -21,6 +28,7 @@ ENCRYPT=1
 BACKEND="${MAGIKOS_PKG_BACKEND:-}"
 ASSUME_YES=0
 DRY_RUN=0
+EXISTING_MODE=0
 
 LOG_FILE="${MAGIKOS_INSTALL_LOG_FILE:-/tmp/magikos-install.log}"
 PKG_FAILURES=()
@@ -40,15 +48,19 @@ die() {
 
 usage() {
   cat <<USAGE
-Usage: magikos-install --disk DEVICE --user NAME [options]
+Usage:
+  magikos-install --disk DEVICE --user NAME [options]   full-disk install (wipes the disk)
+  magikos-install --existing [--user NAME] [options]    adopt the currently running system
 
-Required:
+Required for full-disk install:
   --disk DEVICE     Target disk (whole device, e.g. /dev/vda). Its contents are destroyed.
   --user NAME       Non-root user to create.
 
 Options:
-  --hostname NAME   Target hostname (default: magikos)
-  --timezone TZ     IANA timezone (default: the live media's timezone)
+  --existing        Adopt the running system: no partitioning, no bootloader changes.
+                    Defaults to the invoking user when --user is omitted.
+  --hostname NAME   Target hostname (default: magikos; ignored with --existing)
+  --timezone TZ     IANA timezone (default: the live media's timezone; ignored with --existing)
   --no-encrypt      Skip LUKS2 encryption of the root partition
   --backend BE      pacman | dnf | auto (default: auto-detect on the live media)
   --yes             Assume yes; do not ask before wiping the disk
@@ -67,6 +79,7 @@ while (($#)); do
     --backend) BACKEND="$2"; shift 2 ;;
     --yes) ASSUME_YES=1; shift ;;
     --dry-run) DRY_RUN=1; shift ;;
+    --existing) EXISTING_MODE=1; shift ;;
     -h|--help) usage; exit 0 ;;
     *) echo "Unknown option: $1" >&2; usage >&2; exit 1 ;;
   esac
@@ -77,6 +90,17 @@ run() {
     printf '[dry-run] %s\n' "$*"
   else
     "$@"
+  fi
+}
+
+# All file writes go through here so --dry-run genuinely touches nothing.
+write_file() {
+  local path="$1" content="$2"
+  if (( DRY_RUN )); then
+    printf '[dry-run] write %s (%s bytes)\n' "$path" "${#content}"
+  else
+    run mkdir -p "$(dirname "$path")"
+    printf '%s' "$content" >"$path"
   fi
 }
 
@@ -135,6 +159,40 @@ preflight() {
     die "Run as root (sudo)."
   fi
 
+  export MAGIKOS_PATH="$ROOT"
+  source "$ROOT/bin/magikos-pkg-backend"
+
+  if [[ -z $BACKEND ]]; then
+    BACKEND=$MAGIKOS_PKG_BACKEND
+  elif [[ $BACKEND != "$MAGIKOS_PKG_BACKEND" ]]; then
+    warn "Requested backend '$BACKEND' differs from live media ('${MAGIKOS_PKG_BACKEND}'); proceeding anyway."
+  fi
+
+  require_tools rsync
+
+  export MAGIKOS_INSTALL_LOG_FILE="$LOG_FILE"
+
+  if (( EXISTING_MODE )); then
+    if [[ -z $INSTALL_USER ]]; then
+      INSTALL_USER=${SUDO_USER:-}
+    fi
+    if [[ -z $INSTALL_USER || $INSTALL_USER == "root" ]]; then
+      die "--existing needs --user NAME (or run under sudo so \$SUDO_USER resolves; got: ${INSTALL_USER:-nothing})."
+    fi
+    log "Adopting the running system: backend $BACKEND, user $INSTALL_USER"
+    if ! ask_confirm "Install Magikos onto the running system? Shipped defaults will overwrite matching files in ~$INSTALL_USER at next login."; then
+      die "Aborted."
+    fi
+    return 0
+  fi
+
+  case $BACKEND in
+    pacman) require_tools pacstrap genfstab mkinitcpio sgdisk ;;
+    dnf) require_tools dnf sgdisk ;;
+  esac
+
+  require_tools cryptsetup sfdisk blkid lsblk
+
   if [[ ! -d /sys/firmware/efi ]]; then
     die "Machine is not booted in UEFI mode."
   fi
@@ -150,24 +208,6 @@ preflight() {
   if findmnt -rn -S "$DISK" >/dev/null 2>&1 || findmnt -rn -S "${DISK}2" >/dev/null 2>&1; then
     warn "Partitions on $DISK are mounted; they will be unmounted."
   fi
-
-  export MAGIKOS_PATH="$ROOT"
-  source "$ROOT/bin/magikos-pkg-backend"
-
-  if [[ -z $BACKEND ]]; then
-    BACKEND=$MAGIKOS_PKG_BACKEND
-  elif [[ $BACKEND != "$MAGIKOS_PKG_BACKEND" ]]; then
-    warn "Requested backend '$BACKEND' differs from live media ('${MAGIKOS_PKG_BACKEND}'); proceeding anyway."
-  fi
-
-  case $BACKEND in
-    pacman) require_tools pacstrap genfstab mkinitcpio sgdisk ;;
-    dnf) require_tools dnf sgdisk ;;
-  esac
-
-  require_tools rsync cryptsetup sfdisk blkid lsblk
-
-  export MAGIKOS_INSTALL_LOG_FILE="$LOG_FILE"
 
   [[ -n $HOSTNAME ]] || HOSTNAME="magikos"
 
@@ -242,38 +282,37 @@ partition_disk() {
 seed_target_config() {
   log "Seeding target configuration"
 
-  run mkdir -p "$TARGET/etc"
   if [[ -d $ROOT/etc ]]; then
     run cp -a "$ROOT/etc/." "$TARGET/etc/"
   fi
 
-  run mkdir -p "$TARGET/etc/kernel"
   # Arch's encrypt hook unlocks from /etc/crypttab.initramfs inside the
   # initramfs; dracut (Fedora) copies the real /etc/crypttab and needs
   # rd.luks.uuid on the kernel command line. The root= line is shared.
   if (( ENCRYPT )); then
-    printf '%s\n' "$LUKS_NAME UUID=$LUKS_UUID none luks,discard" >"$TARGET/etc/crypttab.initramfs"
-    printf '%s\n' "$LUKS_NAME UUID=$LUKS_UUID none luks,discard" >"$TARGET/etc/crypttab"
-    printf 'root=UUID=%s rootflags=subvol=@ rw rd.luks.uuid=%s\n' "$ROOT_UUID" "$LUKS_UUID" \
-      >"$TARGET/etc/kernel/cmdline"
+    write_file "$TARGET/etc/crypttab.initramfs" "$LUKS_NAME UUID=$LUKS_UUID none luks,discard"$'\n'
+    write_file "$TARGET/etc/crypttab" "$LUKS_NAME UUID=$LUKS_UUID none luks,discard"$'\n'
+    write_file "$TARGET/etc/kernel/cmdline" \
+      "$(printf 'root=UUID=%s rootflags=subvol=@ rw rd.luks.uuid=%s\n' "$ROOT_UUID" "$LUKS_UUID")"
   else
-    printf 'root=UUID=%s rootflags=subvol=@ rw\n' "$ROOT_UUID" >"$TARGET/etc/kernel/cmdline"
+    write_file "$TARGET/etc/kernel/cmdline" \
+      "$(printf 'root=UUID=%s rootflags=subvol=@ rw\n' "$ROOT_UUID")"
   fi
 
-  echo "$HOSTNAME" >"$TARGET/etc/hostname"
-  cat >"$TARGET/etc/hosts" <<EOF
+  write_file "$TARGET/etc/hostname" "$HOSTNAME"$'\n'
+  write_file "$TARGET/etc/hosts" "$(cat <<EOF
 127.0.0.1 localhost
 ::1 localhost
 127.0.1.1 $HOSTNAME.localdomain $HOSTNAME
 EOF
-
-  printf '%s\n' "en_US.UTF-8 UTF-8" >"$TARGET/etc/locale.gen"
-  printf 'LANG=en_US.UTF-8\n' >"$TARGET/etc/locale.conf"
-  printf '%s\n' "$TIMEZONE" >"$TARGET/etc/timezone"
-
-  run mkdir -p "$TARGET/etc/sudoers.d"
-  printf '%%wheel ALL=(ALL:ALL) ALL\n' >"$TARGET/etc/sudoers.d/10-magikos-wheel"
-  chmod 440 "$TARGET/etc/sudoers.d/10-magikos-wheel"
+)"
+  write_file "$TARGET/etc/locale.gen" "en_US.UTF-8 UTF-8"$'\n'
+  write_file "$TARGET/etc/locale.conf" "LANG=en_US.UTF-8"$'\n'
+  write_file "$TARGET/etc/timezone" "$TIMEZONE"$'\n'
+  write_file "$TARGET/etc/sudoers.d/10-magikos-wheel" '%wheel ALL=(ALL:ALL) ALL'$'\n'
+  if (( ! DRY_RUN )); then
+    chmod 440 "$TARGET/etc/sudoers.d/10-magikos-wheel"
+  fi
 }
 
 bootstrap_arch() {
@@ -372,23 +411,19 @@ configure_target() {
   fi
 
   # Written by hand rather than genfstab so both backends share one code path.
-  local esp_uuid root_opts home_opts
+  local esp_uuid root_opts home_opts fstab
   esp_uuid=$(blkid -s UUID -o value "${DISK}1")
   root_opts="noatime,compress=zstd:1,subvol=@"
   home_opts="noatime,compress=zstd:1,subvol=@home"
 
-  cat >"$TARGET/etc/fstab" <<EOF
+  fstab=$(cat <<EOF
 UUID=$esp_uuid  /boot       vfat    rw,umask=0077   0 2
 UUID=$ROOT_UUID /           btrfs   $root_opts      0 0
 UUID=$ROOT_UUID /home       btrfs   $home_opts      0 0
 tmpfs           /tmp        tmpfs   rw,noatime      0 0
 EOF
-
-  if (( ENCRYPT )); then
-    cat >>"$TARGET/etc/fstab" <<EOF
-# / is /dev/mapper/$LUKS_NAME; unlocking happens in the initramfs.
-EOF
-  fi
+)
+  write_file "$TARGET/etc/fstab" "$fstab"$'\n'
 }
 
 install_bootloader() {
@@ -428,6 +463,14 @@ apply_magikos() {
     bash /usr/share/magikos/bin/magikos-apply-system --install-user $(printf '%q' "$INSTALL_USER")"
 }
 
+report_pkg_failures() {
+  if ((${#PKG_FAILURES[@]} > 0)); then
+    warn "Packages that did not install (${#PKG_FAILURES[@]}):"
+    printf '  %s\n' "${PKG_FAILURES[@]}"
+    echo
+  fi
+}
+
 finish() {
   log "Finishing up"
   run umount -R "$TARGET" || true
@@ -435,13 +478,110 @@ finish() {
     run cryptsetup close "$LUKS_NAME" || true
   fi
 
-  echo
-  if ((${#PKG_FAILURES[@]} > 0)); then
-    warn "Packages that did not install (${#PKG_FAILURES[@]}):"
-    printf '  %s\n' "${PKG_FAILURES[@]}"
-    echo
-  fi
+  report_pkg_failures
   log "Magikos installed on $DISK. You may reboot now."
+  if [[ ${MAGIKOS_INSTALL_LOG_FILE:-} ]]; then
+    log "Install log: $MAGIKOS_INSTALL_LOG_FILE"
+  fi
+}
+
+# --- Existing-system adoption (--existing): everything below runs on the
+# --- live host; no chroot, no partitioning, no bootloader changes.
+
+PLANTED="/usr/share/magikos"
+
+plant_magikos_host() {
+  # Running straight out of the planted tree (packaged checkout or a
+  # previous adoption): rsync --delete onto ourselves would be destructive.
+  if [[ $(realpath "$ROOT") == "$PLANTED" ]]; then
+    log "Tree is already planted at $PLANTED"
+  else
+    log "Planting the Magikos tree at $PLANTED"
+    run mkdir -p "$PLANTED"
+    run rsync -a --delete \
+      --exclude '.git/' --exclude 'test/' --exclude '*.log' \
+      "$ROOT/" "$PLANTED/"
+  fi
+
+  # Shipped user defaults are seeded through /etc/skel, which useradd copies
+  # at account creation and first-login finalization re-reads for existing users.
+  run mkdir -p /etc/skel
+  run cp -a "$ROOT/default/." /etc/skel/
+
+  write_file /etc/sudoers.d/10-magikos-wheel '%wheel ALL=(ALL:ALL) ALL'$'\n'
+  if (( ! DRY_RUN )); then
+    chmod 440 /etc/sudoers.d/10-magikos-wheel
+  fi
+}
+
+install_packages_host() {
+  log "Installing Magikos package set (best effort)"
+
+  mapfile -t packages < <(grep -v '^#' "$ROOT/install/magikos-base.packages" | grep -v '^$')
+
+  if [[ $BACKEND == pacman ]]; then
+    if ! run pacman -S --needed --noconfirm "${packages[@]}"; then
+      warn "Batch install failed; falling back to per-package installs."
+      local pkg
+      for pkg in "${packages[@]}"; do
+        if (( DRY_RUN )); then
+          printf '[dry-run] pacman -S --needed %s\n' "$pkg"
+        elif ! pacman -S --needed --noconfirm "$pkg" >>"$LOG_FILE" 2>&1; then
+          PKG_FAILURES+=("$pkg")
+        fi
+      done
+    fi
+  else
+    run dnf -y --setopt=install_weak_deps=False --skip-broken install "${packages[@]}"
+    if (( ! DRY_RUN )); then
+      local pkg installed
+      for pkg in "${packages[@]}"; do
+        installed=$(rpm -q --qf '%{NAME}\n' "$pkg" 2>/dev/null || true)
+        if [[ -z $installed ]]; then
+          PKG_FAILURES+=("$pkg")
+        fi
+      done
+    fi
+  fi
+}
+
+adopt_user() {
+  if (( DRY_RUN )); then
+    return 0
+  fi
+
+  if id "$INSTALL_USER" >/dev/null 2>&1; then
+    log "User $INSTALL_USER already exists; leaving the account as is"
+    return 0
+  fi
+
+  log "Creating user $INSTALL_USER"
+  run useradd -m -G wheel "$INSTALL_USER"
+  local pass
+  pass=$(ask_password "Password for $INSTALL_USER")
+  printf '%s:%s\n' "$INSTALL_USER" "$pass" | run chpasswd
+}
+
+run_apply_system_host() {
+  log "Running Magikos system setup"
+
+  local cmd="env MAGIKOS_PATH=$PLANTED \
+    MAGIKOS_INSTALL=$PLANTED/install \
+    PATH=$PLANTED/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
+    bash $PLANTED/bin/magikos-apply-system --install-user $(printf '%q' "$INSTALL_USER")"
+
+  if (( DRY_RUN )); then
+    printf '[dry-run] %s\n' "$cmd"
+  else
+    bash -c "$cmd"
+  fi
+}
+
+finish_existing() {
+  echo
+  report_pkg_failures
+  log "Magikos applied to the running system."
+  warn "The bootloader was left untouched. Reboot into your current setup first, then adopt the UKI/Limine layout with 'magikos setup direct-boot' when ready."
   if [[ ${MAGIKOS_INSTALL_LOG_FILE:-} ]]; then
     log "Install log: $MAGIKOS_INSTALL_LOG_FILE"
   fi
@@ -449,6 +589,16 @@ finish() {
 
 main() {
   preflight
+
+  if (( EXISTING_MODE )); then
+    plant_magikos_host
+    install_packages_host
+    adopt_user
+    run_apply_system_host
+    finish_existing
+    return 0
+  fi
+
   trap unmount_target EXIT
 
   partition_disk

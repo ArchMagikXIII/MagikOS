@@ -4,20 +4,35 @@ An in-repo, distro-agnostic installer for Magikos. One script handles both Arch-
 
 ## Usage
 
+Two modes: full-disk install from live media, and adoption of an already-running system.
+
+### Full-disk install
+
 Boot any live Linux with network access (CachyOS for pacman, Fedora Workstation netinst for dnf), clone or copy this repository onto the machine, then:
 
 ```bash
 sudo ./installer/magikos-install --disk /dev/vda --user alice
 ```
 
+### Existing-system adoption
+
+On a running Arch/CachyOS/Fedora system, clone the repo anywhere and run:
+
+```bash
+sudo ./installer/magikos-install --existing
+```
+
+This plants the tree at `/usr/share/magikos`, seeds `/etc/skel`, installs the package set best-effort, creates `--user` if missing (defaults to the invoking user), and runs `magikos-apply-system` directly on the host. It does **not** partition, touch fstab/hostname/locale, or modify the bootloader — adopt the UKI/Limine layout afterwards with `magikos setup direct-boot` when ready. Expect shipped defaults to overwrite matching files in the user's home at next login.
+
 Full options:
 
 | Flag | Purpose |
 |------|---------|
-| `--disk DEVICE` | Whole target disk; its contents are destroyed. Required. |
-| `--user NAME` | Non-root user to create (member of `wheel`). Required. |
-| `--hostname NAME` | Target hostname (default `magikos`). |
-| `--timezone TZ` | IANA timezone (default: the live media's). |
+| `--disk DEVICE` | Whole target disk; its contents are destroyed. Required for full-disk mode. |
+| `--user NAME` | Non-root user to create. Required for full-disk mode; optional with `--existing`. |
+| `--existing` | Adopt the running system instead of wiping a disk. |
+| `--hostname NAME` | Target hostname (default `magikos`; ignored with `--existing`). |
+| `--timezone TZ` | IANA timezone (default: the live media's; ignored with `--existing`). |
 | `--no-encrypt` | Skip LUKS2 encryption of the root partition. |
 | `--backend BE` | `pacman`, `dnf`, or `auto` (default: detect on the live media). |
 | `--yes` | Do not ask before wiping. |
@@ -38,6 +53,7 @@ Every action is logged to `$MAGIKOS_INSTALL_LOG_FILE` (default `/tmp/magikos-ins
 - **Not yet exercised end-to-end.** The script is written to the contracts above but has not completed a real-disk install; do a `--dry-run` first and expect the first real run in a disposable VM.
 - **Arch package set assumes a CachyOS-flavored live media** — `limine-entry-tool`, `pacstrap`, and AUR-adjacent names in `install/magikos-base.packages` resolve there. A stock Arch ISO will report failures for names that are not in the main repos.
 - **Fedora path is beta**: `install/magikos-base.packages` uses Arch package names; the dnf transaction installs a curated core set plus whatever names happen to match (`--skip-broken` keeps one unmapped name from killing the install) and reports everything that did not land. A proper Arch↔Fedora name map is the next piece of work.
+- **`--existing` leaves the bootloader alone** by design; a system booting GRUB or plain systemd-boot gets all userspace setup but keeps its current boot path until you run `magikos setup direct-boot`.
 - Unattended installs (the `cidata` contract documented in manual/52) are not implemented here yet; flags cover the same fields interactively.
 
 ## Roadmap
