@@ -629,6 +629,74 @@ create_user() {
   fi
 }
 
+build_yay_target() {
+  if chroot_exec "command -v yay" >/dev/null 2>&1; then
+    return 0
+  fi
+
+  log "Building yay from the AUR in the target"
+  chroot_exec "pacman -S --needed --noconfirm git go base-devel"
+
+  local home_dir user_q
+  user_q=$(printf '%q' "$INSTALL_USER")
+  home_dir="/home/$INSTALL_USER"
+
+  if chroot_exec "runuser -u $user_q -- env HOME=$(printf '%q' "$home_dir") \
+      git clone --depth=1 $(printf '%q' "$YAY_AUR_URL") $home_dir/yay-build" &&
+    chroot_exec "runuser -u $user_q -- env HOME=$(printf '%q' "$home_dir") \
+      bash -c 'cd $(printf '%q' "$home_dir")/yay-build && makepkg --noconfirm -f'" &&
+    chroot_exec "pacman -U --noconfirm --needed $home_dir/yay-build/yay-*.pkg.tar.*"; then
+    :
+  else
+    warn "Could not build yay in the target; AUR packages will stay missing."
+    chroot_exec "rm -rf $home_dir/yay-build"
+    return 1
+  fi
+  chroot_exec "rm -rf $home_dir/yay-build"
+}
+
+install_aur_packages_target() {
+  if [[ $BACKEND != pacman ]]; then
+    return 0
+  fi
+
+  if (( DRY_RUN )); then
+    aur_candidate_names
+    if (( ${#AUR_CANDIDATES[@]} > 0 )); then
+      printf '[dry-run] chroot %s: yay -S --needed --noconfirm %s\n' "$TARGET" "${AUR_CANDIDATES[*]}"
+    fi
+    return 0
+  fi
+
+  if (( ${#PKG_FAILURES[@]} == 0 )); then
+    return 0
+  fi
+
+  build_yay_target || return 0
+
+  log "Retrying ${#PKG_FAILURES[@]} package(s) through the AUR (yay)"
+  local aur_failed=("${PKG_FAILURES[@]}")
+  local home_dir pkg user_q
+  user_q=$(printf '%q' "$INSTALL_USER")
+  home_dir="/home/$INSTALL_USER"
+  PKG_FAILURES=()
+
+  sudoers_nopasswd_enable "$TARGET"
+  if ! chroot_exec "runuser -u $user_q -- env HOME=$(printf '%q' "$home_dir") \
+      yay -S --needed --noconfirm $(printf '%q ' "${aur_failed[@]}")"; then
+    warn "Batch AUR install failed; retrying package by package."
+    for pkg in "${aur_failed[@]}"; do
+      chroot_exec "runuser -u $user_q -- env HOME=$(printf '%q' "$home_dir") \
+        yay -S --needed --noconfirm $(printf '%q' "$pkg")" || true
+    done
+  fi
+  sudoers_nopasswd_disable "$TARGET"
+
+  for pkg in "${aur_failed[@]}"; do
+    chroot_exec "pacman -Q $(printf '%q' "$pkg")" >/dev/null 2>&1 || PKG_FAILURES+=("$pkg")
+  done
+}
+
 apply_magikos() {
   log "Running Magikos system setup in the target"
 
@@ -803,6 +871,111 @@ install_packages_host() {
   fi
 }
 
+# --- AUR follow-up -----------------------------------------------------------
+# Raw pacman/pacstrap cannot satisfy AUR-only names, so whatever lands in
+# PKG_FAILURES on the Arch side gets one yay pass. yay itself is built from
+# the AUR when the system does not carry it yet. makepkg refuses root, so the
+# build runs as the install user while pacman -U installs the result; yay's
+# own privileged calls need a temporary NOPASSWD drop-in that is removed
+# afterwards.
+
+YAY_AUR_URL="https://aur.archlinux.org/yay.git"
+
+sudoers_nopasswd_enable() {
+  write_file "$1/etc/sudoers.d/00-magikos-installer-nopasswd" \
+    '%wheel ALL=(ALL:ALL) NOPASSWD: ALL'$'\n'
+  if (( ! DRY_RUN )); then
+    chmod 440 "$1/etc/sudoers.d/00-magikos-installer-nopasswd"
+  fi
+}
+
+sudoers_nopasswd_disable() {
+  if (( ! DRY_RUN )); then
+    rm -f "$1/etc/sudoers.d/00-magikos-installer-nopasswd"
+  fi
+}
+
+# Fills AUR_CANDIDATES with package-list names absent from every configured
+# repo — the set pacman/pacstrap cannot satisfy and yay must cover. Read-only,
+# so it is also how --dry-run previews the follow-up.
+aur_candidate_names() {
+  local -A in_repo=()
+  local name
+  while read -r name; do
+    [[ -n $name ]] && in_repo[$name]=1
+  done < <(pacman -Slq 2>/dev/null | sort -u)
+  AUR_CANDIDATES=()
+  local pkg
+  for pkg in "${packages[@]}"; do
+    [[ ${in_repo[$pkg]+set} ]] || AUR_CANDIDATES+=("$pkg")
+  done
+}
+
+build_yay_host() {
+  if command -v yay >/dev/null 2>&1; then
+    return 0
+  fi
+
+  log "Building yay from the AUR (not present on this system)"
+  run pacman -S --needed --noconfirm git go base-devel >>"$LOG_FILE" 2>&1 || true
+
+  local home_dir tmp
+  home_dir=$(getent passwd "$INSTALL_USER" | cut -d: -f6)
+  tmp=$(mktemp -d)
+  chown "$INSTALL_USER" "$tmp"
+
+  if runuser -u "$INSTALL_USER" -- env HOME="$home_dir" git clone --depth=1 "$YAY_AUR_URL" "$tmp/yay" &&
+    runuser -u "$INSTALL_USER" -- env HOME="$home_dir" bash -c "cd '$tmp/yay' && makepkg --noconfirm -f" &&
+    run pacman -U --noconfirm --needed "$tmp"/yay/yay-*.pkg.tar.*; then
+    :
+  else
+    warn "Could not build yay; AUR packages will stay missing."
+    rm -rf "$tmp"
+    return 1
+  fi
+  rm -rf "$tmp"
+}
+
+install_aur_packages_host() {
+  if [[ $BACKEND != pacman ]]; then
+    return 0
+  fi
+
+  if (( DRY_RUN )); then
+    aur_candidate_names
+    if (( ${#AUR_CANDIDATES[@]} > 0 )); then
+      printf '[dry-run] yay -S --needed --noconfirm %s\n' "${AUR_CANDIDATES[*]}"
+    fi
+    return 0
+  fi
+
+  if (( ${#PKG_FAILURES[@]} == 0 )); then
+    return 0
+  fi
+
+  build_yay_host || return 0
+
+  log "Retrying ${#PKG_FAILURES[@]} package(s) through the AUR (yay)"
+  local aur_failed=("${PKG_FAILURES[@]}")
+  local home_dir pkg
+  home_dir=$(getent passwd "$INSTALL_USER" | cut -d: -f6)
+  PKG_FAILURES=()
+
+  sudoers_nopasswd_enable "/"
+  if ! runuser -u "$INSTALL_USER" -- env HOME="$home_dir" \
+    yay -S --needed --noconfirm "${aur_failed[@]}" >>"$LOG_FILE" 2>&1; then
+    warn "Batch AUR install failed; retrying package by package."
+    for pkg in "${aur_failed[@]}"; do
+      runuser -u "$INSTALL_USER" -- env HOME="$home_dir" \
+        yay -S --needed --noconfirm "$pkg" >>"$LOG_FILE" 2>&1 || true
+    done
+  fi
+  sudoers_nopasswd_disable "/"
+
+  for pkg in "${aur_failed[@]}"; do
+    pacman -Q "$pkg" >/dev/null 2>&1 || PKG_FAILURES+=("$pkg")
+  done
+}
 adopt_user() {
   if (( DRY_RUN )); then
     return 0
@@ -939,6 +1112,7 @@ main() {
   if (( EXISTING_MODE )); then
     plant_magikos_host
     install_packages_host
+    install_aur_packages_host
     install_nerd_fonts_host
     install_oh_my_posh_host
     adopt_user
@@ -963,9 +1137,9 @@ main() {
   configure_target
   install_bootloader
   create_user
+  install_aur_packages_target
   apply_magikos
   finalize_user
-
   trap - EXIT
   finish
 }
