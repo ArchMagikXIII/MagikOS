@@ -685,15 +685,20 @@ adopt_user() {
 run_apply_system_host() {
   log "Running Magikos system setup"
 
+  # --first-install marks shipped migrations complete instead of replaying
+  # them over an adopted system; same thing the ISO does for its fresh user.
   local cmd="env MAGIKOS_PATH=$PLANTED \
     MAGIKOS_INSTALL=$PLANTED/install \
     PATH=$PLANTED/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
-    bash $PLANTED/bin/magikos-apply-system --install-user $(printf '%q' "$INSTALL_USER")"
+    bash $PLANTED/bin/magikos-apply-system --install-user $(printf '%q' "$INSTALL_USER") --first-install"
 
   if (( DRY_RUN )); then
     printf '[dry-run] %s\n' "$cmd"
-  else
-    bash -c "$cmd"
+  elif ! bash -c "$cmd"; then
+    # One failing leaf aborts the whole chain (set -euo pipefail); that must
+    # not lose the rest of the install.
+    warn "magikos-apply-system reported errors; system setup may be incomplete."
+    warn "Per-step output is in $LOG_FILE - fix and re-run this installer (it is idempotent)."
   fi
 }
 
@@ -713,14 +718,18 @@ seed_user_home() {
   local home_dir
   home_dir=$(getent passwd "$INSTALL_USER" | cut -d: -f6)
 
-  runuser -u "$INSTALL_USER" -- env HOME="$home_dir" bash -c 'cp -af /etc/skel/. "$HOME/"'
+  if ! runuser -u "$INSTALL_USER" -- env HOME="$home_dir" bash -c 'cp -af /etc/skel/. "$HOME/"'; then
+    warn "Could not resync /etc/skel into ~$INSTALL_USER"
+  fi
 
-  runuser -u "$INSTALL_USER" -- env \
+  if ! runuser -u "$INSTALL_USER" -- env \
     HOME="$home_dir" \
     MAGIKOS_PATH="$PLANTED" \
     MAGIKOS_INSTALL="$PLANTED/install" \
     PATH="$PLANTED/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" \
-    bash "$PLANTED/bin/magikos-provision-user" --first-install
+    bash "$PLANTED/bin/magikos-provision-user" --first-install; then
+    warn "Per-user finalization reported errors; re-run 'magikos finalize user' after first login."
+  fi
 }
 
 finish_existing() {
