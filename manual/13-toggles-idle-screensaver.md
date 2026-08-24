@@ -41,9 +41,9 @@ Inactive indicators are hidden. Hover the area around them and they fade in dimm
 
 ### Night light
 
-`Super + Ctrl + N` warms the screen to 4000K, and hitting it again puts it back to 6500K. It's driven by hyprsunset, which the toggle starts for you if it isn't already running.
+`Super + Ctrl + N` warms the screen to 4000K, and hitting it again puts it back to daylight. It's driven by wlsunset, which the toggle starts for you if it isn't already running.
 
-The 4000K/6500K pair used by the toggle is fixed. If you want a different warmth, run hyprsunset yourself with the temperature of your choosing — say `hyprsunset -t 3000` — and to have it come up at every login, add an exec line for it to `~/.config/sway/autostart.conf`.
+The 4000K warmth used by the toggle is fixed. If you want a different warmth, run wlsunset yourself with matching low and high temperatures — say `wlsunset -t 3000 -T 3000` — and to have it come up at every login, add an exec line for it to `~/.config/sway/autostart.conf`.
 
 ### Do not disturb
 

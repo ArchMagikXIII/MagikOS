@@ -44,36 +44,26 @@ Item {
   }
 
   function runApply(temp) {
-    // For Sway, use hyprsunset directly (compositor-agnostic)
-    applyProcess.command = ["bash", "-lc",
-      "pgrep -x hyprsunset >/dev/null || { setsid hyprsunset >/dev/null 2>&1 & sleep 1; }; " +
-      "hyprsunset -t " + Number(temp)]
+    // wlsunset speaks the standard wlr gamma protocol, so this works on any
+    // compositor. Equal low/high temps pin a constant value immediately;
+    // killing the daemon restores native daylight.
+    var cmd = "pkill -x wlsunset 2>/dev/null; "
+    if (Number(temp) < dayTemperature) {
+      cmd += "sleep 0.3; setsid wlsunset -t " + Number(temp) + " -T " + Number(temp) + " >/dev/null 2>&1 &"
+    }
+    applyProcess.command = ["bash", "-c", cmd]
     applyProcess.running = true
   }
 
   Process {
     id: statusProbe
-    // Use hyprsunset directly for status query
-    command: ["hyprsunset", "--version"]
+    // The daemon's arguments are the only source of truth: wlsunset cannot be
+    // queried live. No output means nothing is running (daylight).
+    command: ["bash", "-c", "pgrep -ax wlsunset | head -n1 | awk '{for(i=2;i<NF;i++) if($i==\"-t\"){print $(i+1); exit}}'"]
     stdout: StdioCollector {
       waitForEnd: true
-      onStreamFinished: {
-        // Try to get current temperature
-        var tempProbe = Qt.createQmlObject(
-          'import Quickshell.Io; Process { command: ["bash", "-c", "hyprsunset -g 2>/dev/null || echo 6500"] }',
-          root
-        )
-        tempProbe.stdout = Qt.createQmlObject(
-          'import Quickshell.Io; StdioCollector { waitForEnd: true; onStreamFinished: function(text) { var temp = NightlightModel.temperatureFromOutput(text); root.temperature = temp; root.stateLoaded = true; } }',
-          tempProbe
-        )
-        tempProbe.running = true
-      }
-    }
-    onExited: function(exitCode) {
-      if (exitCode !== 0) {
-        // hyprsunset not available, use default
-        root.temperature = null
+      onStreamFinished: function(text) {
+        root.temperature = NightlightModel.temperatureFromOutput(text)
         root.stateLoaded = true
       }
     }

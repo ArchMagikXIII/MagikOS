@@ -344,7 +344,7 @@
   "update.channel.rc": {"icon":"🟡","label":"RC","checked":"[[ \"$(magikos-channel-current)\" == \"rc\" ]]","action":"magikos-launch-floating-terminal-with-presentation 'magikos-channel-set rc'"},
   "update.channel.edge": {"icon":"🟠","label":"Edge","checked":"[[ \"$(magikos-channel-current)\" == \"edge\" ]]","action":"magikos-launch-floating-terminal-with-presentation 'magikos-channel-set edge'"},
   "update.channel.dev": {"icon":"🔴","label":"Dev","checked":"[[ \"$(magikos-channel-current)\" == \"dev\" ]]","action":"magikos-launch-floating-terminal-with-presentation 'magikos-channel-set dev'"},
-  "update.process.hyprsunset": {"icon":"","label":"Hyprsunset","when":"magikos-cmd-present hyprsunset","action":"magikos-restart-hyprsunset"},
+  "update.process.wlsunset": {"icon":"󰔎","label":"Night light","when":"magikos-cmd-present wlsunset","action":"magikos-restart-wlsunset"},
   "update.process.sway": {"icon":"","label":"Sway","action":"swaymsg reload"},
   "update.process.shell": {"icon":"󰍜","label":"Shell","action":"magikos-restart-shell"},
   "update.config.sway": {"icon":"","label":"Sway","action":"magikos-launch-floating-terminal-with-presentation magikos-refresh-sway"},

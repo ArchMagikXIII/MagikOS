@@ -8,11 +8,21 @@ ON_TEMP=4000
 OFF_TEMP=6500
 IDENTITY_TEMP=6000
 
+# wlsunset cannot be queried live; the running daemon's own arguments are the
+# source of truth. Equal -t/-T values pin a constant temperature immediately,
+# so the daemon is always started with both flags set to the same value.
 current_temp() {
-  local output
+  local line
+  line=$(pgrep -ax wlsunset 2>/dev/null | head -n1) || return
+  awk '{for(i=2;i<NF;i++) if($i=="-t"){print $(i+1); exit}}' <<<"$line"
+}
 
-  output=$(hyprsunset -g 2>/dev/null) || return
-  grep -oE '[0-9]+' <<<"$output" | head -n1
+start_nightlight() {
+  setsid uwsm-app -- wlsunset -t "$1" -T "$1" >/dev/null 2>&1 &
+}
+
+stop_nightlight() {
+  pkill -x wlsunset 2>/dev/null
 }
 
 status_json() {
@@ -34,11 +44,6 @@ if [[ ${1:-} == "--status" ]]; then
   exit 0
 fi
 
-# Ensure hyprsunset is running
-if ! pgrep -x hyprsunset >/dev/null; then
-  setsid uwsm-app -- hyprsunset &
-fi
-
 # Query the current temperature
 CURRENT_TEMP=$(current_temp)
 
@@ -48,12 +53,11 @@ else
   TARGET_TEMP=$OFF_TEMP
 fi
 
-# A freshly-started hyprsunset applies its default temperature at the end of
-# its boot, overriding anything set before then — so resend until it sticks
-for _ in {1..10}; do
-  hyprsunset -t "$TARGET_TEMP" >/dev/null 2>&1
-  sleep 0.2
-  [[ $(current_temp) == "$TARGET_TEMP" ]] && break
-done
+# Killing the daemon restores native daylight; restarting it applies the
+# target temperature right away thanks to the equal low/high pair.
+stop_nightlight
+if (( TARGET_TEMP != OFF_TEMP )); then
+  start_nightlight "$TARGET_TEMP"
+fi
 
 magikos-shell -q nightlight refresh
