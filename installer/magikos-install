@@ -358,10 +358,11 @@ bootstrap_fedora() {
   run mount --make-rslave "$TARGET/run"
 
   # --skip-broken keeps one unmapped name from killing the transaction; the
-  # audit afterwards reports exactly what did not land.
+  # audit afterwards reports exactly what did not land. It sits after the
+  # subcommand because dnf5 only accepts it there.
   run dnf -y --installroot="$TARGET" --releasever="$releasever" \
-    --setopt=install_weak_deps=False --skip-broken \
-    install \
+    --setopt=install_weak_deps=False \
+    install --skip-broken \
     @core kernel kernel-modules kernel-modules-extra dracut systemd-ukify \
     sudo git btrfs-progs dosfstools NetworkManager sddm sway uwsm foot \
     polkit gnome-keyring pipewire pipewire-pulse wireplumber plymouth \
@@ -532,7 +533,11 @@ install_packages_host() {
       done
     fi
   else
-    run dnf -y --setopt=install_weak_deps=False --skip-broken install "${packages[@]}"
+    # --skip-broken must follow the subcommand on dnf5. A failed transaction
+    # is not fatal here; the rpm audit below reports what did not land.
+    if ! run dnf -y --setopt=install_weak_deps=False install --skip-broken "${packages[@]}"; then
+      warn "Batch dnf transaction failed; the audit below lists what is missing."
+    fi
     if (( ! DRY_RUN )); then
       local pkg installed
       for pkg in "${packages[@]}"; do
