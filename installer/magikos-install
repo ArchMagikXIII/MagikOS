@@ -342,6 +342,12 @@ partition_disk() {
 
   ROOT_UUID=$(blkid -s UUID -o value "$ROOT_DEVICE")
   LUKS_UUID=$(blkid -s UUID -o value "${DISK}2" || true)
+  if [[ -z $ROOT_UUID ]]; then
+    die "Could not read the root filesystem UUID from $ROOT_DEVICE"
+  fi
+  if (( ENCRYPT )) && [[ -z $LUKS_UUID ]]; then
+    die "Could not read the LUKS UUID from ${DISK}2"
+  fi
 }
 
 seed_target_config() {
@@ -384,17 +390,34 @@ bootstrap_arch() {
   log "Bootstrapping Arch base system (pacstrap)"
 
   # Limine goes in before the kernel so the mkinitcpio hook deploys the UKI
-  # as part of the kernel transaction itself.
-  run pacstrap -K "$TARGET" \
+  # as part of the kernel transaction itself. limine-mkinitcpio-hook and
+  # limine-snapper-sync are AUR-only on vanilla Arch media, so this batch is
+  # best effort too: a hard abort here would strand a freshly wiped disk.
+  local base_pkgs=(
     base base-devel linux linux-firmware linux-headers \
     btrfs-progs dosfstools e2fsprogs sudo git \
     limine limine-mkinitcpio-hook limine-snapper-sync snapper \
     networkmanager sddm sway uwsm foot polkit gnome-keyring \
     pipewire wireplumber plymouth ufw gum rsync jq openssh
+  )
+  if ! run pacstrap -K "$TARGET" "${base_pkgs[@]}"; then
+    warn "Base batch install failed; falling back to per-package installs."
+    local pkg
+    for pkg in "${base_pkgs[@]}"; do
+      if (( DRY_RUN )); then
+        printf '[dry-run] pacstrap -K %s: %s\n' "$TARGET" "$pkg"
+      elif ! pacstrap -K "$TARGET" "$pkg" >>"$LOG_FILE" 2>&1; then
+        PKG_FAILURES+=("$pkg")
+      fi
+    done
+  fi
 
   log "Installing Magikos package set (best effort)"
 
   mapfile -t packages < <(grep -v '^#' "$ROOT/install/magikos-base.packages" | grep -v '^$')
+  if (( ${#packages[@]} == 0 )); then
+    die "No packages found in install/magikos-base.packages"
+  fi
   if ! run pacstrap "$TARGET" "${packages[@]}"; then
     warn "Batch install failed; falling back to per-package installs."
     local pkg
@@ -406,6 +429,16 @@ bootstrap_arch() {
       fi
     done
   fi
+
+  # Scriptlets and chroot_exec need the virtual kernels inside the target;
+  # pacstrap's own mounts live in a private namespace and vanish with it.
+  run mount --rbind /dev "$TARGET/dev"
+  run mount --make-rslave "$TARGET/dev"
+  run mount -t proc /proc "$TARGET/proc"
+  run mount --rbind /sys "$TARGET/sys"
+  run mount --make-rslave "$TARGET/sys"
+  run mount --rbind /run "$TARGET/run"
+  run mount --make-rslave "$TARGET/run"
 }
 
 bootstrap_fedora() {
@@ -559,6 +592,21 @@ install_bootloader() {
 create_user() {
   log "Creating user $INSTALL_USER"
 
+  # Neither distro repository carries oh-my-posh, so fresh installs get the
+  # pinned upstream binary directly; the host-side helper only covers the
+  # adopt-existing-system path.
+  local omp_target="$TARGET/usr/local/bin/oh-my-posh"
+  if (( DRY_RUN )) || [[ ! -x $omp_target ]]; then
+    run mkdir -p "$TARGET/usr/local/bin"
+    local omp_url="https://github.com/JanDeDobbeleer/oh-my-posh/releases/download/$OH_MY_POSH_VERSION/posh-linux-amd64"
+    if run curl -fsSL "$omp_url" -o "$omp_target"; then
+      run chmod 755 "$omp_target"
+    else
+      warn "Could not download oh-my-posh; fish will use its stock prompt."
+      rm -f "$omp_target"
+    fi
+  fi
+
   chroot_exec "useradd -m -G wheel $(printf '%q' "$INSTALL_USER")"
   if (( ! DRY_RUN )); then
     local pass
@@ -648,6 +696,9 @@ install_packages_host() {
   log "Installing Magikos package set (best effort)"
 
   mapfile -t packages < <(grep -v '^#' "$ROOT/install/magikos-base.packages" | grep -v '^$')
+  if (( ${#packages[@]} == 0 )); then
+    die "No packages found in install/magikos-base.packages"
+  fi
 
   if [[ $BACKEND == pacman ]]; then
     if ! run pacman -S --needed --noconfirm "${packages[@]}"; then
@@ -773,7 +824,9 @@ seed_user_home() {
   local home_dir
   home_dir=$(getent passwd "$INSTALL_USER" | cut -d: -f6)
 
-  if ! runuser -u "$INSTALL_USER" -- env HOME="$home_dir" bash -c 'cp -af /etc/skel/. "$HOME/"'; then
+  # --remove-destination keeps a skel file from being written *through* an
+  # existing user symlink, which would truncate whatever the link targets.
+  if ! runuser -u "$INSTALL_USER" -- env HOME="$home_dir" bash -c 'cp -a --remove-destination /etc/skel/. "$HOME/"'; then
     warn "Could not resync /etc/skel into ~$INSTALL_USER"
   fi
 
