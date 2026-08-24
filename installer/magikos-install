@@ -696,10 +696,36 @@ run_apply_system_host() {
   fi
 }
 
+# useradd only replays /etc/skel for accounts it creates. An adopting user
+# keeps their old $HOME until the skel tree is replayed over it (the same
+# thing magikos-reinstall-configs does), then per-user finalization runs as
+# that user -- it refuses root.
+seed_user_home() {
+  log "Syncing shipped defaults into ~$INSTALL_USER and finalizing"
+
+  if (( DRY_RUN )); then
+    printf '[dry-run] cp -af /etc/skel/. ~%s/\n' "$INSTALL_USER"
+    printf '[dry-run] runuser -u %s -- magikos-provision-user --first-install\n' "$INSTALL_USER"
+    return 0
+  fi
+
+  local home_dir
+  home_dir=$(getent passwd "$INSTALL_USER" | cut -d: -f6)
+
+  runuser -u "$INSTALL_USER" -- env HOME="$home_dir" bash -c 'cp -af /etc/skel/. "$HOME/"'
+
+  runuser -u "$INSTALL_USER" -- env \
+    HOME="$home_dir" \
+    MAGIKOS_PATH="$PLANTED" \
+    MAGIKOS_INSTALL="$PLANTED/install" \
+    PATH="$PLANTED/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" \
+    bash "$PLANTED/bin/magikos-provision-user" --first-install
+}
+
 finish_existing() {
   echo
   report_pkg_failures
-  log "Magikos applied to the running system."
+  log "Magikos applied to the running system; ~$INSTALL_USER resynced from shipped defaults."
   warn "The bootloader was left untouched. Reboot into your current setup first, then adopt the UKI/Limine layout with 'magikos setup direct-boot' when ready."
   if [[ ${MAGIKOS_INSTALL_LOG_FILE:-} ]]; then
     log "Install log: $MAGIKOS_INSTALL_LOG_FILE"
@@ -714,6 +740,7 @@ main() {
     install_packages_host
     adopt_user
     run_apply_system_host
+    seed_user_home
     finish_existing
     return 0
   fi
