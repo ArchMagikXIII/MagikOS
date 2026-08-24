@@ -201,11 +201,12 @@ It only does the things `/etc/skel` can't:
   checkout repoints them correctly.
 - `xdg-user-dirs-update` (Templates/Public/Desktop folded back into `$HOME`)
   and `~/.config/gtk-3.0/bookmarks` (needs `$HOME` expansion).
-- `xdg-settings set default-web-browser chromium.desktop` and
+- `xdg-settings set default-web-browser brave-origin.desktop` and
   `xdg-mime default HEY.desktop x-scheme-handler/mailto` (XDG-aware paths).
 - `magikos-refresh-applications` (composes generated `.desktop` launchers).
-- Sources `install/user/all.sh` — theme, chromium, git, xcompose, mise,
-  keyring, per-user hardware quirks (asus mic/mixer, framework f13 audio, …).
+- Sources `install/user/all.sh` — theme, browser native-messaging hosts, git,
+  xcompose, mise, keyring, per-user hardware quirks (asus mic/mixer, framework
+  f13 audio, …).
 - On `--first-install`, marks every shipped user migration as already applied
   for the freshly-created user.
 

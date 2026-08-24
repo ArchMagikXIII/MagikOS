@@ -109,7 +109,7 @@ done
 source "$MAGIKOS_INSTALL/user/all.sh"
 
 magikos-refresh-applications
-env -u BROWSER xdg-settings set default-web-browser chromium.desktop
+env -u BROWSER xdg-settings set default-web-browser brave-origin.desktop
 xdg-mime default HEY.desktop x-scheme-handler/mailto
 
 if (( first_install )); then

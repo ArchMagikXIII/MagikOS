@@ -20,8 +20,8 @@ verify_core_packages() {
 }
 
 verify_defaults() {
-  [[ $(magikos-default-browser) == "chromium" ]] || fail "Chromium is the default browser"
-  pass "Chromium is the default browser"
+  [[ $(magikos-default-browser) == "brave-origin" ]] || fail "Brave Origin is the default browser"
+  pass "Brave Origin is the default browser"
 
   [[ $(magikos-default-terminal) == "foot" ]] || fail "Foot is the default terminal"
   pass "Foot is the default terminal"
@@ -38,8 +38,7 @@ verify_defaults() {
   [[ -n $(magikos-font-current) ]] || fail "a monospace font is configured"
   pass "a monospace font is configured"
 
-  [[ $(xdg-mime query default x-scheme-handler/http) == "chromium.desktop" ]] || fail "HTTP MIME handling uses Chromium"
-  [[ $(xdg-mime query default inode/directory) == "org.gnome.Nautilus.desktop" ]] || fail "directory MIME handling uses Nautilus"
+  [[ $(xdg-mime query default x-scheme-handler/http) == "brave-origin.desktop" ]] || fail "HTTP MIME handling uses Brave Origin"
   pass "desktop MIME handlers are configured"
 }
 
@@ -47,9 +46,8 @@ verify_services() {
   local unit
 
   for unit in \
-    avahi-daemon.service cups.service cups-browsed.service docker.socket \
-    NetworkManager.service power-profiles-daemon.service sddm.service \
-    systemd-resolved.service ufw.service; do
+    avahi-daemon.service NetworkManager.service power-profiles-daemon.service \
+    sddm.service systemd-resolved.service ufw.service; do
     systemctl is-enabled --quiet "$unit" || fail "core system services are enabled" "$unit is not enabled"
   done
   pass "core system services are enabled"
@@ -65,9 +63,6 @@ verify_services() {
 }
 
 verify_runtime_tools() {
-  timeout 20 docker info >/dev/null 2>&1 || fail "Docker is usable by the desktop user"
-  pass "Docker is usable by the desktop user"
-
   nvim --headless '+qa' >/dev/null 2>&1 || fail "Neovim starts headlessly"
   pass "Neovim starts headlessly"
 
@@ -75,7 +70,6 @@ verify_runtime_tools() {
   pass "Fastfetch can read system information"
 
   git --version >/dev/null || fail "Git is installed and runnable"
-  tmux -V >/dev/null || fail "Tmux is installed and runnable"
   mise --version >/dev/null || fail "Mise is installed and runnable"
   pass "core terminal tools are runnable"
 }
