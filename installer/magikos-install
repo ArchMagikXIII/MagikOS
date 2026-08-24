@@ -533,18 +533,42 @@ install_app_icons() {
 # is distro-specific, so an Arch-flavored copy must never land on Fedora.
 sync_etc_dropins() {
   local dest="$1"
+  # --chown matters: the checkout files are owned by the invoking user, and
+  # sudo refuses /etc/sudoers.d entries that are not owned by root.
   if [[ $BACKEND == dnf ]]; then
-    run rsync -a --exclude=nsswitch.conf "$ROOT/etc/" "$dest/"
+    run rsync -a --chown=root:root --exclude=nsswitch.conf "$ROOT/etc/" "$dest/"
   else
-    run rsync -a "$ROOT/etc/" "$dest/"
+    run rsync -a --chown=root:root "$ROOT/etc/" "$dest/"
   fi
+  # Force the canonical sudoers mode too; the checkout carries user umask bits.
+  if [[ -d $dest/sudoers.d ]]; then
+    run find "$dest/sudoers.d" -type f -exec chmod 440 {} +
+  fi
+}
+
+# The planted tree is the only source of magikos-* commands on an
+# installer-built system (the magikos package that normally ships them into
+# /usr/bin is not installed here). Expose every executable through
+# /usr/local/bin, which precedes /usr/bin on PATH and is visible to every
+# session context: terminals, systemd units, SSH, and the shell itself.
+link_planted_binaries() {
+  local tree="$1" prefix="$2"
+  local exe name bindir="$prefix/usr/local/bin"
+  run mkdir -p "$bindir"
+  # Enumerate from the checkout: it is exactly what plant_* rsyncs into
+  # $tree, which may not exist yet under --dry-run.
+  for exe in "$ROOT/bin/"*; do
+    [[ -f $exe && -x $exe ]] || continue
+    name=${exe##*/}
+    run ln -sfn "$tree/bin/$name" "$bindir/$name"
+  done
 }
 
 plant_magikos() {
   log "Planting the Magikos tree at /usr/share/magikos"
 
   run mkdir -p "$TARGET/usr/share/magikos"
-  run rsync -a --delete \
+  run rsync -a --delete --chown=root:root \
     --exclude '.git/' --exclude 'test/' --exclude '*.log' \
     "$ROOT/" "$TARGET/usr/share/magikos/"
 
@@ -553,6 +577,13 @@ plant_magikos() {
   run mkdir -p "$TARGET/etc/skel"
   assemble_skeleton "$TARGET/etc/skel"
   install_app_icons "$TARGET"
+
+  link_planted_binaries "$TARGET/usr/share/magikos" "$TARGET"
+
+  # uwsm sources /usr/share/uwsm/env.d/* for the graphical session; the
+  # packaged install ships this file, so recreate it here.
+  run install -Dm644 "$ROOT/default/uwsm/env.d/10-magikos" \
+    "$TARGET/usr/share/uwsm/env.d/10-magikos"
 }
 
 configure_target() {
@@ -772,7 +803,7 @@ plant_magikos_host() {
   else
     log "Planting the Magikos tree at $PLANTED"
     run mkdir -p "$PLANTED"
-    run rsync -a --delete \
+    run rsync -a --delete --chown=root:root \
       --exclude '.git/' --exclude 'test/' --exclude '*.log' \
       "$ROOT/" "$PLANTED/"
   fi
@@ -783,6 +814,16 @@ plant_magikos_host() {
   run mkdir -p /etc/skel
   assemble_skeleton /etc/skel
   install_app_icons ""
+
+  link_planted_binaries "$PLANTED" ""
+
+  # uwsm sources /usr/share/uwsm/env.d/* for the graphical session; the
+  # packaged install ships this file, so recreate it here. Skip when the
+  # checkout already IS the planted tree (install -D refuses same-file).
+  if [[ ! "$ROOT/default/uwsm/env.d/10-magikos" -ef /usr/share/uwsm/env.d/10-magikos ]]; then
+    run install -Dm644 "$ROOT/default/uwsm/env.d/10-magikos" \
+      /usr/share/uwsm/env.d/10-magikos
+  fi
 
   sync_etc_dropins /etc
 
