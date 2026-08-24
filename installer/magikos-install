@@ -130,6 +130,28 @@ require_tools() {
 
 declare -A DNF_MAP
 
+# quickshell only ships for Fedora through COPR; the repo file is written
+# directly so the dnf copr plugin is not a dependency.
+QUICKSHELL_COPR_REPO=$(cat <<'REPO'
+[errornointernet-quickshell]
+name=Copr repo for quickshell owned by errornointernet
+baseurl=https://download.copr.fedorainfracloud.org/results/errornointernet/quickshell/fedora-$releasever/
+type=rpm-md
+skip_if_unavailable=False
+repo_gpgcheck=0
+enabled=1
+enabled_metadata=1
+gpgcheck=1
+gpgkey=https://download.copr.fedorainfracloud.org/results/errornointernet/quickshell/pubkey.gpg
+REPO
+)
+
+add_quickshell_repo() {
+  local etc_dir="$1"
+  write_file "$etc_dir/yum.repos.d/_copr_errornointernet-quickshell.repo" \
+    "$QUICKSHELL_COPR_REPO"$'\n'
+}
+
 load_dnf_map() {
   local line arch specs
   while IFS= read -r line; do
@@ -408,6 +430,7 @@ bootstrap_fedora() {
     polkit gnome-keyring pipewire pipewire-pulse wireplumber plymouth
     ufw gum rsync jq openssh-server
   )
+  add_quickshell_repo "$TARGET/etc"
   mapfile -t packages < <(grep -v '^#' "$ROOT/install/magikos-base.packages" | grep -v '^$')
   load_dnf_map
   translate_packages "${packages[@]}"
@@ -587,6 +610,7 @@ install_packages_host() {
     # is not fatal here; the rpm audit below reports what did not land.
     load_dnf_map
     translate_packages "${packages[@]}"
+    add_quickshell_repo "/etc"
 
     # power-profiles-daemon and tuned-ppd both provide ppd-service; whichever
     # already owns it wins, or the transaction aborts on the conflict.
