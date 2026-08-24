@@ -8,6 +8,11 @@
 # (don't mess with these directly, just overwrite them here!)
 source "$MAGIKOS_PATH/default/bash/rc"
 
+# Starship drives the bash prompt (config: ~/.config/starship.toml)
+if command -v starship >/dev/null 2>&1; then
+  eval "$(starship init bash)"
+fi
+
 # Greet interactive shells with the system summary and ASCII art
 if [[ -r $HOME/.config/fastfetch/MagikOS.txt ]] && command -v fastfetch >/dev/null 2>&1; then
   fastfetch
