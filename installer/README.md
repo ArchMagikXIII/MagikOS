@@ -22,7 +22,7 @@ On a running Arch/CachyOS/Fedora system, clone the repo anywhere and run:
 sudo ./installer/magikos-install --existing
 ```
 
-This plants the tree at `/usr/share/magikos`, seeds `/etc/skel`, installs the package set best-effort, creates `--user` if missing (defaults to the invoking user), runs `magikos-apply-system` directly on the host, then replays shipped defaults into the user's `$HOME` and runs per-user finalization as that user. It does **not** partition, touch fstab/hostname/locale, or modify the bootloader — adopt the UKI/Limine layout afterwards with `magikos setup direct-boot` when ready. Shipped defaults overwrite matching files in the user's home immediately (the confirmation prompt covers this).
+This plants the tree at `/usr/share/magikos`, assembles `/etc/skel` the way the `magikos-settings` package would (`config/**` → `.config/**`, `default/bashrc` → `.bashrc`, desktop entries and hicolor icons), installs the package set best-effort, creates `--user` if missing (defaults to the invoking user), runs `magikos-apply-system` directly on the host, then replays shipped defaults into the user's `$HOME` and runs per-user finalization as that user. It does **not** partition, touch fstab/hostname/locale, or modify the bootloader — adopt the UKI/Limine layout afterwards with `magikos setup direct-boot` when ready. Shipped defaults overwrite matching files in the user's home immediately (the confirmation prompt covers this).
 
 Full options:
 

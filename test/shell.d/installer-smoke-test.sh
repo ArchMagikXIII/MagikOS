@@ -28,6 +28,15 @@ if grep -q 'OMARCHY_PATH' "$installer"; then
 fi
 pass "installer speaks MAGIKOS_PATH only"
 
+# The skeleton must be assembled the way the magikos-settings package would:
+# config/** under .config, bashrc as a dotfile, not a flat default/ dump.
+grep -q 'skel/.config' "$installer" || fail "assembles skel .config from config/"
+grep -q 'skel/.bashrc' "$installer" || fail "installs default/bashrc as skel .bashrc"
+if grep -q 'cp -a "$ROOT/default/." ' "$installer"; then
+  fail "no flat default/ copy into skel remains"
+fi
+pass "skeleton assembly follows the build-time map"
+
 # --- dnf.map: every mapping must name a real entry in the base package list ---
 
 map_file="$ROOT/installer/dnf.map"

@@ -348,7 +348,7 @@ seed_target_config() {
   log "Seeding target configuration"
 
   if [[ -d $ROOT/etc ]]; then
-    run cp -a "$ROOT/etc/." "$TARGET/etc/"
+    sync_etc_dropins "$TARGET/etc"
   fi
 
   # Arch's encrypt hook unlocks from /etc/crypttab.initramfs inside the
@@ -456,6 +456,43 @@ bootstrap_fedora() {
   fi
 }
 
+# Replicates the magikos-settings package assembly of /etc/skel, which does
+# not exist as a package yet: config/** maps under .config, default/bashrc
+# becomes the dotfile, and shipped desktop entries land in .local/share.
+assemble_skeleton() {
+  local skel="$1"
+  run mkdir -p "$skel/.config" "$skel/.local/share/applications"
+  run cp -a "$ROOT/config/." "$skel/.config/"
+  run cp -a "$ROOT/default/bashrc" "$skel/.bashrc"
+  if [[ -d $ROOT/applications ]]; then
+    run cp -a "$ROOT/applications/." "$skel/.local/share/applications/"
+  fi
+}
+
+install_app_icons() {
+  # applications/icons are single-size PNGs; hicolor wants them under the
+  # standard size dirs so desktop lookups resolve.
+  local prefix="$1" size
+  if [[ ! -d $ROOT/applications/icons ]]; then
+    return 0
+  fi
+  for size in 48x48 256x256; do
+    run mkdir -p "$prefix/usr/share/icons/hicolor/$size/apps"
+    run cp -a "$ROOT/applications/icons/." "$prefix/usr/share/icons/hicolor/$size/apps/"
+  done
+}
+
+# System drop-ins we own outright. nsswitch.conf is the exception: its shape
+# is distro-specific, so an Arch-flavored copy must never land on Fedora.
+sync_etc_dropins() {
+  local dest="$1"
+  if [[ $BACKEND == dnf ]]; then
+    run rsync -a --exclude=nsswitch.conf "$ROOT/etc/" "$dest/"
+  else
+    run rsync -a "$ROOT/etc/" "$dest/"
+  fi
+}
+
 plant_magikos() {
   log "Planting the Magikos tree at /usr/share/magikos"
 
@@ -466,12 +503,9 @@ plant_magikos() {
 
   # Shipped user defaults are seeded through /etc/skel, which useradd copies
   # at account creation (normally the magikos-settings package does this).
-  if [[ -d $ROOT/default ]]; then
-    run cp -a "$ROOT/default/." "$TARGET/etc/skel/" 2>/dev/null || {
-      run mkdir -p "$TARGET/etc/skel"
-      run cp -a "$ROOT/default/." "$TARGET/etc/skel/"
-    }
-  fi
+  run mkdir -p "$TARGET/etc/skel"
+  assemble_skeleton "$TARGET/etc/skel"
+  install_app_icons "$TARGET"
 }
 
 configure_target() {
@@ -565,6 +599,17 @@ finish() {
 
 PLANTED="/usr/share/magikos"
 
+# A previous installer version copied default/ flat into /etc/skel; none of
+# those entries belong there (default/** lives under /usr/share/magikos).
+clean_stale_skel_flat_copy() {
+  local name
+  while IFS= read -r name; do
+    if [[ -e "/etc/skel/$name" || -L "/etc/skel/$name" ]]; then
+      run rm -rf -- "/etc/skel/$name"
+    fi
+  done < <(find "$ROOT/default" -mindepth 1 -maxdepth 1 -printf '%f\n')
+}
+
 plant_magikos_host() {
   # Running straight out of the planted tree (packaged checkout or a
   # previous adoption): rsync --delete onto ourselves would be destructive.
@@ -579,9 +624,13 @@ plant_magikos_host() {
   fi
 
   # Shipped user defaults are seeded through /etc/skel, which useradd copies
-  # at account creation and first-login finalization re-reads for existing users.
+  # at account creation and seed_user_home replays for existing users.
+  clean_stale_skel_flat_copy
   run mkdir -p /etc/skel
-  run cp -a "$ROOT/default/." /etc/skel/
+  assemble_skeleton /etc/skel
+  install_app_icons ""
+
+  sync_etc_dropins /etc
 
   write_file /etc/sudoers.d/10-magikos-wheel '%wheel ALL=(ALL:ALL) ALL'$'\n'
   if (( ! DRY_RUN )); then
