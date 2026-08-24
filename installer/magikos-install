@@ -340,13 +340,23 @@ partition_disk() {
   run mount -o "noatime,compress=zstd:1,subvol=@home" "$ROOT_DEVICE" "$TARGET/home"
   run mount "${DISK}1" "$TARGET/boot"
 
-  ROOT_UUID=$(blkid -s UUID -o value "$ROOT_DEVICE")
-  LUKS_UUID=$(blkid -s UUID -o value "${DISK}2" || true)
-  if [[ -z $ROOT_UUID ]]; then
-    die "Could not read the root filesystem UUID from $ROOT_DEVICE"
-  fi
-  if (( ENCRYPT )) && [[ -z $LUKS_UUID ]]; then
-    die "Could not read the LUKS UUID from ${DISK}2"
+  if (( DRY_RUN )); then
+    # Nothing was created, so there is nothing to probe. Placeholders keep
+    # the run going into the config templates that consume the UUIDs.
+    ROOT_UUID="00000000-0000-4000-8000-000000000001"
+    LUKS_UUID=""
+    if (( ENCRYPT )); then
+      LUKS_UUID="00000000-0000-4000-8000-000000000002"
+    fi
+  else
+    ROOT_UUID=$(blkid -s UUID -o value "$ROOT_DEVICE")
+    LUKS_UUID=$(blkid -s UUID -o value "${DISK}2" || true)
+    if [[ -z $ROOT_UUID ]]; then
+      die "Could not read the root filesystem UUID from $ROOT_DEVICE"
+    fi
+    if (( ENCRYPT )) && [[ -z $LUKS_UUID ]]; then
+      die "Could not read the LUKS UUID from ${DISK}2"
+    fi
   fi
 }
 
@@ -558,7 +568,11 @@ configure_target() {
 
   # Written by hand rather than genfstab so both backends share one code path.
   local esp_uuid root_opts home_opts fstab
-  esp_uuid=$(blkid -s UUID -o value "${DISK}1")
+  if (( DRY_RUN )); then
+    esp_uuid="00000000-0000-4000-8000-000000000003"
+  else
+    esp_uuid=$(blkid -s UUID -o value "${DISK}1")
+  fi
   root_opts="noatime,compress=zstd:1,subvol=@"
   home_opts="noatime,compress=zstd:1,subvol=@home"
 
@@ -622,6 +636,24 @@ apply_magikos() {
     MAGIKOS_INSTALL=/usr/share/magikos/install \
     PATH=/usr/share/magikos/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
     bash /usr/share/magikos/bin/magikos-apply-system --install-user $(printf '%q' "$INSTALL_USER")"
+}
+
+# Same handoff the ISO makes after apply-system: per-user finalization runs in
+# the target as the install user (--first-install marks shipped migrations
+# complete). The login-triggered first-run pass later catches up the steps
+# that need a live systemd user session.
+finalize_user() {
+  log "Finalizing per-user setup in the target"
+
+  local home_dir="/home/$INSTALL_USER"
+  if ! chroot_exec "runuser -u $(printf '%q' "$INSTALL_USER") -- env \
+    HOME=$(printf '%q' "$home_dir") \
+    MAGIKOS_PATH=/usr/share/magikos \
+    MAGIKOS_INSTALL=/usr/share/magikos/install \
+    PATH=/usr/share/magikos/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
+    bash /usr/share/magikos/bin/magikos-provision-user --force --first-install"; then
+    warn "Per-user finalization reported errors; run 'magikos finalize user' after first login."
+  fi
 }
 
 report_pkg_failures() {
@@ -932,6 +964,7 @@ main() {
   install_bootloader
   create_user
   apply_magikos
+  finalize_user
 
   trap - EXIT
   finish
