@@ -827,6 +827,16 @@ plant_magikos_host() {
 
   sync_etc_dropins /etc
 
+  # Repair pacman configuration on systems this project installed earlier:
+  # shipped channel confs once referenced package repos that are not live
+  # yet, which broke every -Sy. Redeploying the current channel conf fixes
+  # them; dnf systems never had a pacman.conf to begin with.
+  if [[ $BACKEND == pacman ]] && grep -q "https://pkgs.magikos.org/" /etc/pacman.conf 2>/dev/null; then
+    local channel=${MAGIKOS_MIRROR:-stable}
+    write_file /etc/pacman.conf "$(cat "$ROOT/default/pacman/pacman-$channel.conf")"$'\n'
+    write_file /etc/pacman.d/mirrorlist "$(cat "$ROOT/default/pacman/mirrorlist-$channel")"$'\n'
+  fi
+
   write_file /etc/sudoers.d/10-magikos-wheel '%wheel ALL=(ALL:ALL) ALL'$'\n'
   if (( ! DRY_RUN )); then
     chmod 440 /etc/sudoers.d/10-magikos-wheel

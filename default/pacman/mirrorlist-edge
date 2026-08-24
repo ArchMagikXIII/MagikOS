@@ -1,1 +1,4 @@
-Server = https://mirror.magikos.org/$repo/os/$arch
+# Placeholder upstream mirror until mirror.magikos.org is live. The commented line keeps
+# magikos-version-channel reporting this channel correctly.
+#Server = https://mirror.magikos.org/$repo/os/$arch
+Server = https://archlinux.cachyos.org/repo/$repo/os/$arch
