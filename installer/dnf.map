@@ -24,7 +24,6 @@ woff2-font-awesome|fontawesome-fonts
 # Reported absent from current Fedora repositories; revisit as repos change.
 gnome-themes-extra|-
 libvips|-
-starship|-
 uwsm|-
 
 # Left out of the dnf set by request; still installed on the Arch side.
