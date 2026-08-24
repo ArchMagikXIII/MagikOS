@@ -603,6 +603,7 @@ finish() {
 
 PLANTED="/usr/share/magikos"
 NERD_FONTS_VERSION="v3.5.0"
+OH_MY_POSH_VERSION="v30.6.5"
 
 # A previous installer version copied default/ flat into /etc/skel; none of
 # those entries belong there (default/** lives under /usr/share/magikos).
@@ -829,6 +830,24 @@ install_nerd_fonts_host() {
   fi
 }
 
+# Neither distro's repositories carry oh-my-posh, so ship the pinned upstream
+# binary when it is missing. The fish config guards its init, so systems
+# without the binary simply keep the stock prompt.
+install_oh_my_posh_host() {
+  if command -v oh-my-posh >/dev/null 2>&1; then
+    return 0
+  fi
+
+  local url="https://github.com/JanDeDobbeleer/oh-my-posh/releases/download/$OH_MY_POSH_VERSION/posh-linux-amd64"
+  log "Installing oh-my-posh $OH_MY_POSH_VERSION"
+  if ! run curl -fsSL "$url" -o /usr/local/bin/oh-my-posh; then
+    warn "Could not download oh-my-posh; fish will use its stock prompt."
+    rm -f /usr/local/bin/oh-my-posh
+    return 0
+  fi
+  run chmod 755 /usr/local/bin/oh-my-posh
+}
+
 main() {
   preflight
 
@@ -836,6 +855,7 @@ main() {
     plant_magikos_host
     install_packages_host
     install_nerd_fonts_host
+    install_oh_my_posh_host
     adopt_user
     run_apply_system_host
     seed_user_home
