@@ -629,8 +629,19 @@ install_packages_host() {
     done
     TRANSLATED_PACKAGES=("${ppd_filtered[@]}")
 
+    # One unresolvable name or conflict kills the whole batch transaction,
+    # so a failed batch retries package by package; the audit below remains
+    # the single source of truth for what is genuinely missing.
     if ! run dnf -y --setopt=install_weak_deps=False install --skip-broken "${TRANSLATED_PACKAGES[@]}"; then
-      warn "Batch dnf transaction failed; the audit below lists what is missing."
+      warn "Batch dnf transaction failed; retrying package by package."
+      local dnf_spec
+      for dnf_spec in "${TRANSLATED_PACKAGES[@]}"; do
+        if (( DRY_RUN )); then
+          printf '[dry-run] dnf install %s\n' "$dnf_spec"
+        else
+          dnf -y --setopt=install_weak_deps=False install "$dnf_spec" >>"$LOG_FILE" 2>&1 || true
+        fi
+      done
     fi
     if (( ! DRY_RUN )); then
       local pkg spec installed
