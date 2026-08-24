@@ -10,16 +10,21 @@ bluez-utils|bluez
 fd|fd-find
 imagemagick|ImageMagick
 networkmanager|NetworkManager
-noto-fonts|google-noto-sans-fonts,google-noto-serif-fonts,google-noto-mono-fonts
-noto-fonts-cjk|google-noto-sans-cjk-ttc-fonts
-noto-fonts-emoji|google-noto-emoji-fonts
+noto-fonts|google-noto-sans-vf-fonts,google-noto-serif-vf-fonts,google-noto-sans-mono-vf-fonts
+noto-fonts-cjk|google-noto-sans-cjk-fonts
+noto-fonts-emoji|google-noto-color-emoji-fonts
+nvim|neovim
 postgresql-libs|libpq
 python-gobject|python3-gobject
+python-poetry-core|python3-poetry-core
 qemu-user-static-binfmt|qemu-user-static,qemu-user-binfmt
 qt6-imageformats|qt6-qtimageformats
 tesseract-data-eng|tesseract-langpack-eng
 ttf-jetbrains-mono-nerd-basic|jetbrains-mono-fonts
-woff2-font-awesome|fontawesome-fonts
+woff2-font-awesome|fontawesome-6-free-fonts
+
+# Ships as podman on Fedora; installing docker alongside it conflicts.
+docker|-
 
 # Reported absent from current Fedora repositories; revisit as repos change.
 gnome-themes-extra|-
