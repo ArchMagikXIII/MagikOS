@@ -9,7 +9,6 @@
 bluez-utils|bluez
 fd|fd-find
 imagemagick|ImageMagick
-libreoffice-fresh|libreoffice
 networkmanager|NetworkManager
 noto-fonts|google-noto-sans-fonts,google-noto-serif-fonts,google-noto-mono-fonts
 noto-fonts-cjk|google-noto-sans-cjk-ttc-fonts
@@ -27,6 +26,9 @@ gnome-themes-extra|-
 libvips|-
 starship|-
 uwsm|-
+
+# Left out of the dnf set by request; still installed on the Arch side.
+libreoffice-fresh|-
 
 # Not carried by the Fedora repositories at all: Arch-only tooling,
 # COPR/AUR-only apps, and Magikos-custom commands awaiting magikos-pkgs.
