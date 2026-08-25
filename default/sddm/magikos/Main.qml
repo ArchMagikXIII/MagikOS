@@ -3,8 +3,9 @@ import SddmComponents 2.0
 
 Rectangle {
   id: root
-  width: Screen.width
-  height: Screen.height
+  # The greeter view sizes the root item to itself, so no explicit width or
+  # height here: bare Screen.width fails to resolve under SDDM's Qt6 engine
+  # and reports a zero-sized fake screen in --test-mode.
   color: "#1a1b26"
 
   property string currentUser: userModel.lastUser
