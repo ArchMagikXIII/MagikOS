@@ -1,7 +1,7 @@
 # Magikos
 
-Magikos is a beautiful, modern & opinionated Linux distribution by DHH.
-
+MagikOS is a Beautiful, Fun Project For Me, Shamelessly Based on Omarchy That Doesnt Run Well On My Laptop ( Hyprland Eats My TrackPad and its Gone into Oblivion )
+Most of the Functionality Has Been Ported to Sway Through This Lovely Project MagikOS
 Read more at [magikos.org](https://magikos.org).
 
 ## The Magikos Manual
