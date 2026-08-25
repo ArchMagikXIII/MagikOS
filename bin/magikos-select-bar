@@ -71,9 +71,9 @@ enable_quickshell() {
 
     mv -f "$tmp" "$SWAY_AUTOSTART"
   else
-    cat >"$SWAY_AUTOSTART" <<'SWAY_EOF'
+    cat >"$SWAY_AUTOSTART" <<SWAY_EOF
 # --- Bar: QuickShell (default) or Waybar (uncomment to switch) ---
-exec_always MAGIKOS_PATH="$HOME/Projects/magikos" PATH="$HOME/Projects/magikos/bin:$HOME/.local/bin:$PATH" /usr/bin/quickshell -p "$HOME/Projects/magikos/shell" &
+exec_always bash -c 'export MAGIKOS_PATH="\${MAGIKOS_PATH:-$MAGIKOS_PATH}"; export PATH="\$MAGIKOS_PATH/bin:\$HOME/.local/bin:\$PATH"; mkdir -p "\$HOME/.local/state/magikos"; { systemctl --user import-environment MAGIKOS_PATH PATH 2>/dev/null; exec /usr/bin/quickshell -p "\$MAGIKOS_PATH/shell"; } >>"\$HOME/.local/state/magikos/quickshell.log" 2>&1'
 # exec_always   waybar&
 SWAY_EOF
   fi
@@ -111,7 +111,7 @@ enable_waybar() {
   else
     cat >"$SWAY_AUTOSTART" <<'SWAY_EOF'
 # --- Bar: QuickShell (default) or Waybar (uncomment to switch) ---
-# exec_always MAGIKOS_PATH="$HOME/Projects/magikos" PATH="$HOME/Projects/magikos/bin:$HOME/.local/bin:$PATH" /usr/bin/quickshell -p "$HOME/Projects/magikos/shell" &
+# exec_always bash -c 'export MAGIKOS_PATH="${MAGIKOS_PATH:-/usr/share/magikos}"; export PATH="$MAGIKOS_PATH/bin:$HOME/.local/bin:$PATH"; mkdir -p "$HOME/.local/state/magikos"; { systemctl --user import-environment MAGIKOS_PATH PATH 2>/dev/null; exec /usr/bin/quickshell -p "$MAGIKOS_PATH/shell"; } >>"$HOME/.local/state/magikos/quickshell.log" 2>&1'
 exec_always   waybar&
 SWAY_EOF
   fi
