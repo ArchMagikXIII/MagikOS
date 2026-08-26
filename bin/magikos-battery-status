@@ -26,19 +26,17 @@ battery_info=$(upower -i "$battery")
 percentage=$(awk '/percentage/ { print int($2); exit }' <<<"$battery_info")
 capacity=$(awk '/energy-full:/ { printf "%d", $2; exit }' <<<"$battery_info")
 time_remaining=$(awk '/time to (empty|full)/ {
-  value = $4
-  unit = $5
-  if (unit ~ /^minute/) {
-    printf "%dm", int(value)
-  } else {
-    hours = int(value)
-    minutes = int((value - hours) * 60)
-    if (minutes > 0) {
-      printf "%dh %dm", hours, minutes
-    } else {
-      printf "%dh", hours
-    }
+  # UPower format: "3h 30min", "45min", "3h", or "2h 0min"
+  total = 0
+  for (i = 4; i <= NF; i++) {
+    if ($i ~ /h$/) total += int($i) * 60
+    else if ($i ~ /min$/) total += int($i)
   }
+  hours = int(total / 60)
+  minutes = total % 60
+  if (hours > 0 && minutes > 0) printf "%dh %dm", hours, minutes
+  else if (hours > 0) printf "%dh", hours
+  else printf "%dm", minutes
   exit
 }' <<<"$battery_info")
 power_rate_raw=$(awk '/energy-rate/ { print $2; exit }' <<<"$battery_info")
