@@ -4,6 +4,12 @@
 
 clear
 echo -e "\033[32m"
-cat <$MAGIKOS_PATH/logo.txt
+if [[ -f "$HOME/Pictures/ASCII/MagikOS.txt" ]]; then
+  cat "$HOME/Pictures/ASCII/MagikOS.txt"
+elif [[ -n "${MAGIKOS_PATH:-}" && -f "$MAGIKOS_PATH/logo.txt" ]]; then
+  cat "$MAGIKOS_PATH/logo.txt"
+elif [[ -n "${MAGIKOS_PATH:-}" && -f "$MAGIKOS_PATH/config/branding/about.txt" ]]; then
+  cat "$MAGIKOS_PATH/config/branding/about.txt"
+fi
 echo -e "\033[0m"
 echo

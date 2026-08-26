@@ -330,7 +330,7 @@
   "remove.development.elixir.phoenix": {"icon":"","label":"Phoenix","when":"[[ -d $HOME/.local/share/mise/installs/elixir ]]","action":"magikos-launch-floating-terminal-with-presentation 'magikos-remove-dev-env phoenix'"},
 
   // Update
-  "update.magikos": {"icon":"","iconFont":"magikos","label":"Magikos","action":"magikos-launch-floating-terminal-with-presentation magikos-update"},
+  "update.magikos": {"icon":"","iconFont":"magikos","label":"MagikOS Update","action":"magikos-launch-floating-terminal-with-presentation magikos-update"},
   "update.channel": {"icon":"󰔫","label":"Channel"},
   "update.config": {"icon":"","label":"Config","title":"Reset to default"},
   "update.themes": {"icon":"󰸌","label":"Extra Themes","action":"magikos-launch-floating-terminal-with-presentation magikos-theme-update"},
