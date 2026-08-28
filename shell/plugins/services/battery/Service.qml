@@ -60,6 +60,18 @@ Item {
     onExited: if (root.pendingPowerSource !== "") root.runPendingPowerProfile()
   }
 
+  Process { id: powerSourceHookProcess }
+
+  function notifyPowerSource() {
+    if (powerSourceHookProcess.running) return
+    powerSourceHookProcess.command = [
+      "magikos-hook",
+      "power-source",
+      UPower.onBattery ? "battery" : "ac"
+    ]
+    powerSourceHookProcess.running = true
+  }
+
   Timer {
     interval: 30000
     running: true
@@ -73,6 +85,7 @@ Item {
     function onOnBatteryChanged() {
       root.checkBattery()
       root.applyPowerProfile()
+      root.notifyPowerSource()
     }
   }
 }
