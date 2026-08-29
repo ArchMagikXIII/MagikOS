@@ -372,10 +372,14 @@ EOF
 bootstrap_arch() {
   log "Bootstrapping Arch base system (pacstrap)"
 
-  # Limine goes in before the kernel so the mkinitcpio hook deploys the UKI
-  # as part of the kernel transaction itself. limine-mkinitcpio-hook and
-  # limine-snapper-sync are AUR-only on vanilla Arch media, so this batch is
-  # best effort too: a hard abort here would strand a freshly wiped disk.
+  # Limine goes in with the kernel so the mkinitcpio hook deploys the UKI in
+  # the same transaction. limine-mkinitcpio-hook and limine-snapper-sync are
+  # not in the repos on vanilla Arch media, so split the base set exactly like
+  # the Magikos set: only names the active repos resolve go into the atomic
+  # batch, and anything else defers to the yay pass. A single unknown name
+  # would otherwise abort the whole batch and force a slow per-package loop
+  # over every base package. install_bootloader re-runs mkinitcpio -P after
+  # the AUR pass, so it sees any hooks that were deferred.
   local base_pkgs=(
     base base-devel linux linux-firmware linux-headers \
     btrfs-progs dosfstools e2fsprogs sudo git \
@@ -383,16 +387,36 @@ bootstrap_arch() {
     networkmanager sddm sway uwsm foot polkit gnome-keyring \
     pipewire wireplumber plymouth ufw gum rsync jq openssh
   )
-  if ! run pacstrap -K "$TARGET" "${base_pkgs[@]}"; then
+  local -A in_base_repo=()
+  local name
+  while read -r name; do
+    [[ -n $name ]] && in_base_repo[$name]=1
+  done < <(pacman -Slq 2>/dev/null | sort -u)
+  local BASE_REPO=() BASE_AUR=() pkg
+  for pkg in "${base_pkgs[@]}"; do
+    if [[ ${in_base_repo[$pkg]+set} ]]; then
+      BASE_REPO+=("$pkg")
+    else
+      BASE_AUR+=("$pkg")
+    fi
+  done
+  if ((${#BASE_REPO[@]} == 0)); then
+    die "No base packages resolve from the live media repos."
+  fi
+  if ! run pacstrap -K "$TARGET" "${BASE_REPO[@]}"; then
     warn "Base batch install failed; falling back to per-package installs."
     local pkg
-    for pkg in "${base_pkgs[@]}"; do
+    for pkg in "${BASE_REPO[@]}"; do
       if (( DRY_RUN )); then
         printf '[dry-run] pacstrap -K %s: %s\n' "$TARGET" "$pkg"
       elif ! pacstrap -K "$TARGET" "$pkg" >>"$LOG_FILE" 2>&1; then
         PKG_FAILURES+=("$pkg")
       fi
     done
+  fi
+  if ((${#BASE_AUR[@]} > 0)); then
+    warn "Deferring AUR-only base package(s) to the yay pass: ${BASE_AUR[*]}"
+    PKG_FAILURES+=("${BASE_AUR[@]}")
   fi
 
   log "Installing Magikos package set (best effort)"
@@ -1029,9 +1053,9 @@ main() {
 
   plant_magikos
   configure_target
-  install_bootloader
   create_user
   install_aur_packages_target
+  install_bootloader
   apply_magikos
   finalize_user
   trap - EXIT
