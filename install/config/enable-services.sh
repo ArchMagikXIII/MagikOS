@@ -9,6 +9,16 @@ systemctl enable NetworkManager.service
 # in install/hardware/network.sh.
 systemctl mask NetworkManager-wait-online.service
 systemctl enable power-profiles-daemon.service
+# Only SDDM may own the display-manager.service alias. A second enabled DM
+# (gdm/lightdm/lxdm/greetd/ly, whether left over from the live media or a prior
+# install) would boot a second, generic greeter alongside the SDDM one. Disable
+# the known alternatives first so the alias points at SDDM and no competitor
+# starts. Absent units are harmless; we don't start/reload anything since
+# installs are followed by reboot.
+for dm in gdm lightdm lxdm greetd ly sddm; do
+  systemctl disable "$dm.service" 2>/dev/null || true
+done
+rm -f /etc/systemd/system/display-manager.service
 systemctl enable sddm.service
 # Kill one runaway app scope instead of letting reclaim thrashing take the
 # whole session down. [Install] pulls in systemd-oomd.socket via Also=, which
