@@ -154,6 +154,30 @@ ask_password() {
   printf '%s' "$pass"
 }
 
+# Ask for a value on the live media when it was not given on the command line,
+# so a bare "sudo ./magikos-install" still gets through the wizard instead of
+# dying on a missing flag. SKIP_PROMPT means the value must come from the CLI.
+prompt_value() {
+  local label="$1" default="${2:-}" answer
+  if [[ -n $default ]]; then
+    read -r -p "$label [$default]: " answer || return 1
+    printf '%s' "${answer:-$default}"
+  else
+    read -r -p "$label: " answer || return 1
+    printf '%s' "$answer"
+  fi
+}
+
+# The live media's candidate target disks, one per line for plating in a prompt.
+# Excludes virtual devices (zram, loop, ram) that must never be offered as a
+# wipe target.
+list_block_devices() {
+  if command -v lsblk >/dev/null 2>&1; then
+    lsblk -dpno NAME,TYPE,SIZE,MODEL 2>/dev/null |
+      awk '$2=="disk" && $1 !~ /\/(zram|loop|ram)/ {print $1" "$3" "$4}'
+  fi
+}
+
 preflight() {
   if (( EUID != 0 )); then
     die "Run as root (sudo)."
@@ -182,6 +206,26 @@ preflight() {
       die "Aborted."
     fi
     return 0
+  fi
+
+  # Interactive wizard for a bare invocation: when required flags were not
+  # given on the command line, ask on the live media instead of failing with a
+  # cryptic message. Only prompts when input is a terminal so scripted runs
+  # stay strict.
+  if (( ! EXISTING_MODE )) && [[ -t 0 ]]; then
+    if [[ -z $DISK ]]; then
+      log "Available block devices:"
+      list_block_devices | sed 's/^/  /'
+      local single_disk=""
+      mapfile -t _devs < <(list_block_devices | awk '{print $1}')
+      if ((${#_devs[@]} == 1)); then
+        single_disk="${_devs[0]}"
+      fi
+      DISK=$(prompt_value "Target disk to erase and install onto" "$single_disk")
+    fi
+    if [[ -z $INSTALL_USER ]]; then
+      INSTALL_USER=$(prompt_value "Non-root user to create" "${SUDO_USER:-}")
+    fi
   fi
 
   require_tools pacstrap genfstab mkinitcpio sgdisk
@@ -357,10 +401,21 @@ bootstrap_arch() {
   if (( ${#packages[@]} == 0 )); then
     die "No packages found in install/magikos-base.packages"
   fi
-  if ! run pacstrap "$TARGET" "${packages[@]}"; then
-    warn "Batch install failed; falling back to per-package installs."
+  split_repo_and_aur
+  if (( ${#PACKAGE_REPO[@]} == 0 )); then
+    run mount --rbind /dev "$TARGET/dev"
+    run mount --make-rslave "$TARGET/dev"
+    run mount -t proc /proc "$TARGET/proc"
+    run mount --rbind /sys "$TARGET/sys"
+    run mount --make-rslave "$TARGET/sys"
+    run mount --rbind /run "$TARGET/run"
+    run mount --make-rslave "$TARGET/run"
+    return 0
+  fi
+  if ! run pacstrap "$TARGET" "${PACKAGE_REPO[@]}"; then
+    warn "Batch install failed for ${#PACKAGE_REPO[@]} repo package(s); retrying per-package."
     local pkg
-    for pkg in "${packages[@]}"; do
+    for pkg in "${PACKAGE_REPO[@]}"; do
       if (( DRY_RUN )); then
         printf '[dry-run] pacstrap %s: %s\n' "$TARGET" "$pkg"
       elif ! pacstrap "$TARGET" "$pkg" >>"$LOG_FILE" 2>&1; then
@@ -706,6 +761,27 @@ plant_magikos_host() {
   fi
 }
 
+# Split the global $packages into ${PACKAGE_REPO[@]} (names the active repos
+# resolve) and everything else, which is deferred to the yay pass. Feeding a
+# single unknown AUR name to a pacman batch aborts the whole transaction, so
+# raw pacman must only ever see names the repos actually carry.
+split_repo_and_aur() {
+  local -A in_repo=()
+  local name
+  while read -r name; do
+    [[ -n $name ]] && in_repo[$name]=1
+  done < <(pacman -Slq 2>/dev/null | sort -u)
+  PACKAGE_REPO=()
+  local pkg
+  for pkg in "${packages[@]}"; do
+    if [[ ${in_repo[$pkg]+set} ]]; then
+      PACKAGE_REPO+=("$pkg")
+    else
+      PKG_FAILURES+=("$pkg")
+    fi
+  done
+}
+
 install_packages_host() {
   log "Installing Magikos package set (best effort)"
 
@@ -714,10 +790,14 @@ install_packages_host() {
     die "No packages found in install/magikos-base.packages"
   fi
 
-  if ! run pacman -S --needed --noconfirm "${packages[@]}"; then
-    warn "Batch install failed; falling back to per-package installs."
+  split_repo_and_aur
+  if (( ${#PACKAGE_REPO[@]} == 0 )); then
+    return 0
+  fi
+  if ! run pacman -S --needed --noconfirm "${PACKAGE_REPO[@]}"; then
+    warn "Batch install failed for ${#PACKAGE_REPO[@]} repo package(s); retrying per-package."
     local pkg
-    for pkg in "${packages[@]}"; do
+    for pkg in "${PACKAGE_REPO[@]}"; do
       if (( DRY_RUN )); then
         printf '[dry-run] pacman -S --needed %s\n' "$pkg"
       elif ! pacman -S --needed --noconfirm "$pkg" >>"$LOG_FILE" 2>&1; then
