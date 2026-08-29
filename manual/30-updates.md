@@ -26,11 +26,11 @@ Your packages aren't the only thing that goes stale. Many laptops and peripheral
 
 ### Warning about direct pacman/yay updates
 
-If you're already familiar with Arch, you might be tempted to just run `pacman -Syu` or `yay -Syu` yourself, but if you do that, you'll miss the snapshot, migrations, and configuration updates that Magikos runs together with new packages. That's why Magikos will actually stop a direct system upgrade and point you to `magikos update` instead. (If you really know what you're doing, the guard will tell you how to bypass it for a single transaction.)
+If you're already familiar with Arch, you might be tempted to just run `pacman -Syu` or `yay -Syu` yourself, but if you do that, you'll miss the migrations and post-update hooks that Magikos applies after an update. That's why Magikos will actually stop a direct system upgrade and point you to `magikos update` instead — `magikos update` drives the whole update through [topgrade](https://github.com/topgrade-rs/topgrade) and then runs pending migrations and post-update hooks. (If you really know what you're doing, the guard will tell you how to bypass it for a single transaction.)
 
 ### Rolling back bad updates
 
-If you ever have a problem after doing an update, you can rollback your system to the snapshot taken before the update. Just restart and pick the snapshot in the boot loading menu from before you started the update.
+If you ever have a problem after doing an update, you can rollback your system to a snapshot. Restart and pick a snapshot in the boot loading menu from before things went wrong. Note that updates no longer create a dedicated pre-update snapshot automatically — this relies on Snapper's own scheduled snapshots (and any snapshot you create with `magikos snapshot create`), so enable Snapper's timers if you want regular rollback points.
 
 ![bootloader](images/bootloader.webp)
 

@@ -91,6 +91,4 @@ status=$?
 set -e
 
 (( status == 127 )) || fail "snapshot create exits 127 without snapper" "got $status"
-grep -qF 'magikos-snapshot create || (($? == 127))' "$ROOT/bin/magikos-update" ||
-  fail "update ignores only the missing-snapper exit code"
 pass "snapshot create keeps the quiet 127 path for systems without snapper"

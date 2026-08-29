@@ -52,8 +52,8 @@ run through:
 
   magikos update
 
-That path handles the update transcript, snapshot, keyrings, package upgrade,
-migrations, post-update hooks, shell update state, and restart checks together.
+That path drives the whole update through topgrade and then applies pending
+migrations and post-update hooks.
 
 If you really meant to bypass Magikos for this transaction, rerun pacman with:
 

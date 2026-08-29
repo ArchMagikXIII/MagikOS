@@ -1,8 +1,6 @@
 #!/bin/bash
 
-# magikos:summary=Update MagikOS and system packages with cachy-update
-# magikos:args=[-y]
-# magikos:examples=magikos update | magikos update -y
+# magikos:summary=Update MagikOS and system packages with topgrade
 # magikos:requires-sudo=true
 
 set -e
@@ -12,38 +10,17 @@ if [[ -z ${MAGIKOS_UPDATE_LOGGED:-} ]]; then
   exec env MAGIKOS_UPDATE_LOGGED=1 script -qefc "$script_command" "/tmp/magikos-update.log"
 fi
 
-if ! magikos-update-lock held; then
-  exec magikos-update-lock run "$0" "$@"
-fi
-
 trap 'echo ""; echo -e "\033[0;31mSomething went wrong during the update!\n\nPlease review the output above carefully, correct the error, and retry the update.\n\nIf you need assistance, get help from the community at https://magikos.org/discord\033[0m"' ERR
-trap 'magikos-update-stay-awake stop' EXIT
 
-magikos-update-requires-free-space
+echo -e "\033[1;32m=== MagikOS Update (topgrade) ===\033[0m\n"
 
-echo -e "\033[1;32m=== MagikOS Update ===\033[0m\n"
+# topgrade drives the whole update. MAGIKOS_UPDATE_PACMAN lets topgrade's
+# internal pacman step past the magikos-update-pacman-guard hook, which would
+# otherwise block it as a "direct" system upgrade.
+MAGIKOS_UPDATE_PACMAN=1 topgrade "$@"
 
-# 127 means Snapper is deliberately absent. Any other failure already said
-# what went wrong, and a missing snapshot is not worth blocking an update
-# over, but it must not pass for one either.
-magikos-snapshot create || (($? == 127)) ||
-  echo -e "\e[33mContinuing the update without a snapshot.\e[0m" >&2
-
-magikos-update-stay-awake start
-
-# Run cachy-update.
-# Note: cachy-update (arch-update) exits with code 7 when no updates are available,
-# which is a normal status rather than a failure.
-cachy_exit=0
-cachy-update "$@" || cachy_exit=$?
-
-if (( cachy_exit != 0 && cachy_exit != 7 )); then
-  exit "$cachy_exit"
-fi
-
+# Migrations ship with the packages the upgrade installs and are written against
+# them, so they only run once the package upgrade actually went through.
+# Post-update hooks have no login-time runner, so they follow the update here.
 magikos-migrate || true
 magikos-hook post-update || true
-magikos-update-status || true
-
-magikos-update-stay-awake stop
-trap - EXIT

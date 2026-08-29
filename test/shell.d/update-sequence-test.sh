@@ -10,99 +10,44 @@ trap 'rm -rf "$test_tmp"' EXIT
 stub_bin="$test_tmp/bin"
 mkdir -p "$stub_bin"
 
-# Every step magikos-update runs, recorded in order with the unattended flag it
-# was handed. One of them can be told to fail.
-steps=(
-  magikos-update-lock
-  magikos-update-requires-free-space
-  magikos-update-confirm
-  magikos-update-pkg-prune
-  magikos-snapshot
-  magikos-update-stay-awake
-  magikos-update-dev
-  magikos-update-keyring
-  magikos-update-system-pkgs
-  magikos-migrate
-  magikos-hook
-  magikos-update-aur-pkgs
-  magikos-update-mise
-  magikos-update-orphan-pkgs
-  magikos-update-analyze-logs
-  magikos-update-status
-  magikos-update-restart
-)
-
-for step in "${steps[@]}"; do
-  cat >"$stub_bin/$step" <<'STUB'
+# magikos-update delegates the whole update to topgrade. Stub topgrade to
+# record the arguments it was handed, and stub the migrate/hook tail that
+# follows it so the test exercises only the update path.
+topgrade_log="$test_tmp/topgrade"
+topgrade_env="$test_tmp/topgrade-env"
+cat >"$stub_bin/topgrade" <<'STUB'
 #!/bin/bash
-printf '%s unattended=%s\n' "${0##*/}" "${MAGIKOS_UPDATE_UNATTENDED:-}" >>"$STEP_LOG"
-[[ ${FAILING_STEP:-} != "${0##*/}" ]] || exit 1
+printf '%s\n' "$@" >"$TOPGRADE_LOG"
+printf '%s\n' "${MAGIKOS_UPDATE_PACMAN:-}" >"$TOPGRADE_ENV"
 STUB
-  chmod +x "$stub_bin/$step"
+for tail_step in magikos-migrate magikos-hook; do
+  printf '#!/bin/bash\nexit 0\n' >"$stub_bin/$tail_step"
 done
+chmod +x "$stub_bin/topgrade" "$stub_bin/magikos-migrate" "$stub_bin/magikos-hook"
 
 # MAGIKOS_UPDATE_LOGGED stands in for the script(1) wrapper the update re-execs
-# itself under; the stubbed lock reports itself already held.
+# itself under.
 run_update() {
-  : >"$test_tmp/steps"
-  STEP_LOG="$test_tmp/steps" \
-    FAILING_STEP="${FAILING_STEP:-}" \
+  : >"$test_tmp/topgrade"
+  : >"$test_tmp/topgrade-env"
+  TOPGRADE_LOG="$test_tmp/topgrade" \
+    TOPGRADE_ENV="$test_tmp/topgrade-env" \
     MAGIKOS_UPDATE_LOGGED=1 \
-    PATH="$stub_bin:$PATH" \
-    bash "$ROOT/bin/magikos-update" "$@" >"$test_tmp/out" 2>"$test_tmp/err"
+    PATH="$stub_bin:$PATH" bash "$ROOT/bin/magikos-update" "$@"
 }
 
-steps_run() {
-  cut -d' ' -f1 "$test_tmp/steps"
-}
+run_update || fail "an update reports a failure when nothing goes wrong"
+[[ -f $topgrade_log ]] || fail "magikos-update does not run topgrade"
+pass "magikos update runs topgrade"
 
-# Every step of a whole update, in order. $1 asks for the one a person confirms.
-# Stay Awake bookends the work, so it is here twice.
-expected_steps() {
-  printf '%s\n' \
-    magikos-update-lock \
-    magikos-update-requires-free-space \
-    ${1:+magikos-update-confirm} \
-    magikos-update-pkg-prune \
-    magikos-snapshot \
-    magikos-update-stay-awake \
-    magikos-update-dev \
-    magikos-update-keyring \
-    magikos-update-system-pkgs \
-    magikos-migrate \
-    magikos-hook \
-    magikos-update-aur-pkgs \
-    magikos-update-mise \
-    magikos-update-orphan-pkgs \
-    magikos-update-analyze-logs \
-    magikos-update-status \
-    magikos-update-stay-awake \
-    magikos-update-restart
-}
+# The pacman guard hook would block topgrade's internal pacman step, so the
+# update must let it through.
+[[ $(cat "$test_tmp/topgrade-env") == "1" ]] ||
+  fail "magikos update does not let topgrade's pacman step past the guard"
+pass "magikos update lets the guard allow topgrade's pacman step"
 
-run_update -y || fail "an update where everything works reports a failure"
-diff <(expected_steps) <(steps_run) >"$test_tmp/order" ||
-  fail "an update where everything works does not run every step in order" "$(cat "$test_tmp/order")"
-pass "an update where every step works runs all of them, in order"
-
-grep -q '^magikos-update-system-pkgs unattended=1$' "$test_tmp/steps" ||
-  fail "-y does not mark the update unattended"
-run_update </dev/null || fail "a confirmed update reports a failure"
-diff <(expected_steps confirmed) <(steps_run) >"$test_tmp/order" ||
-  fail "a confirmed update runs a different set of steps" "$(cat "$test_tmp/order")"
-grep -q '^magikos-update-system-pkgs unattended=$' "$test_tmp/steps" ||
-  fail "an update a person confirmed is treated as unattended"
-pass "-y is what marks an update unattended, not the update itself"
-
-# Migrations ship with the packages the upgrade installs and are written against
-# them. Running them against what is still on disk is the failure this ordering
-# exists to prevent, so the update stops where the packages did.
-if FAILING_STEP=magikos-update-system-pkgs run_update -y; then
-  fail "an update whose packages did not upgrade passes for a whole one"
-fi
-for step in magikos-migrate magikos-hook magikos-update-aur-pkgs magikos-update-restart; do
-  if grep -q "^$step " "$test_tmp/steps"; then
-    fail "a blocked package upgrade still runs $step"
-  fi
-done
-pass "a blocked package upgrade stops the update before it migrates"
+# Arguments given to magikos update are handed straight to topgrade.
+run_update --cleanup
+[[ $(cat "$test_tmp/topgrade") == "--cleanup" ]] ||
+  fail "magikos update does not pass arguments through to topgrade" "$(cat "$test_tmp/topgrade")"
+pass "magikos update forwards arguments to topgrade"
