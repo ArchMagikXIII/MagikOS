@@ -91,7 +91,7 @@ BarWidget {
         foreground: focused ? wsCol : (occupied ? Color.muted : Color.foreground)
         useActiveColor: false
         opacity: 1
-        fontSize: 14
+        fontSize: 12
         horizontalMargin: 0
         verticalPadding: 0
         fixedWidth: root.vertical ? root.barSize : -1
