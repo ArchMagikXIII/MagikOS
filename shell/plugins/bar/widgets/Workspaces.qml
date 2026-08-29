@@ -68,7 +68,7 @@ BarWidget {
     id: grid
     anchors.fill: parent
     columns: root.vertical ? 1 : root.workspaceIds().length
-    columnSpacing: 0
+    columnSpacing: root.vertical ? 0 : Style.space(6)
     rowSpacing: 0
 
     Repeater {
@@ -87,10 +87,11 @@ BarWidget {
         // focus-state swapped in a second glyph, which rendered as a stray
         // box over the icon whenever that codepoint was missing from the
         // active font -- focus is already expressed by coloring the icon.
-        text: modelData === 1 ? "󰙯" : modelData === 2 ? "󰅴" : modelData === 3 ? "󰖟" : modelData === 4 ? "󰘐" : modelData === 5 ? "\uF1B6" : String(modelData)
+        text: modelData === 1 ? "\uDB81\uDE6F" : modelData === 2 ? "\uF120" : modelData === 3 ? "\uF269" : modelData === 4 ? "\uDB81\uDE74" : modelData === 5 ? "\uF1B6" : modelData === 6 ? "\uF11B" : modelData === 7 ? "\uDB85\uDC0B" : modelData === 8 ? "\uDB81\uDF68" : modelData === 9 ? "\uDB85\uDF19" : modelData === 10 ? "\uDB83\uDE30" : String(modelData)
         foreground: focused ? wsCol : (occupied ? Color.muted : Color.foreground)
         useActiveColor: false
         opacity: 1
+        fontSize: 18
         horizontalMargin: 0
         verticalPadding: 0
         fixedWidth: root.vertical ? root.barSize : -1

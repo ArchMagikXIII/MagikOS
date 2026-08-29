@@ -74,6 +74,23 @@ Example `shell.json` (bar subtree only shown):
 
 The `magikos.indicators` widget loads individual bar indicators from `indicators/`. Omit `items` (or set it to an empty array) to show all indicators in the default order, or set `items` to a subset such as `["Dnd", "Reminder", "NightLight"]`. Set `alwaysShow` to `true` to keep inactive indicators visible instead of revealing them only on hover. Multiple `magikos.indicators` instances are allowed, so different sections can show different subsets.
 
+### Default workspace icons
+
+`magikos.workspaces` shows a distinct Nerd Font glyph per index (1–10) and falls back to the number itself beyond that. Workstations 1–5 carry the app icons from the author's daily-driver layout; 6–10 are the decorative set. The glyph mapping lives in `widgets/Workspaces.qml`; glyphs on supplementary Unicode planes (`U+F0xxx`, e.g. Discord, creation, lightning, atom, robot, firework) are written as UTF-16 surrogate-pair escapes so they survive any font stack.
+
+| Index | Icon | Codepoint |
+|---|---|---|
+| 1 | Discord | nf-md-discord `U+F066F` |
+| 2 | Terminal | nf-fa-terminal `U+F120` |
+| 3 | Firefox | nf-fa-firefox `U+F269` |
+| 4 | Sparkles (agent) | nf-md-creation `U+F0674` |
+| 5 | Steam | nf-fa-steam `U+F1B6` |
+| 6 | Gamepad | nf-md-gamepad `U+F11B` |
+| 7 | Lightning | nf-md-lightning_bolt `U+F140B` |
+| 8 | Atom | nf-md-atom `U+F0768` |
+| 9 | Robot | nf-md-robot_happy `U+F1719` |
+| 10 | Firework | nf-md-firework `U+F0E30` |
+
 ## Orientation
 
 All widgets work in `top`, `bottom`, `left`, and `right` positions. Popups anchor on the side opposite the bar edge, sliding into the workspace. Vertical bars use 28px width; widgets that show text fall back to compact icon-only forms (e.g. `media` hides its scrolling label).
