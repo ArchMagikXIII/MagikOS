@@ -1,7 +1,9 @@
 [font]
-base-size = 10
+base-size = 13
 font-family = "JetBrainsMono Nerd Font"
 
 [bar]
-size-horizontal = 16
+size-horizontal = 28
 scale-with-font = false
+icon-slot = 30
+icon-font = 16
