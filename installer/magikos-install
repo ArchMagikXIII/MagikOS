@@ -579,9 +579,11 @@ sync_etc_dropins() {
 
 # The planted tree is the only source of magikos-* commands on an
 # installer-built system (the magikos package that normally ships them into
-# /usr/bin is not installed here). Expose every executable through
-# /usr/local/bin, which precedes /usr/bin on PATH and is visible to every
-# session context: terminals, systemd units, SSH, and the shell itself.
+# /usr/bin is not installed here). Expose every command through /usr/local/bin,
+# which precedes /usr/bin on PATH and is visible to every session context:
+# terminals, systemd units, SSH, and the shell itself. Non-executable sourced
+# libraries (e.g. magikos-pkg-backend) live in bin/ too and must be reachable
+# on PATH just like the executables that source them.
 link_planted_binaries() {
   local tree="$1" prefix="$2"
   local exe name bindir="$prefix/usr/local/bin"
@@ -589,7 +591,7 @@ link_planted_binaries() {
   # Enumerate from the checkout: it is exactly what plant_* rsyncs into
   # $tree, which may not exist yet under --dry-run.
   for exe in "$ROOT/bin/"*; do
-    [[ -f $exe && -x $exe ]] || continue
+    [[ -f $exe ]] || continue
     name=${exe##*/}
     run ln -sfn "$tree/bin/$name" "$bindir/$name"
   done

@@ -85,6 +85,11 @@ wait_for_pacman_transaction
 mkdir -p "$STATE_DIR"
 [[ -d $MIGRATIONS_DIR ]] || exit 0
 
+# Migrations call the magikos-* helpers, which source sibling libraries (e.g.
+# magikos-pkg-backend) by bare name. Guarantee $MAGIKOS_PATH/bin is on PATH so
+# those resolves regardless of the session that invoked the migrator.
+export PATH="$MAGIKOS_PATH/bin:$PATH"
+
 while IFS=$'\t' read -r name file marker; do
   [[ -n $name ]] || continue
 
