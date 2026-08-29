@@ -8,8 +8,19 @@ TMPDIR=""
 QS_PID=""
 
 cleanup() {
-  if [[ -n $QS_PID ]] && kill -0 "$QS_PID" 2>/dev/null; then
-    kill "$QS_PID" 2>/dev/null || true
+  if [[ -n $QS_PID ]]; then
+    # Quickshell is launched via setsid into its own process group, so the
+    # whole tree (including the long-running inotifywait / swaymsg subscribe
+    # watchers it spawns) can be reaped here. A SIGTERM alone does not
+    # deterministically run QML Component.onDestruction handlers before exit,
+    # and an unreaped watcher is orphaned (ppid 1) and accumulates across runs;
+    # fall back to SIGKILL against the group to guarantee the reaping.
+    kill -- -"$QS_PID" 2>/dev/null || true
+    for _ in {1..20}; do
+      kill -0 "$QS_PID" 2>/dev/null || break
+      sleep 0.1
+    done
+    kill -KILL -- -"$QS_PID" 2>/dev/null || true
     wait "$QS_PID" 2>/dev/null || true
   fi
   [[ -n $TMPDIR && -d $TMPDIR ]] && rm -rf "$TMPDIR"
@@ -104,7 +115,7 @@ XDG_CONFIG_HOME="$test_home/.config" \
 XDG_CACHE_HOME="$test_home/.cache" \
 XDG_STATE_HOME="$test_home/.local/state" \
 PATH="$stub_bin:$ROOT/bin:$PATH" \
-  quickshell -p "$test_root/shell" --no-color >"$log" 2>&1 &
+  setsid quickshell -p "$test_root/shell" --no-color >"$log" 2>&1 &
 QS_PID=$!
 
 for _ in {1..80}; do

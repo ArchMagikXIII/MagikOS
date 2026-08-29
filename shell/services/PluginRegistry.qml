@@ -713,4 +713,14 @@ QtObject {
   }
 
   Component.onCompleted: ensureUserDir()
+
+  // Terminate the long-running watcher subprocesses on teardown. Without this
+  // a shell shutdown that never sets them running=false leaves orphaned
+  // inotifywait/swaymsg children (ppid 1) holding a swaymsg subscription and
+  // an inotify fd, accumulating across test and reload cycles.
+  Component.onDestruction: {
+    localPluginWatcher.running = false
+    scanProcess.running = false
+    initProcess.running = false
+  }
 }

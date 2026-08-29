@@ -198,4 +198,13 @@ Item {
     ids.sort(function(left, right) { return left - right })
     return ids
   }
+
+  // Kill the long-running swaymsg subscription on teardown; otherwise it is
+  // orphaned (ppid 1) when the shell exits, holding a swaymsg subscription
+  // and building up across test and reload cycles.
+  Component.onDestruction: {
+    eventStream.running = false
+    workspaceQuery.running = false
+    outputQuery.running = false
+  }
 }
