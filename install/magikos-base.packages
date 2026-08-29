@@ -157,7 +157,6 @@ rebuild-detector
 reflector
 ripgrep
 rsync
-rustdesk
 scdoc
 sddm
 sg3_utils
