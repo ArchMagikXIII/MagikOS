@@ -193,7 +193,7 @@ assert(
   'menu update Magikos entry renders the private glyph with the Magikos font'
 )
 assert(
-  defaultById['setup.input'].action.includes('input.lua'),
+  defaultById['setup.input'].action.includes('sway/input.conf'),
   'menu keeps Input as a direct config action'
 )
 assert(
@@ -421,11 +421,6 @@ assertEqual(
   defaultById['trigger.hardware.laptop-display'].when,
   'magikos-hw-laptop',
   'menu only shows Laptop Display on laptops'
-)
-assertEqual(
-  defaultById['trigger.hardware.mirror-display'].when,
-  'magikos-hw-laptop',
-  'menu only shows Mirror Display on laptops'
 )
 assertEqual(
   defaultById['trigger.capture.screenrecord.webcam'].when,

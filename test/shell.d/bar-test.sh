@@ -191,8 +191,8 @@ assert(
   'bar routes panel hotkeys through the focused-monitor picker'
 )
 assert(
-  /function focusedScreenName\(\) \{[\s\S]*?Hyprland\.focusedMonitor/.test(barSource),
-  'bar reads the focused monitor from Hyprland'
+  /function focusedScreenName\(\) \{[\s\S]*?swayService\.focusedOutputName/.test(barSource),
+  'bar reads the focused monitor from Sway'
 )
 assert(
   /var slots = panelNavigationSlots\(currentSlot\.region, slotWindow\(currentSlot\)\)/.test(barSource),
