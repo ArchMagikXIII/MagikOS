@@ -11,4 +11,3 @@ run_logged "$MAGIKOS_INSTALL/user/hardware/dell/xps13-text-scaling.sh"
 
 run_logged "$MAGIKOS_INSTALL/user/default-keyring.sh"
 run_logged "$MAGIKOS_INSTALL/user/mise.sh"
-run_logged "$MAGIKOS_INSTALL/user/select-bar.sh"

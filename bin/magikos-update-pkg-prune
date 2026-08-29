@@ -5,14 +5,6 @@
 
 set -e
 
-source magikos-pkg-backend
-
-# paccache is pacman's versioned cache; dnf keeps no such offline downgrade
-# cache by default.
-if ! backend_is_pacman; then
-  exit 0
-fi
-
 # The cache is the only offline downgrade path, so keep two. Run before the
 # packages update and the installed version survives with a spare. paccache
 # retains by version order, never by what is installed.

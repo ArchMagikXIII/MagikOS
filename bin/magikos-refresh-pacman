@@ -5,11 +5,6 @@
 
 source magikos-pkg-backend
 
-if ! backend_is_pacman; then
-  echo "Error: pacman mirror channels are Arch-only; this system uses $MAGIKOS_PKG_BACKEND." >&2
-  exit 1
-fi
-
 sudo cp -f /etc/pacman.conf /etc/pacman.conf.bak
 sudo cp -f /etc/pacman.d/mirrorlist /etc/pacman.d/mirrorlist.bak
 

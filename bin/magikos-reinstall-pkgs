@@ -9,13 +9,11 @@ source magikos-pkg-backend
 
 # Reinstall all default Magikos packages from the stable channel and downgrade any packages that are too new.
 
-if backend_is_pacman; then
-  # Set the package repository to the stable mirrors
-  magikos-refresh-pacman
+# Set the package repository to the stable mirrors
+magikos-refresh-pacman
 
-  # Downgrade any packages to the stable setup
-  sudo env MAGIKOS_UPDATE_PACMAN=1 pacman -Suu --noconfirm
-fi
+# Downgrade any packages to the stable setup
+sudo env MAGIKOS_UPDATE_PACMAN=1 pacman -Suu --noconfirm
 
 # Ensure all packages are installed
 mapfile -t packages < <(grep -v '^#' "$MAGIKOS_PATH/install/magikos-base.packages" | grep -v '^$')

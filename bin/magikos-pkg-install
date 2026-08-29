@@ -5,10 +5,7 @@
 
 source magikos-pkg-backend
 
-case $MAGIKOS_PKG_BACKEND in
-  pacman) preview_cmd='pacman -Sii {1}' ;;
-  dnf) preview_cmd='dnf info {1}' ;;
-esac
+preview_cmd='pacman -Sii {1}'
 
 fzf_args=(
   --multi

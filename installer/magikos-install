@@ -62,7 +62,7 @@ Options:
   --hostname NAME   Target hostname (default: magikos; ignored with --existing)
   --timezone TZ     IANA timezone (default: the live media's timezone; ignored with --existing)
   --no-encrypt      Skip LUKS2 encryption of the root partition
-  --backend BE      pacman | dnf | auto (default: auto-detect on the live media)
+  --backend BE      pacman | auto (default: auto-detect on the live media)
   --yes             Assume yes; do not ask before wiping the disk
   --dry-run         Print every action without touching anything
   -h, --help        This help
@@ -126,71 +126,6 @@ require_tools() {
   fi
 }
 
-# --- Arch -> dnf name translation (installer/dnf.map) ---
-
-declare -A DNF_MAP
-
-# quickshell only ships for Fedora through COPR; the repo file is written
-# directly so the dnf copr plugin is not a dependency. skip_if_unavailable
-# keeps releases without COPR chroots from poisoning every transaction.
-QUICKSHELL_COPR_REPO=$(cat <<'REPO'
-[errornointernet-quickshell]
-name=Copr repo for quickshell owned by errornointernet
-baseurl=https://download.copr.fedorainfracloud.org/results/errornointernet/quickshell/fedora-$releasever/
-type=rpm-md
-skip_if_unavailable=True
-repo_gpgcheck=0
-enabled=1
-enabled_metadata=1
-gpgcheck=1
-gpgkey=https://download.copr.fedorainfracloud.org/results/errornointernet/quickshell/pubkey.gpg
-REPO
-)
-
-add_quickshell_repo() {
-  local etc_dir="$1"
-  write_file "$etc_dir/yum.repos.d/_copr_errornointernet-quickshell.repo" \
-    "$QUICKSHELL_COPR_REPO"$'\n'
-}
-
-load_dnf_map() {
-  local line arch specs
-  while IFS= read -r line; do
-    [[ $line =~ ^[^#[:space:]] ]] || continue
-    arch=${line%%|*}
-    specs=${line#*|}
-    DNF_MAP[$arch]=$specs
-  done <"$ROOT/installer/dnf.map"
-}
-
-# Prints the dnf specs to attempt for one Arch name: its mapping expanded,
-# nothing when mapped away, or the name itself when unmapped.
-translate_one() {
-  local pkg="$1"
-  if [[ ${DNF_MAP[$pkg]+set} ]]; then
-    if [[ ${DNF_MAP[$pkg]} == "-" ]]; then
-      return 0
-    fi
-    local specs
-    IFS=',' read -ra specs <<<"${DNF_MAP[$pkg]}"
-    printf '%s\n' "${specs[@]}"
-  else
-    printf '%s\n' "$pkg"
-  fi
-}
-
-# Fills TRANSLATED_PACKAGES with the dnf specs for the given Arch names.
-translate_packages() {
-  TRANSLATED_PACKAGES=()
-  local pkg spec
-  while read -r pkg; do
-    [[ -n $pkg ]] || continue
-    while read -r spec; do
-      TRANSLATED_PACKAGES+=("$spec")
-    done < <(translate_one "$pkg")
-  done < <(printf '%s\n' "$@")
-}
-
 ask_confirm() {
   if (( ASSUME_YES || DRY_RUN )); then
     return 0
@@ -227,11 +162,9 @@ preflight() {
   export MAGIKOS_PATH="$ROOT"
   source "$ROOT/bin/magikos-pkg-backend"
 
-  if [[ -z $BACKEND ]]; then
-    BACKEND=$MAGIKOS_PKG_BACKEND
-  elif [[ $BACKEND != "$MAGIKOS_PKG_BACKEND" ]]; then
-    warn "Requested backend '$BACKEND' differs from live media ('${MAGIKOS_PKG_BACKEND}'); proceeding anyway."
-  fi
+  # The only supported backend is pacman (Arch/CachyOS); magikos-pkg-backend
+  # has already required it on the live media.
+  BACKEND=pacman
 
   require_tools rsync
 
@@ -251,10 +184,7 @@ preflight() {
     return 0
   fi
 
-  case $BACKEND in
-    pacman) require_tools pacstrap genfstab mkinitcpio sgdisk ;;
-    dnf) require_tools dnf sgdisk ;;
-  esac
+  require_tools pacstrap genfstab mkinitcpio sgdisk
 
   require_tools cryptsetup sfdisk blkid lsblk
 
@@ -367,9 +297,8 @@ seed_target_config() {
     sync_etc_dropins "$TARGET/etc"
   fi
 
-  # Arch's encrypt hook unlocks from /etc/crypttab.initramfs inside the
-  # initramfs; dracut (Fedora) copies the real /etc/crypttab and needs
-  # rd.luks.uuid on the kernel command line. The root= line is shared.
+  # The initramfs unlocks the root from /etc/crypttab.initramfs; the kernel
+  # command line carries the LUKS UUID for the systemd initramfs generator.
   if (( ENCRYPT )); then
     write_file "$TARGET/etc/crypttab.initramfs" "$LUKS_NAME UUID=$LUKS_UUID none luks,discard"$'\n'
     write_file "$TARGET/etc/crypttab" "$LUKS_NAME UUID=$LUKS_UUID none luks,discard"$'\n'
@@ -451,53 +380,6 @@ bootstrap_arch() {
   run mount --make-rslave "$TARGET/run"
 }
 
-bootstrap_fedora() {
-  log "Bootstrapping Fedora base system (dnf --installroot) [beta]"
-
-  local releasever="${FEDORA_RELEASEVER:-44}"
-
-  # Scriptlets need the virtual kernels inside the installroot.
-  run mount --rbind /dev "$TARGET/dev"
-  run mount --make-rslave "$TARGET/dev"
-  run mount -t proc /proc "$TARGET/proc"
-  run mount --rbind /sys "$TARGET/sys"
-  run mount --make-rslave "$TARGET/sys"
-  run mount --rbind /run "$TARGET/run"
-  run mount --make-rslave "$TARGET/run"
-
-  # --skip-broken keeps one unmapped name from killing the transaction; the
-  # audit afterwards reports exactly what did not land. It sits after the
-  # subcommand because dnf5 only accepts it there.
-  local core_specs=(
-    @core kernel kernel-modules kernel-modules-extra dracut systemd-ukify
-    sudo git btrfs-progs dosfstools NetworkManager sddm sway uwsm foot
-    polkit gnome-keyring pipewire pipewire-pulse wireplumber plymouth
-    ufw gum rsync jq openssh-server
-  )
-  add_quickshell_repo "$TARGET/etc"
-  mapfile -t packages < <(grep -v '^#' "$ROOT/install/magikos-base.packages" | grep -v '^$')
-  load_dnf_map
-  translate_packages "${packages[@]}"
-  run dnf -y --installroot="$TARGET" --releasever="$releasever" \
-    --setopt=install_weak_deps=False \
-    install --skip-broken \
-    "${core_specs[@]}" "${TRANSLATED_PACKAGES[@]}"
-
-  if (( ! DRY_RUN )); then
-    local pkg installed
-    while read -r pkg; do
-      [[ -n $pkg ]] || continue
-      installed=1
-      while read -r spec; do
-        chroot "$TARGET" rpm -q --qf '%{NAME}\n' "$spec" >/dev/null 2>&1 || installed=0
-      done < <(translate_one "$pkg")
-      if (( ! installed )); then
-        PKG_FAILURES+=("$pkg")
-      fi
-    done < <(grep -v '^#' "$ROOT/install/magikos-base.packages" | grep -v '^$')
-    log "Fedora bootstrap complete; ${#PKG_FAILURES[@]} package(s) unmapped or unavailable."
-  fi
-}
 
 # Replicates the magikos-settings package assembly of /etc/skel, which does
 # not exist as a package yet: config/** maps under .config, default/bashrc
@@ -529,17 +411,12 @@ install_app_icons() {
   done
 }
 
-# System drop-ins we own outright. nsswitch.conf is the exception: its shape
-# is distro-specific, so an Arch-flavored copy must never land on Fedora.
+# System drop-ins we own outright.
 sync_etc_dropins() {
   local dest="$1"
   # --chown matters: the checkout files are owned by the invoking user, and
   # sudo refuses /etc/sudoers.d entries that are not owned by root.
-  if [[ $BACKEND == dnf ]]; then
-    run rsync -a --chown=root:root --exclude=nsswitch.conf "$ROOT/etc/" "$dest/"
-  else
-    run rsync -a --chown=root:root "$ROOT/etc/" "$dest/"
-  fi
+  run rsync -a --chown=root:root "$ROOT/etc/" "$dest/"
   # Force the canonical sudoers mode too; the checkout carries user umask bits.
   if [[ -d $dest/sudoers.d ]]; then
     run find "$dest/sudoers.d" -type f -exec chmod 440 {} +
@@ -589,15 +466,11 @@ plant_magikos() {
 configure_target() {
   log "Configuring locale, clock, and fstab"
 
-  if [[ $BACKEND == pacman ]]; then
-    chroot_exec "locale-gen"
-  fi
+  chroot_exec "locale-gen"
   chroot_exec "ln -sf /usr/share/zoneinfo/$(printf '%q' "$TIMEZONE") /etc/localtime"
-  if [[ $BACKEND == pacman ]]; then
-    chroot_exec "hwclock --systohc"
-  fi
+  chroot_exec "hwclock --systohc"
 
-  # Written by hand rather than genfstab so both backends share one code path.
+  # Written by hand rather than genfstab.
   local esp_uuid root_opts home_opts fstab
   if (( DRY_RUN )); then
     esp_uuid="00000000-0000-4000-8000-000000000003"
@@ -618,19 +491,13 @@ EOF
 }
 
 install_bootloader() {
-  if [[ $BACKEND == pacman ]]; then
-    log "Rebuilding UKIs and deploying Limine"
-    chroot_exec "mkinitcpio -P"
-    if chroot_exec "command -v limine-entry-tool" >/dev/null 2>&1; then
-      chroot_exec "limine-entry-tool deploy || limine-entry-tool update" ||
-        warn "limine-entry-tool could not deploy; verify the ESP boots before rebooting."
-    else
-      warn "limine-entry-tool is not present; the kernel hooks should have populated the ESP."
-    fi
+  log "Rebuilding UKIs and deploying Limine"
+  chroot_exec "mkinitcpio -P"
+  if chroot_exec "command -v limine-entry-tool" >/dev/null 2>&1; then
+    chroot_exec "limine-entry-tool deploy || limine-entry-tool update" ||
+      warn "limine-entry-tool could not deploy; verify the ESP boots before rebooting."
   else
-    log "Installing systemd-boot [beta]"
-    chroot_exec "bootctl install --esp-path=/boot --no-variables || bootctl install --esp-path=/boot"
-    chroot_exec "kernel-install add-all || dracut -f --regenerate-all || true"
+    warn "limine-entry-tool is not present; the kernel hooks should have populated the ESP."
   fi
 }
 
@@ -687,10 +554,6 @@ build_yay_target() {
 }
 
 install_aur_packages_target() {
-  if [[ $BACKEND != pacman ]]; then
-    return 0
-  fi
-
   if (( DRY_RUN )); then
     aur_candidate_names
     if (( ${#AUR_CANDIDATES[@]} > 0 )); then
@@ -830,8 +693,8 @@ plant_magikos_host() {
   # Repair pacman configuration on systems this project installed earlier:
   # shipped channel confs once referenced package repos that are not live
   # yet, which broke every -Sy. Redeploying the current channel conf fixes
-  # them; dnf systems never had a pacman.conf to begin with.
-  if [[ $BACKEND == pacman ]] && grep -q "https://pkgs.magikos.org/" /etc/pacman.conf 2>/dev/null; then
+  # them.
+  if grep -q "https://pkgs.magikos.org/" /etc/pacman.conf 2>/dev/null; then
     local channel=${MAGIKOS_MIRROR:-stable}
     write_file /etc/pacman.conf "$(cat "$ROOT/default/pacman/pacman-$channel.conf")"$'\n'
     write_file /etc/pacman.d/mirrorlist "$(cat "$ROOT/default/pacman/mirrorlist-$channel")"$'\n'
@@ -851,74 +714,16 @@ install_packages_host() {
     die "No packages found in install/magikos-base.packages"
   fi
 
-  if [[ $BACKEND == pacman ]]; then
-    if ! run pacman -S --needed --noconfirm "${packages[@]}"; then
-      warn "Batch install failed; falling back to per-package installs."
-      local pkg
-      for pkg in "${packages[@]}"; do
-        if (( DRY_RUN )); then
-          printf '[dry-run] pacman -S --needed %s\n' "$pkg"
-        elif ! pacman -S --needed --noconfirm "$pkg" >>"$LOG_FILE" 2>&1; then
-          PKG_FAILURES+=("$pkg")
-        fi
-      done
-    fi
-  else
-    # --skip-broken must follow the subcommand on dnf5. A failed transaction
-    # is not fatal here; the rpm audit below reports what did not land.
-    load_dnf_map
-    translate_packages "${packages[@]}"
-    add_quickshell_repo "/etc"
-
-    # power-profiles-daemon and tuned-ppd both provide ppd-service; whichever
-    # already owns it wins, or the transaction aborts on the conflict.
-    PPD_HELD_BY_TUNED=0
-    if (( ! DRY_RUN )) && rpm -q tuned-ppd >/dev/null 2>&1; then
-      PPD_HELD_BY_TUNED=1
-      log "tuned-ppd already provides ppd-service; skipping power-profiles-daemon"
-    fi
-    local ppd_filtered=()
-    local dnf_spec
-    for dnf_spec in "${TRANSLATED_PACKAGES[@]}"; do
-      if [[ $dnf_spec == "power-profiles-daemon" ]] && (( PPD_HELD_BY_TUNED )); then
-        continue
+  if ! run pacman -S --needed --noconfirm "${packages[@]}"; then
+    warn "Batch install failed; falling back to per-package installs."
+    local pkg
+    for pkg in "${packages[@]}"; do
+      if (( DRY_RUN )); then
+        printf '[dry-run] pacman -S --needed %s\n' "$pkg"
+      elif ! pacman -S --needed --noconfirm "$pkg" >>"$LOG_FILE" 2>&1; then
+        PKG_FAILURES+=("$pkg")
       fi
-      ppd_filtered+=("$dnf_spec")
     done
-    TRANSLATED_PACKAGES=("${ppd_filtered[@]}")
-
-    # One unresolvable name or conflict kills the whole batch transaction,
-    # so a failed batch retries package by package; the audit below remains
-    # the single source of truth for what is genuinely missing.
-    if ! run dnf -y --setopt=install_weak_deps=False install --skip-broken "${TRANSLATED_PACKAGES[@]}"; then
-      warn "Batch dnf transaction failed; retrying package by package."
-      local dnf_spec
-      for dnf_spec in "${TRANSLATED_PACKAGES[@]}"; do
-        if (( DRY_RUN )); then
-          printf '[dry-run] dnf install %s\n' "$dnf_spec"
-        else
-          dnf -y --setopt=install_weak_deps=False install "$dnf_spec" >>"$LOG_FILE" 2>&1 || true
-        fi
-      done
-    fi
-    if (( ! DRY_RUN )); then
-      local pkg spec installed
-      for pkg in "${packages[@]}"; do
-        if [[ ${DNF_MAP[$pkg]+set} && ${DNF_MAP[$pkg]} == "-" ]]; then
-          continue
-        fi
-        if [[ $pkg == "power-profiles-daemon" ]] && (( PPD_HELD_BY_TUNED )); then
-          continue
-        fi
-        installed=1
-        while read -r spec; do
-          rpm -q --qf '%{NAME}\n' "$spec" >/dev/null 2>&1 || installed=0
-        done < <(translate_one "$pkg")
-        if (( ! installed )); then
-          PKG_FAILURES+=("$pkg")
-        fi
-      done
-    fi
   fi
 }
 
@@ -988,10 +793,6 @@ build_yay_host() {
 }
 
 install_aur_packages_host() {
-  if [[ $BACKEND != pacman ]]; then
-    return 0
-  fi
-
   if (( DRY_RUN )); then
     aur_candidate_names
     if (( ${#AUR_CANDIDATES[@]} > 0 )); then
@@ -1106,39 +907,6 @@ finish_existing() {
   fi
 }
 
-# Fedora ships no Nerd Font packaging, so fetch the pinned upstream archive
-# for the glyphs the shell's workspaces, network, bluetooth and battery
-# widgets rely on. Arch installs the same glyphs via ttf-jetbrains-mono-nerd.
-install_nerd_fonts_host() {
-  if [[ $BACKEND == pacman ]]; then
-    return 0
-  fi
-
-  local font_dir="/usr/local/share/fonts/JetBrainsMono-Nerd"
-  if [[ -d $font_dir ]]; then
-    log "JetBrainsMono Nerd Font already present at $font_dir"
-    return 0
-  fi
-
-  local archive_url="https://github.com/ryanoasis/nerd-fonts/releases/download/$NERD_FONTS_VERSION/JetBrainsMono.tar.xz"
-  log "Fetching JetBrainsMono Nerd Font $NERD_FONTS_VERSION"
-  local tmp
-  tmp=$(mktemp -d)
-  if ! run curl -fsSL "$archive_url" -o "$tmp/JetBrainsMono.tar.xz"; then
-    warn "Could not download JetBrainsMono Nerd Font; shell icons will fall back to text."
-    rm -rf "$tmp"
-    return 0
-  fi
-  run mkdir -p "$font_dir"
-  if ! run tar -xJf "$tmp/JetBrainsMono.tar.xz" -C "$font_dir"; then
-    warn "Could not unpack JetBrainsMono Nerd Font; shell icons will fall back to text."
-  fi
-  rm -rf "$tmp"
-  if (( ! DRY_RUN )); then
-    fc-cache -f "$font_dir" >>"$LOG_FILE" 2>&1 || true
-  fi
-}
-
 # Neither distro's repositories carry oh-my-posh, so ship the pinned upstream
 # binary when it is missing. The fish config guards its init, so systems
 # without the binary simply keep the stock prompt.
@@ -1164,7 +932,6 @@ main() {
     plant_magikos_host
     install_packages_host
     install_aur_packages_host
-    install_nerd_fonts_host
     install_oh_my_posh_host
     adopt_user
     run_apply_system_host
@@ -1178,11 +945,7 @@ main() {
   partition_disk
   seed_target_config
 
-  if [[ $BACKEND == pacman ]]; then
-    bootstrap_arch
-  else
-    bootstrap_fedora
-  fi
+  bootstrap_arch
 
   plant_magikos
   configure_target

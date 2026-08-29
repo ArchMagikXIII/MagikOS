@@ -7,32 +7,6 @@ set -e
 
 source magikos-pkg-backend
 
-if [[ $MAGIKOS_PKG_BACKEND == dnf ]]; then
-  mapfile -t orphans < <(dnf repoquery --unneeded --qf '%{name}' 2>/dev/null || true)
-  (( ${#orphans[@]} )) || exit 0
-
-  echo -e "\e[32m\nUnneeded system packages\e[0m"
-  printf '  %s\n' "${orphans[@]}"
-  echo
-
-  if [[ ! -t 0 || ! -t 1 ]]; then
-    echo "${#orphans[@]} unneeded package(s) found. Re-run magikos-update-orphan-pkgs in a terminal to review/remove them."
-    echo
-    exit 0
-  fi
-
-  if ! gum confirm --default=false "Remove ${#orphans[@]} unneeded package(s)?"; then
-    echo "Keeping unneeded packages."
-    echo
-    exit 0
-  fi
-
-  echo -e "\e[32m\nRemoving unneeded system packages\e[0m"
-  sudo dnf autoremove -y
-  echo
-  exit 0
-fi
-
 mapfile -t orphans < <(pacman -Qtdq 2>/dev/null || true)
 (( ${#orphans[@]} )) || exit 0
 

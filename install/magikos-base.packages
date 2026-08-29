@@ -77,7 +77,6 @@ gamescope
 git
 glances
 gum
-gpu-usage-waybar-git
 gst-libav
 gst-plugins-bad
 gst-plugins-ugly
@@ -145,7 +144,6 @@ perl
 pkgfile
 plocate
 plymouth
-polkit-gnome
 poppler-glib
 power-profiles-daemon
 profile-sync-daemon
@@ -192,7 +190,6 @@ uwsm
 vim
 vlc-plugins-all
 vulkan-icd-loader
-waybar
 wayland-protocols
 wget
 which

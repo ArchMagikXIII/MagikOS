@@ -5,9 +5,5 @@
 
 source magikos-pkg-backend
 
-if ! backend_is_pacman; then
-  echo "Error: AUR packages are Arch-only; this system uses $MAGIKOS_PKG_BACKEND." >&2
-  exit 1
-fi
 curl -sf --connect-timeout 30 --retry 3 --retry-delay 3 -A "magikos-update" \
   "https://aur.archlinux.org/rpc/?v=5&type=info&arg=base" >/dev/null

@@ -1,11 +1,6 @@
 # Install Panther Lake kernel for Dell XPS Panther Lake systems
 # The linux-ptl kernel includes audio driver patches not yet in mainline.
 
-# A packaged patched kernel is an Arch-repo concept; Fedora ships PTL support
-# in its stock kernel, so there is nothing to swap.
-source "$MAGIKOS_PATH/bin/magikos-pkg-backend"
-backend_is_pacman || exit 0
-
 if magikos-hw-match "XPS" && magikos-hw-intel-ptl; then
   echo "Detected Dell XPS Panther Lake, installing PTL kernel..."
 
