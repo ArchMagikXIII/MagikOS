@@ -13,10 +13,10 @@ fi
 magikos-theme-set-pi --activate
 
 # Seed the default sway wallpaper so the fallback bg path resolves.
-OSAKA_WALLPAPER="$MAGIKOS_PATH/themes/osaka-jade/backgrounds/Osaka.jpg"
-if [[ -f $OSAKA_WALLPAPER ]]; then
+LOGO_WALLPAPER="$MAGIKOS_PATH/Logo-Wallpaper.png"
+if [[ -f $LOGO_WALLPAPER ]]; then
   mkdir -p ~/Pictures/Wallpapers
-  cp -n "$OSAKA_WALLPAPER" ~/Pictures/Wallpapers/Osaka.jpg 2>/dev/null || true
+  cp -n "$LOGO_WALLPAPER" ~/Pictures/Wallpapers/Logo-Wallpaper.png 2>/dev/null || true
 fi
 
 mkdir -p ~/.config/btop/themes
