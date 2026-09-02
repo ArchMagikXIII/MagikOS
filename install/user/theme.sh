@@ -12,12 +12,12 @@ if [[ ! -s $HOME/.local/state/magikos/current/theme.name ]]; then
 fi
 magikos-theme-set-pi --activate
 
-# Seed the default sway wallpaper so the fallback bg path resolves.
-LOGO_WALLPAPER="$MAGIKOS_PATH/Logo-Wallpaper.png"
-if [[ -f $LOGO_WALLPAPER ]]; then
-  mkdir -p ~/Pictures/Wallpapers
-  cp -n "$LOGO_WALLPAPER" ~/Pictures/Wallpapers/Logo-Wallpaper.png 2>/dev/null || true
-fi
+# Seed the wallpaper set so sway's fallback bg path resolves.
+mkdir -p ~/Pictures/Wallpapers
+for wallpaper in "$MAGIKOS_PATH"/wallpapers/*; do
+  [[ -f $wallpaper ]] || continue
+  cp -n "$wallpaper" ~/Pictures/Wallpapers/ 2>/dev/null || true
+done
 
 mkdir -p ~/.config/btop/themes
 ln -snf "$HOME/.local/state/magikos/current/theme/btop.theme" ~/.config/btop/themes/current.theme
