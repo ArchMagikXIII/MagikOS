@@ -19,5 +19,14 @@ for wallpaper in "$MAGIKOS_PATH"/wallpapers/*; do
   cp -n "$wallpaper" ~/Pictures/Wallpapers/ 2>/dev/null || true
 done
 
+# Expose the same set through the shell style menu, which lists the active
+# theme's user background folder alongside the theme's stock backgrounds.
+CURRENT_THEME=$(cat "$HOME/.local/state/magikos/current/theme.name" 2>/dev/null || echo tokyo-night)
+mkdir -p "$HOME/.config/magikos/backgrounds/$CURRENT_THEME"
+for wallpaper in "$MAGIKOS_PATH"/wallpapers/*; do
+  [[ -f $wallpaper ]] || continue
+  cp -n "$wallpaper" "$HOME/.config/magikos/backgrounds/$CURRENT_THEME/" 2>/dev/null || true
+done
+
 mkdir -p ~/.config/btop/themes
 ln -snf "$HOME/.local/state/magikos/current/theme/btop.theme" ~/.config/btop/themes/current.theme

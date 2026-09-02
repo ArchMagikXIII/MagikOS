@@ -348,6 +348,6 @@ return to the packaged default.
 | Package-owned path something else may already write | Prefer a path nothing else writes, such as a vendor drop-in under `/usr/lib`. Otherwise the `--overwrite` entry in `bin/magikos-update-system-pkgs` has to ship a release before the file |
 | User-facing `magikos-*` command | `bin/magikos-<group>-<verb>` — see `GROUP_DESCRIPTIONS` in `bin/magikos` |
 | New stock theme | `themes/<name>/` (+ matching templates under `default/themed/` if they need theme colors) |
-| Shipped wallpaper images (seeded into `~/Pictures/Wallpapers`) | `wallpapers/` |
+| Shipped wallpaper images (seeded into `~/Pictures/Wallpapers` and the active theme's background menu folder) | `wallpapers/` |
 | User-installed theme | `~/.config/magikos/themes/<name>/` |
 | Generated current theme/background state | `~/.local/state/magikos/current/` |
