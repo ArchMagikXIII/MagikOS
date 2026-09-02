@@ -1,12 +1,17 @@
 if lspci | grep -qi 'nvidia'; then
   source "$MAGIKOS_PATH/bin/magikos-pkg-backend"
 
-  # Check which kernel is installed and set appropriate headers package
-  KERNEL_PACKAGE=$(pacman -Qqs '^linux(-zen|-lts|-hardened|-t2|-ptl)?$' | head -1 || true)
+  # Check which kernel is installed and set the matching headers package, so
+  # DKMS builds below have headers present.
+  KERNEL_PACKAGE=$(pacman -Qqs '^linux(-cachyos(-rc)?|-zen|-lts|-hardened|-t2|-ptl)?$' | head -1 || true)
   [[ -n $KERNEL_PACKAGE ]] && magikos-pkg-add "$KERNEL_PACKAGE-headers"
 
   if magikos-hw-nvidia-gsp; then
-    PACKAGES=(nvidia-open-dkms nvidia-utils lib32-nvidia-utils libva-nvidia-driver)
+    # Turing and newer: the prebuilt module for the base kernels ships in
+    # magikos-base.packages, so only the userspace pieces are added here.
+    # Installing nvidia-open-dkms alongside it would conflict with that
+    # NVIDIA-MODULE provider and abort the transaction.
+    PACKAGES=(nvidia-utils lib32-nvidia-utils libva-nvidia-driver)
   elif magikos-hw-nvidia-without-gsp; then
     PACKAGES=(nvidia-580xx-dkms nvidia-580xx-utils lib32-nvidia-580xx-utils)
   fi
