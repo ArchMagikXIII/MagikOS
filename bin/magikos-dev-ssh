@@ -1,0 +1,150 @@
+#!/bin/bash
+
+# magikos:summary=Set up SSH auth for a MagikOS dev-repo git checkout
+# magikos:group=dev
+# magikos:args=[--remote=<name>] [--key=<path>] [--register]
+# magikos:examples=magikos dev ssh | magikos dev ssh --register
+
+set -euo pipefail
+
+if (( EUID == 0 )); then
+  echo "Error: run magikos-dev-ssh as your user, not under sudo." >&2
+  exit 1
+fi
+
+key="${MAGIKOS_SSH_KEY:-$HOME/.ssh/id_ed25519}"
+remote=origin
+register=0
+
+while (($#)); do
+  case "$1" in
+    --remote=*) remote="${1#--remote=}"; shift ;;
+    --key=*) key="${1#--key=}"; shift ;;
+    --register) register=1; shift ;;
+    -h|--help)
+      cat <<'USAGE'
+Usage: magikos dev ssh [--remote=<name>] [--key=<path>] [--register]
+
+Prepares a MagikOS git checkout to authenticate over SSH instead of a
+plaintext-hosted HTTPS token:
+
+  1. Ensures an SSH key exists (~/.ssh/id_ed25519 by default), generating one
+     with your git user.email if missing.
+  2. Prints the public key and, unless --register, tells you how to add it.
+     With --register it uploads the key to GitHub via the GitHub API (needs a
+     gh token or a GITHUB_TOKEN with the "write:public_key" scope).
+  3. Switches the origin remote (or --remote=<name>) from HTTPS to the
+     equivalent git@github.com:OWNER/REPO.git SSH URL, so future pulls and
+     pushes need no token/password.
+
+Options:
+  --remote=<name>  Remote to rewrite to SSH (default: origin)
+  --key=<path>     SSH private-key path to use/ensure (default: ~/.ssh/id_ed25519)
+  --register       Upload the public key to GitHub automatically
+USAGE
+      exit 0
+      ;;
+    *)
+      echo "Unknown option: $1" >&2
+      echo "Usage: magikos dev ssh [--remote=<name>] [--key=<path>] [--register]" >&2
+      exit 1
+      ;;
+  esac
+done
+
+pub="$key.pub"
+authorized_fingerprint=
+earlier_key=0
+
+# --- 1. ensure key exists ----------------------------------------------------
+if [[ ! -f "$pub" ]]; then
+  email=$(git config user.email 2>/dev/null || true)
+  [[ -n $email ]] || email="$(whoami)@$(hostname)"
+
+  if [[ ! -f "$key" ]]; then
+    mkdir -p "$(dirname "$key")"
+    chmod 700 "$HOME/.ssh" 2>/dev/null || true
+    ssh-keygen -t ed25519 -C "$email" -f "$key" -N "" >/dev/null
+    echo "generated $key ($email)"
+  else
+    earlier_key=1
+  fi
+  chmod 600 "$key"
+else
+  earlier_key=1
+fi
+
+if [[ $earlier_key == 1 && ! -f "$key" ]]; then
+  echo "Error: $pub exists but $key is missing; reusing keys requires the private half." >&2
+  exit 1
+fi
+
+pub_contents=$(tr -d '\n' < "$pub")
+
+# --- 2. optionally register with GitHub -------------------------------------
+if (( register )); then
+  token="${GITHUB_TOKEN:-}"
+  if [[ -z $token ]] && command -v gh >/dev/null 2>&1; then
+    token=$(gh auth token 2>/dev/null || true)
+  fi
+
+  if [[ -n $token ]]; then
+    resp=$(curl -fsS -m 30 \
+      -H "Authorization: Bearer $token" \
+      -H "Accept: application/vnd.github+json" \
+      -d "$(printf '{"title":"%s@%s","key":"%s"}' "$(whoami)" "$(hostname)" "$pub_contents")" \
+      https://api.github.com/user/keys) || {
+      echo "Error: GitHub rejected the key (see API response above). Maybe it is already registered." >&2
+      exit 1
+    }
+    echo "registered key with GitHub: $(printf '%s' "$resp" | sed -n 's/.*"id"[[:space:]]*:[[:space:]]*\([0-9][0-9]*\).*/id \1/p')"
+  else
+    echo "no GitHub credentials found; skipping auto-registration."
+    echo "Add it manually: https://github.com/settings/ssh/new"
+  fi
+fi
+
+cat <<EOF
+
+Public key (ssh-ed25519) — add to https://github.com/settings/ssh/new:
+
+$pub_contents
+
+EOF
+
+# --- 3. rewrite target remote to SSH ---------------------------------------
+if ! git config "remote.$remote.url" >/dev/null 2>&1; then
+  echo "Error: no git remote named '$remote' in the current repo (run from your MagikOS checkout)." >&2
+  exit 1
+fi
+
+current=$(git config "remote.$remote.url")
+case "$current" in
+  git@github.com:*|ssh://git@github.com/*)
+    echo "remote '$remote' already uses SSH: $current"
+    ;;
+  https://github.com/*|http://github.com/*)
+    rest="${current#https://github.com/}"
+    rest="${rest#http://github.com/}"
+    rest="${rest%.git}.git"
+    ssh_url="git@github.com:${rest}"
+    git remote set-url "$remote" "$ssh_url"
+    echo "remote '$remote':"
+    echo "  $current"
+    echo "  -> $ssh_url"
+    ;;
+  *)
+    echo "remote '$remote' is not a github.com URL ($current); leaving it unchanged." >&2
+    ;;
+esac
+
+# --- verify with openssh if it is installed --------------------------------
+if command -v timeout >/dev/null 2>&1 && command -v ssh-keyscan >/dev/null 2>&1 && command -v ssh-keygen >/dev/null 2>&1; then
+  echo
+  echo "Verifying github.com host key ..."
+  timeout 15 ssh-keyscan github.com 2>/dev/null | ssh-keygen -lf - 2>/dev/null | sed 's/^/  /' \
+    || echo "  (could not fingerprint github.com right now)"
+fi
+
+echo
+echo "Next: if 'git pull' asks for a password, run 'ssh -T git@github.com' once to accept the host key."
