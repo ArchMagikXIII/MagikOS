@@ -81,7 +81,19 @@ pass "nightlight status reports daylight temperature as disabled"
 printf '6500\n' >"$STATE"
 : >"$SHELL_LOG"
 nightlight_cli >/dev/null
-[[ $(<"$STATE") == 4000 ]] || fail "nightlight toggle warms the screen from daylight"
+# start_nightlight backgrounds the daemon, so the new temperature lands in the
+# (pkill-deleted) state file asynchronously; poll for it instead of guessing.
+# Guard with -e first: $(<file 2>/dev/null) misbehaves in bash (returns empty),
+# so existence-check before reading, and never read a missing file.
+for _ in {1..50}; do
+  if [[ -e $STATE ]] && [[ $(<"$STATE") == 4000 ]]; then
+    break
+  fi
+  sleep 0.02
+done
+if [[ ! -e $STATE ]] || [[ $(<"$STATE") != 4000 ]]; then
+  fail "nightlight toggle warms the screen from daylight"
+fi
 pass "nightlight toggle warms the screen from daylight"
 
 grep -Fqx -- '-q nightlight refresh' "$SHELL_LOG" || fail "nightlight toggle nudges the shell nightlight service"
