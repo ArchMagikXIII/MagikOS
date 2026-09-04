@@ -120,7 +120,7 @@ sleep 0.8
 
 geometry=$(shell_ipc shell debugBarGeometry)
 jq -e '
-  any(.[]; .id == "magikos.menu" and .visible == true and .width > 0 and .height > 0) and
+  any(.[]; .id == "magikos.workspaces" and .visible == true and .width > 0 and .height > 0) and
   any(.[]; .id == "magikos.clock" and .visible == true and .width > 0 and .height > 0)
 ' <<<"$geometry" >/dev/null || {
   printf 'Geometry:\n' >&2

@@ -231,7 +231,6 @@ sleep 0.8
 
 default_ids=$(jq -c '(.bar.layout.left + .bar.layout.center + .bar.layout.right) | map(.id // .)' "$ROOT/config/magikos/shell.json")
 visible_default_ids='[
-  "magikos.menu",
   "magikos.workspaces",
   "magikos.clock",
   "magikos.weather",
