@@ -12,6 +12,15 @@ if lspci | grep -qi 'nvidia'; then
     # Installing nvidia-open-dkms alongside it would conflict with that
     # NVIDIA-MODULE provider and abort the transaction.
     PACKAGES=(nvidia-utils lib32-nvidia-utils libva-nvidia-driver)
+
+    # On hybrid systems runtime DPM lets the idle dGPU power down instead of
+    # idling at ~15W. nvidia-powerd needs the BIOS NvPCF ACPI feature; on
+    # laptops without it the daemon exits at boot rather than failing the
+    # install, so enabling it here is safe across hardware. Desktop systems
+    # with NVIDIA as the only GPU get no benefit and skip this.
+    if magikos-hw-nvidia-powerd; then
+      sudo systemctl enable nvidia-powerd.service
+    fi
   elif magikos-hw-nvidia-without-gsp; then
     PACKAGES=(nvidia-580xx-dkms nvidia-580xx-utils lib32-nvidia-580xx-utils)
   fi

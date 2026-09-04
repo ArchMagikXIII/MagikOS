@@ -1,0 +1,30 @@
+#!/bin/bash
+
+# magikos:summary=Detect whether nvidia-powerd is worth enabling (hybrid NVIDIA laptop)
+
+# nvidia-powerd drives runtime dynamic power management for the NVIDIA GPU, but
+# it only pays off on hybrid systems where the dGPU is used for offload and can
+# be powered down when idle. On a desktop where NVIDIA is the only display GPU,
+# runtime DPM is meaningless, so gate on the presence of a second display
+# controller alongside the NVIDIA GPU.
+#
+# Read the cached sysfs IDs rather than lspci, which reads PCI config space and
+# resumes runtime-suspended GPUs.
+pci_devices_path="${MAGIKOS_PCI_DEVICES_PATH:-/sys/bus/pci/devices}"
+
+shopt -s nullglob
+
+has_nvidia=0
+has_other=0
+
+for device in "$pci_devices_path"/*; do
+  [[ $(< "$device/class") == 0x03* ]] || continue
+
+  if [[ $(< "$device/vendor") == "0x10de" ]]; then
+    has_nvidia=1
+  else
+    has_other=1
+  fi
+done
+
+(( has_nvidia && has_other ))
