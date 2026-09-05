@@ -432,12 +432,20 @@ Panel {
     connectDirectly(net.ssid)
   }
 
-  // Bar pill state, derived from the native NetworkManager service so the
-  // icon reflects connection changes without polling. Wired is preferred
-  // when both are up, matching the default-route device.
+  // Bar pill state. Quickshell.Networking reacts to connection changes without
+  // polling, but build variants can hide the wired device (no DeviceType.Wired
+  // in Networking.devices), so the native status source is trusted first: it
+  // reflects the default-route interface, which is the bar's subject. Both are
+  // consulted so the icon survives inside which property the state is in.
+  // Wired is preferred when both are up.
   readonly property var wiredDevice: findDevice(DeviceType.Wired)
+  property string liveKind: "disconnected"
   readonly property string kind: {
+    if (liveKind === "ethernet") return "ethernet"
+    if (info.type === "ethernet") return "ethernet"
     if (wiredDevice && wiredDevice.connected) return "ethernet"
+    if (liveKind === "wifi") return "wifi"
+    if (info.type === "wifi") return "wifi"
     if (connectedWifiNetwork) return "wifi"
     return "disconnected"
   }
@@ -804,7 +812,10 @@ Panel {
   implicitWidth: button.implicitWidth
   implicitHeight: button.implicitHeight
 
-  Component.onCompleted: refresh()
+  Component.onCompleted: {
+    refresh()
+    statusProc.running = true
+  }
 
   // Pulls everything we want about the active route's interface in one shot.
   Process {
@@ -813,6 +824,30 @@ Panel {
     stdout: StdioCollector {
       waitForEnd: true
       onStreamFinished: root.updateDetails(text)
+    }
+  }
+
+  // Lightweight "which kind am I" probe used while the panel is closed. It
+  // never pings, so it is cheap to poll; the open case is covered by
+  // detailsPoll, which keeps liveKind in line with the verbose source.
+  Process {
+    id: statusProc
+    command: ["magikos-network-status"]
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: root.liveKind = Model.parseNetworkStatus(text).kind
+    }
+  }
+
+  Timer {
+    id: statusPoll
+    interval: 5000
+    repeat: true
+    running: true
+    onTriggered: {
+      if (root.opened) return
+      if (statusProc.running) return
+      statusProc.running = true
     }
   }
 

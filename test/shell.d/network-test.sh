@@ -293,4 +293,33 @@ assertDeepEqual(
 
 assertEqual(network.headerDetail({ type: 'wifi', freq: '5745' }), '', 'network keeps wifi band state out of the hero')
 assertEqual(network.headerDetail({ type: 'ethernet', speed: '100' }), '100mbit', 'network keeps ethernet speed in the hero')
+
+// The bar pill must survive Quickshell builds whose Networking backend never
+// lists wired devices. kind() trusts the native status source first (liveKind
+// and the verbose info both reflect the default route), then the model.
+assert(
+  /if \(liveKind === "ethernet"\) return "ethernet"[\s\S]*if \(info\.type === "ethernet"\) return "ethernet"/.test(panelSource),
+  'network derives wired state from the native status source before the model'
+)
+assert(
+  /if \(liveKind === "wifi"\) return "wifi"[\s\S]*if \(info\.type === "wifi"\) return "wifi"/.test(panelSource),
+  'network derives wifi state from the native status source before the model'
+)
+assertEqual(network.parseNetworkStatus('ethernet').kind, 'ethernet', 'network parses wired status')
+
+// The status probe the closed panel uses is the cheap, non-verbose form; it
+// never pings, and it only fires when the panel is not open for the details
+// stack to cover.
+assert(
+  /id: statusProc[\s\S]*command: \["magikos-network-status"\]/.test(panelSource),
+  'network has the lightweight status probe'
+)
+assert(
+  /id: statusPoll\b[\s\S]*if \(root\.opened\) return[\s\S]*if \(statusProc\.running\) return/.test(panelSource),
+  'network polls the closed panel against an in-flight probe'
+)
+assert(
+  /Component\.onCompleted: \{[\s\S]*statusProc\.running = true/.test(panelSource),
+  'network starts the live-kind probe on construction'
+)
 JS
