@@ -513,12 +513,19 @@ prompt_cachyos() {
   fi
 }
 
+# Curated from the cachyos-mirrorlist package so the paths match what the
+# repo actually serves (repo/$arch/$repo). The package replaces this file
+# with the current full list on its first install.
 cachyos_mirrorlist() {
   cat <<'EOF'
-# CachyOS repository mirrors (installer bootstrap list; the cachyos-mirrorlist
-# package replaces this with the current full list on its first install).
-Server = https://mirror.cachyos.org/$repo/$arch
-Server = https://cachy.moson.org/$repo/$arch
+Server = https://cdn77.cachyos.org/repo/$arch/$repo
+Server = https://at.cachyos.org/repo/$arch/$repo
+Server = https://us.cachyos.org/repo/$arch/$repo
+Server = https://nl.mirror.cx/cachyos/repo/$arch/$repo
+Server = https://ca.mirror.cx/cachyos/repo/$arch/$repo
+Server = https://mirror.mergedcloud.de/cachyos/repo/$arch/$repo
+Server = https://mirror.lesviallon.fr/cachy/repo/$arch/$repo
+Server = https://mirror.zyner.org/mirror/cachyos/repo/$arch/$repo
 EOF
 }
 
@@ -552,6 +559,13 @@ enable_cachyos_repos() {
 
   log "Adding the CachyOS repositories"
 
+  # pacstrap leaves no resolv.conf behind in the target; chroot network ops
+  # (keyring fetch, keyserver, the repo syncs) need one, so copy the live
+  # media's when the target has none.
+  if [[ -n $root && ! -e "$root/etc/resolv.conf" && -r /etc/resolv.conf ]]; then
+    run cp /etc/resolv.conf "$root/etc/resolv.conf"
+  fi
+
   if ! cachyos_trust_key "$root"; then
     warn "Could not establish CachyOS key trust; leaving repositories unchanged."
     return 1
@@ -583,8 +597,12 @@ enable_cachyos_repos() {
       || warn "Could not install the CachyOS keyring package."
     run pacman-key --populate archlinux cachyos || warn "Could not populate the CachyOS keyring."
   else
-    chroot_exec "pacman -Sy --noconfirm --needed cachyos-keyring cachyos-mirrorlist" \
-      || warn "Could not install the CachyOS keyring package in the target."
+    if chroot_exec "pacman -Sy --noconfirm --needed cachyos-keyring cachyos-mirrorlist"; then
+      :
+    else
+      chroot_exec "pacman -Syy --noconfirm --needed cachyos-keyring cachyos-mirrorlist" \
+        || warn "Could not install the CachyOS keyring package in the target."
+    fi
     chroot_exec "pacman-key --populate cachyos" || warn "Could not populate the CachyOS keyring in the target."
   fi
 }
