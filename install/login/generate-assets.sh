@@ -57,6 +57,9 @@ done
 
 echo "  Creating SDDM assets in $SDDM_DIR"
 
+# Login wallpaper (background for the greeter's Main.qml)
+cp "$MAGIKOS_PATH/wallpapers/Logo-Wallpaper.png" "$SDDM_DIR/Logo-Wallpaper.png"
+
 # Logo (500x120, transparent background, white text with shadow)
 # First create text layer, then composite for proper centering
 magick -size 500x120 xc:transparent \

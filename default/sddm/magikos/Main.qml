@@ -8,6 +8,13 @@ Rectangle {
   # and reports a zero-sized fake screen in --test-mode.
   color: "#1a1b26"
 
+  Image {
+    id: background
+    anchors.fill: parent
+    source: "Logo-Wallpaper.png"
+    fillMode: Image.PreserveAspectCrop
+  }
+
   property string currentUser: userModel.lastUser
   property bool loginFailed: false
   property int sessionIndex: {
@@ -31,87 +38,72 @@ Rectangle {
     }
   }
 
-  Column {
+  Row {
     anchors.centerIn: parent
-    spacing: 40
+    spacing: 15
 
     Image {
-      id: logo
-      source: "logo.png"
-      width: Math.min(sourceSize.width, root.width * 0.6)
-      height: sourceSize.width > 0 ? Math.round(width * sourceSize.height / sourceSize.width) : 0
+      source: root.loginFailed ? "lock-failed.png" : "lock.png"
+      width: 34
+      height: 38
       fillMode: Image.PreserveAspectFit
-      anchors.horizontalCenter: parent.horizontalCenter
+      anchors.verticalCenter: parent.verticalCenter
     }
 
-    Row {
-      anchors.horizontalCenter: parent.horizontalCenter
-      spacing: 15
+    Item {
+      width: entry.width
+      height: entry.height
 
       Image {
-        source: root.loginFailed ? "lock-failed.png" : "lock.png"
-        width: 34
-        height: 38
-        fillMode: Image.PreserveAspectFit
-        anchors.verticalCenter: parent.verticalCenter
+        id: entry
+        source: root.loginFailed ? "entry-failed.png" : "entry.png"
+        anchors.centerIn: parent
       }
 
-      Item {
-        width: entry.width
-        height: entry.height
+      Row {
+        anchors.left: parent.left
+        anchors.leftMargin: 20
+        anchors.verticalCenter: parent.verticalCenter
+        spacing: 5
 
-        Image {
-          id: entry
-          source: root.loginFailed ? "entry-failed.png" : "entry.png"
-          anchors.centerIn: parent
-        }
+        Repeater {
+          model: Math.min(password.text.length, 21)
 
-        Row {
-          anchors.left: parent.left
-          anchors.leftMargin: 20
-          anchors.verticalCenter: parent.verticalCenter
-          spacing: 5
-
-          Repeater {
-            model: Math.min(password.text.length, 21)
-
-            Image {
-              source: "bullet.png"
-              width: 7
-              height: 7
-            }
+          Image {
+            source: "bullet.png"
+            width: 7
+            height: 7
           }
         }
+      }
 
-        TextInput {
-          id: password
-          anchors.fill: parent
-          anchors.leftMargin: 20
-          anchors.rightMargin: 20
-          verticalAlignment: TextInput.AlignVCenter
-          echoMode: TextInput.Password
-          font.family: "JetBrainsMono Nerd Font"
-          font.pixelSize: 24
-          font.letterSpacing: 5
-          passwordCharacter: "\u2022"
-          color: "transparent"
-          selectionColor: "transparent"
-          selectedTextColor: "transparent"
-          cursorDelegate: Item {}
-          focus: true
+      TextInput {
+        id: password
+        anchors.fill: parent
+        anchors.leftMargin: 20
+        anchors.rightMargin: 20
+        verticalAlignment: TextInput.AlignVCenter
+        echoMode: TextInput.Password
+        font.family: "JetBrainsMono Nerd Font"
+        font.pixelSize: 24
+        font.letterSpacing: 5
+        passwordCharacter: "\u2022"
+        color: "transparent"
+        selectionColor: "transparent"
+        selectedTextColor: "transparent"
+        cursorDelegate: Item {}
+        focus: true
 
-          onTextChanged: root.loginFailed = false
+        onTextChanged: root.loginFailed = false
 
-          Keys.onPressed: {
-            if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-              sddm.login(root.currentUser, password.text, root.sessionIndex)
-              event.accepted = true
-            }
+        Keys.onPressed: {
+          if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+            sddm.login(root.currentUser, password.text, root.sessionIndex)
+            event.accepted = true
           }
         }
       }
     }
-
   }
 
   Component.onCompleted: password.forceActiveFocus()

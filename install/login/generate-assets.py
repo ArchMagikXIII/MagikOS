@@ -5,6 +5,7 @@ Requires: pip install Pillow
 """
 
 import os
+import shutil
 from PIL import Image, ImageDraw, ImageFont
 
 # Colors
@@ -160,6 +161,8 @@ def main():
 
     # SDDM assets
     print(f"  Creating SDDM assets in {sddm_dir}")
+    shutil.copy(os.path.join(magikos_path, "wallpapers", "Logo-Wallpaper.png"),
+                os.path.join(sddm_dir, "Logo-Wallpaper.png"))
     create_logo(os.path.join(sddm_dir, "logo.png"))
     create_lock_icon(os.path.join(sddm_dir, "lock.png"))
     create_lock_icon(os.path.join(sddm_dir, "lock-failed.png"), color=ERROR_COLOR)

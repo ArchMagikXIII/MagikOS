@@ -751,13 +751,13 @@ install_authorized_keys() {
 
 configure_login() {
   mkdir -p /var/lib/sddm
-  printf '[Last]\nSession=magikos.desktop\nUser=%s\n' "$username" >/var/lib/sddm/state.conf
+  printf '[Last]\nSession=sway\nUser=%s\n' "$username" >/var/lib/sddm/state.conf
   chown -R sddm:sddm /var/lib/sddm 2>/dev/null || true
 
   # Autologin straight into the desktop after first-boot setup — the owner just
   # authenticated in the form, so we don't make them retype at SDDM.
   mkdir -p /etc/sddm.conf.d
-  printf '[Autologin]\nUser=%s\nSession=magikos.desktop\n' "$username" >/etc/sddm.conf.d/autologin.conf
+  printf '[Autologin]\nUser=%s\nSession=sway\n' "$username" >/etc/sddm.conf.d/autologin.conf
 
   # Encrypted installs keep autologin permanently (the LUKS prompt is the auth
   # boundary). Unencrypted installs autologin only this first boot, then a
