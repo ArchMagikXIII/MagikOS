@@ -593,14 +593,16 @@ enable_cachyos_repos() {
   # Pull the keyring/mirrorlist packages from the repo itself so signatures
   # and mirrorlist stay exactly what CachyOS ships.
   if [[ -z $root ]]; then
-    run pacman -Sy --noconfirm --needed cachyos-keyring cachyos-mirrorlist \
+    # --ask=4 answers the "remove conflicting package?" prompt (yes), so a
+    # stale legacy package like chwd-db cannot abort a --noconfirm batch.
+    run pacman -Sy --ask=4 --noconfirm --needed cachyos-keyring cachyos-mirrorlist \
       || warn "Could not install the CachyOS keyring package."
     run pacman-key --populate archlinux cachyos || warn "Could not populate the CachyOS keyring."
   else
-    if chroot_exec "pacman -Sy --noconfirm --needed cachyos-keyring cachyos-mirrorlist"; then
+    if chroot_exec "pacman -Sy --ask=4 --noconfirm --needed cachyos-keyring cachyos-mirrorlist"; then
       :
     else
-      chroot_exec "pacman -Syy --noconfirm --needed cachyos-keyring cachyos-mirrorlist" \
+      chroot_exec "pacman -Syy --ask=4 --noconfirm --needed cachyos-keyring cachyos-mirrorlist" \
         || warn "Could not install the CachyOS keyring package in the target."
     fi
     chroot_exec "pacman-key --populate cachyos" || warn "Could not populate the CachyOS keyring in the target."
@@ -919,7 +921,7 @@ build_yay_target() {
   fi
 
   log "Building yay from the AUR in the target"
-  chroot_exec "pacman -S --needed --noconfirm git go base-devel"
+  chroot_exec "pacman -S --ask=4 --needed --noconfirm git go base-devel"
 
   local home_dir user_q
   user_q=$(printf '%q' "$INSTALL_USER")
@@ -943,7 +945,7 @@ install_aur_packages_target() {
   if (( DRY_RUN )); then
     aur_candidate_names
     if (( ${#AUR_CANDIDATES[@]} > 0 )); then
-      printf '[dry-run] chroot %s: yay -S --needed --noconfirm %s\n' "$TARGET" "${AUR_CANDIDATES[*]}"
+      printf '[dry-run] chroot %s: yay -S --ask=4 --needed --noconfirm %s\n' "$TARGET" "${AUR_CANDIDATES[*]}"
     fi
     return 0
   fi
@@ -963,11 +965,11 @@ install_aur_packages_target() {
 
   sudoers_nopasswd_enable "$TARGET"
   if ! chroot_exec "runuser -u $user_q -- env HOME=$(printf '%q' "$home_dir") \
-      yay -S --needed --noconfirm $(printf '%q ' "${aur_failed[@]}")"; then
+      yay -S --ask=4 --needed --noconfirm $(printf '%q ' "${aur_failed[@]}")"; then
     warn "Batch AUR install failed; retrying package by package."
     for pkg in "${aur_failed[@]}"; do
       chroot_exec "runuser -u $user_q -- env HOME=$(printf '%q' "$home_dir") \
-        yay -S --needed --noconfirm $(printf '%q' "$pkg")" || true
+        yay -S --ask=4 --needed --noconfirm $(printf '%q' "$pkg")" || true
     done
   fi
   sudoers_nopasswd_disable "$TARGET"
@@ -1132,13 +1134,16 @@ install_packages_host() {
   if (( ${#PACKAGE_REPO[@]} == 0 )); then
     return 0
   fi
-  if ! run pacman -S --needed --noconfirm "${PACKAGE_REPO[@]}"; then
+  # --ask=4 answers the "remove conflicting package?" prompt (yes), so a stale
+  # legacy package such as chwd-db is auto-removed instead of aborting the
+  # otherwise --noconfirm batch with an unresolvable conflict.
+  if ! run pacman -S --ask=4 --needed --noconfirm "${PACKAGE_REPO[@]}"; then
     warn "Batch install failed for ${#PACKAGE_REPO[@]} repo package(s); retrying per-package."
     local pkg
     for pkg in "${PACKAGE_REPO[@]}"; do
       if (( DRY_RUN )); then
-        printf '[dry-run] pacman -S --needed %s\n' "$pkg"
-      elif ! pacman -S --needed --noconfirm "$pkg" >>"$LOG_FILE" 2>&1; then
+        printf '[dry-run] pacman -S --ask=4 --needed %s\n' "$pkg"
+      elif ! pacman -S --ask=4 --needed --noconfirm "$pkg" >>"$LOG_FILE" 2>&1; then
         PKG_FAILURES+=("$pkg")
       fi
     done
@@ -1191,7 +1196,7 @@ build_yay_host() {
   fi
 
   log "Building yay from the AUR (not present on this system)"
-  run pacman -S --needed --noconfirm git go base-devel >>"$LOG_FILE" 2>&1 || true
+  run pacman -S --ask=4 --needed --noconfirm git go base-devel >>"$LOG_FILE" 2>&1 || true
 
   local home_dir tmp
   home_dir=$(getent passwd "$INSTALL_USER" | cut -d: -f6)
@@ -1214,7 +1219,7 @@ install_aur_packages_host() {
   if (( DRY_RUN )); then
     aur_candidate_names
     if (( ${#AUR_CANDIDATES[@]} > 0 )); then
-      printf '[dry-run] yay -S --needed --noconfirm %s\n' "${AUR_CANDIDATES[*]}"
+      printf '[dry-run] yay -S --ask=4 --needed --noconfirm %s\n' "${AUR_CANDIDATES[*]}"
     fi
     return 0
   fi
@@ -1233,11 +1238,11 @@ install_aur_packages_host() {
 
   sudoers_nopasswd_enable "/"
   if ! runuser -u "$INSTALL_USER" -- env HOME="$home_dir" \
-    yay -S --needed --noconfirm "${aur_failed[@]}" >>"$LOG_FILE" 2>&1; then
+    yay -S --ask=4 --needed --noconfirm "${aur_failed[@]}" >>"$LOG_FILE" 2>&1; then
     warn "Batch AUR install failed; retrying package by package."
     for pkg in "${aur_failed[@]}"; do
       runuser -u "$INSTALL_USER" -- env HOME="$home_dir" \
-        yay -S --needed --noconfirm "$pkg" >>"$LOG_FILE" 2>&1 || true
+        yay -S --ask=4 --needed --noconfirm "$pkg" >>"$LOG_FILE" 2>&1 || true
     done
   fi
   sudoers_nopasswd_disable "/"
