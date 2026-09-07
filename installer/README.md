@@ -34,6 +34,7 @@ Full options:
 | `--hostname NAME` | Target hostname (default `magikos`; ignored with `--existing`). |
 | `--timezone TZ` | IANA timezone (default: the live media's; ignored with `--existing`). |
 | `--no-encrypt` | Skip LUKS2 encryption of the root partition. |
+| `--cachyos-repos` | Add the CachyOS repositories before the package install. On any base without them (e.g. stock Arch), they are auto-added and — when the terminal allows it — the installer asks first. `--no-cachyos-repos` forces them off. |
 | `--yes` | Do not ask before wiping. |
 | `--dry-run` | Print every action without touching anything. |
 
@@ -50,7 +51,7 @@ Every action is logged to `$MAGIKOS_INSTALL_LOG_FILE` (default `/tmp/magikos-ins
 ## Current limitations
 
 - **Not yet exercised end-to-end.** The script is written to the contracts above but has not completed a real-disk install; do a `--dry-run` first and expect the first real run in a disposable VM.
-- **Arch package set assumes a CachyOS-flavored live media** — `limine-entry-tool`, `pacstrap`, and AUR-adjacent names in `install/magikos-base.packages` resolve there. Names absent from the repos (AUR-only packages) are retried through `yay`, which the installer builds from the AUR when it is missing; a stock Arch ISO still needs network access for that step.
+- **Arch package set assumes a CachyOS-flavored live media** — `limine-entry-tool`, `pacstrap`, and AUR-adjacent names in `install/magikos-base.packages` resolve there. When the base lacks the CachyOS repos, the installer adds them (see `--cachyos-repos`) so the cachyos-* set and `linux-cachyos` install as binaries; without them those names are retried through `yay`, which the installer builds from the AUR when it is missing. A stock Arch ISO still needs network access for the keyring step.
 - **`--existing` leaves the bootloader alone** by design; a system booting GRUB or plain systemd-boot gets all userspace setup but keeps its current boot path until you run `magikos setup direct-boot`.
 - Unattended installs (the `cidata` contract documented in manual/52) are not implemented here yet; flags cover the same fields interactively.
 

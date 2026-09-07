@@ -29,6 +29,8 @@ BACKEND="${MAGIKOS_PKG_BACKEND:-}"
 ASSUME_YES=0
 DRY_RUN=0
 EXISTING_MODE=0
+# -1 = auto (enable when the CachyOS repo is not already present); 0 = off; 1 = on.
+CACHYOS_REPOS=-1
 
 LOG_FILE="${MAGIKOS_INSTALL_LOG_FILE:-/tmp/magikos-install.log}"
 PKG_FAILURES=()
@@ -72,6 +74,12 @@ Options:
   --timezone TZ     IANA timezone (default: the live media's timezone; ignored with --existing)
   --no-encrypt      Skip LUKS2 encryption of the root partition
   --backend BE      pacman | auto (default: auto-detect on the live media)
+  --cachyos-repos   Add the CachyOS repositories before packages are installed.
+                    Auto-enabled when they are missing and a confirmation was
+                    not possible; --no-cachyos-repos forces them off.
+  --no-cachyos-repos  Do not add the CachyOS repositories (not recommended:
+                    the Magikos package set contains CachyOS-only names that
+                    would otherwise be built from the AUR).
   --yes             Assume yes; do not ask before wiping the disk
   --dry-run         Print every action without touching anything
   -h, --help        This help
@@ -86,6 +94,8 @@ while (($#)); do
     --timezone) TIMEZONE="$2"; shift 2 ;;
     --no-encrypt) ENCRYPT=0; shift ;;
     --backend) BACKEND="$2"; shift 2 ;;
+    --cachyos-repos) CACHYOS_REPOS=1; shift ;;
+    --no-cachyos-repos) CACHYOS_REPOS=0; shift ;;
     --yes) ASSUME_YES=1; shift ;;
     --dry-run) DRY_RUN=1; shift ;;
     --existing) EXISTING_MODE=1; shift ;;
@@ -249,6 +259,7 @@ preflight() {
     if ! ask_confirm "Install Magikos onto the running system? Shipped defaults will overwrite matching files in ~$INSTALL_USER at next login."; then
       die "Aborted."
     fi
+    prompt_cachyos
     return 0
   fi
 
@@ -284,6 +295,7 @@ preflight() {
         [[ $reply == n || $reply == N ]] && ENCRYPT=0
       fi
     fi
+    prompt_cachyos
   fi
 
   require_tools pacstrap genfstab mkinitcpio sgdisk
@@ -444,6 +456,160 @@ EOF
   fi
 }
 
+# The CachyOS admin signing key (used by the official bootstrap flow; the
+# short id is what pacman-key matches for --recv-keys/--lsign-key).
+CACHYOS_SIGNING_KEY="F3B607488DB35A47"
+
+# Is the effective pacman already configured with the CachyOS repo? $1 is
+# the pacman.conf to check ("" defaults to the live/host one).
+cachyos_configured() {
+  local conf="${1:-/etc/pacman.conf}"
+  grep -qE '^\s*\[cachyos[[:space:]]*\]' "$conf" 2>/dev/null
+}
+
+# Should the installer add the CachyOS repos? Returns 0 when yes. $1 is the
+# pacman.conf that matters for this run (the target's on fresh installs, the
+# host's on adoption).
+cachyos_wanted() {
+  if (( CACHYOS_REPOS == 1 )); then
+    return 0
+  fi
+  if (( CACHYOS_REPOS == 0 )); then
+    return 1
+  fi
+  # Auto: add when the repos are missing from the effective configuration.
+  cachyos_configured "$1" || return 0
+  return 1
+}
+
+# Ask on the live media when the user did not pick a side. Defaults to yes:
+# without the CachyOS repos a dozen package-set names (linux-cachyos, the
+# cachyos-* settings/apps, the limine hooks) fall to slow AUR builds.
+prompt_cachyos() {
+  if (( CACHYOS_REPOS == 1 || CACHYOS_REPOS == 0 )); then
+    return 0
+  fi
+  if (( ASSUME_YES )); then
+    CACHYOS_REPOS=1
+    return 0
+  fi
+  if [[ ! -t 0 ]]; then
+    return 0
+  fi
+  if command -v gum >/dev/null 2>&1; then
+    if gum confirm --default=true "Add the CachyOS repositories before installing packages?"; then
+      CACHYOS_REPOS=1
+    else
+      CACHYOS_REPOS=0
+    fi
+  else
+    local reply=""
+    read -r -p "Add the CachyOS repositories before installing packages? [Y/n] " reply || reply=""
+    if [[ $reply == n || $reply == N ]]; then
+      CACHYOS_REPOS=0
+    else
+      CACHYOS_REPOS=1
+    fi
+  fi
+}
+
+cachyos_mirrorlist() {
+  cat <<'EOF'
+# CachyOS repository mirrors (installer bootstrap list; the cachyos-mirrorlist
+# package replaces this with the current full list on its first install).
+Server = https://mirror.cachyos.org/$repo/$arch
+Server = https://cachy.moson.org/$repo/$arch
+EOF
+}
+
+# Trust the CachyOS signing key in $root ("" = live host, $TARGET = chroot).
+# Returns 0 once the key is received and locally signed.
+cachyos_trust_key() {
+  local root="$1"
+  if [[ -z $root ]]; then
+    if run pacman-key --recv-keys "$CACHYOS_SIGNING_KEY" --keyserver keyserver.ubuntu.com; then
+      :
+    elif run pacman-key --recv-keys "$CACHYOS_SIGNING_KEY" --keyserver keys.openpgp.org; then
+      :
+    else
+      return 1
+    fi
+    run pacman-key --lsign-key "$CACHYOS_SIGNING_KEY" || return 1
+  else
+    chroot_exec "pacman-key --recv-keys $CACHYOS_SIGNING_KEY --keyserver keyserver.ubuntu.com \
+      || pacman-key --recv-keys $CACHYOS_SIGNING_KEY --keyserver keys.openpgp.org" || return 1
+    chroot_exec "pacman-key --lsign-key $CACHYOS_SIGNING_KEY" || return 1
+  fi
+}
+
+# Add the [cachyos] repo ("$root"/etc/pacman.conf, mirrorlist, keyring, sync).
+# $1 is "" for the live host or $TARGET for a fresh-install chroot. Returns
+# nonzero (without touching pacman.conf) when key trust cannot be established,
+# so a broken fetch can never leave an untrusted repo blocking every -S.
+enable_cachyos_repos() {
+  local root="$1"
+  local conf="$root/etc/pacman.conf"
+
+  log "Adding the CachyOS repositories"
+
+  if ! cachyos_trust_key "$root"; then
+    warn "Could not establish CachyOS key trust; leaving repositories unchanged."
+    return 1
+  fi
+
+  if [[ -f $conf ]]; then
+    if grep -qE '^\s*\[cachyos[[:space:]]*\]' "$conf"; then
+      :
+    elif grep -q '^\[core\]' "$conf"; then
+      # The repos must precede Arch's so CachyOS-provided packages win;
+      # the sed inserts both lines directly above [core].
+      run cp "$conf" "$conf.magikos-bak"
+      run sed -i \
+        -e '/^\[core\]/i # CachyOS repos (added by the Magikos installer; backup: '"$(basename "$conf")"$'.magikos-bak)' \
+        -e '/^\[core\]/i [cachyos]\nInclude = /etc/pacman.d/cachyos-mirrorlist' \
+        "$conf"
+    else
+      run cp "$conf" "$conf.magikos-bak"
+      write_file "$conf" "$(cat "$conf")"$'\n[cachyos]\nInclude = /etc/pacman.d/cachyos-mirrorlist\n'
+    fi
+  fi
+
+  write_file "$root/etc/pacman.d/cachyos-mirrorlist" "$(cachyos_mirrorlist)"
+
+  # Pull the keyring/mirrorlist packages from the repo itself so signatures
+  # and mirrorlist stay exactly what CachyOS ships.
+  if [[ -z $root ]]; then
+    run pacman -Sy --noconfirm --needed cachyos-keyring cachyos-mirrorlist \
+      || warn "Could not install the CachyOS keyring package."
+    run pacman-key --populate archlinux cachyos || warn "Could not populate the CachyOS keyring."
+  else
+    chroot_exec "pacman -Sy --noconfirm --needed cachyos-keyring cachyos-mirrorlist" \
+      || warn "Could not install the CachyOS keyring package in the target."
+    chroot_exec "pacman-key --populate cachyos" || warn "Could not populate the CachyOS keyring in the target."
+  fi
+}
+
+# Names in $@ that the TARGET's pacman databases can actually resolve. The
+# target's repo list is authoritative: the live media may carry CachyOS repos
+# the target has not been configured with (and vice versa after --cachyos-repos),
+# so feeding pacstrap a name it cannot find would abort the whole batch.
+packages_resolvable_in_target() {
+  local name
+  local -A in_repo=()
+  if (( DRY_RUN )); then
+    printf '[dry-run] resolve %d package name(s) against the target repository list\n' "$#"
+    return 0
+  fi
+  while read -r name; do
+    [[ -n $name ]] && in_repo[$name]=1
+  done < <(chroot "$TARGET" /bin/bash -lc 'pacman -Slq' 2>/dev/null | sort -u)
+  for name in "$@"; do
+    if [[ ${in_repo[$name]+set} ]]; then
+      printf '%s\n' "$name"
+    fi
+  done
+}
+
 bootstrap_arch() {
   log "Bootstrapping Arch base system (pacstrap)"
 
@@ -490,8 +656,55 @@ bootstrap_arch() {
     done
   fi
   if ((${#BASE_AUR[@]} > 0)); then
-    warn "Deferring AUR-only base package(s) to the yay pass: ${BASE_AUR[*]}"
-    PKG_FAILURES+=("${BASE_AUR[@]}")
+    warn "Deferring AUR-only base package(s) temporarily: ${BASE_AUR[*]}"
+  fi
+
+  # Scriptlets, pacman-key, and chroot_exec need the virtual kernels inside
+  # the target; pacstrap's own mounts live in a private namespace and vanish
+  # with it.
+  run mount --rbind /dev "$TARGET/dev"
+  run mount --make-rslave "$TARGET/dev"
+  run mount -t proc /proc "$TARGET/proc"
+  run mount --rbind /sys "$TARGET/sys"
+  run mount --make-rslave "$TARGET/sys"
+  run mount --rbind /run "$TARGET/run"
+  run mount --make-rslave "$TARGET/run"
+
+  # Give the target the CachyOS repos before any Magikos package resolution:
+  # the package set carries CachyOS-only names (linux-cachyos, the cachyos-*
+  # settings/apps, the limine hooks) that must resolve as binaries instead of
+  # being compiled from the AUR.
+  if cachyos_wanted "$TARGET/etc/pacman.conf"; then
+    enable_cachyos_repos "$TARGET" \
+      || warn "Continuing without the CachyOS repositories."
+  fi
+
+  # Names the base batch could not resolve on the live media may be available
+  # in the target now that CachyOS is configured (limine-mkinitcpio-hook,
+  # limine-snapper-sync). Install what the target resolves; only the truly
+  # missing ones fall to the yay pass.
+  local base_resolvable=() base_missing=() pkg
+  for pkg in "${BASE_AUR[@]}"; do
+    if [[ $(packages_resolvable_in_target "$pkg") == "$pkg" ]]; then
+      base_resolvable+=("$pkg")
+    else
+      base_missing+=("$pkg")
+    fi
+  done
+  if ((${#base_resolvable[@]} > 0)); then
+    log "Installing deferred base packages from the target repos"
+    if (( DRY_RUN )); then
+      printf '[dry-run] pacstrap %s: %s\n' "$TARGET" "${base_resolvable[*]}"
+    elif ! pacstrap "$TARGET" "${base_resolvable[@]}"; then
+      warn "Base follow-up batch failed; falling back per-package."
+      for pkg in "${base_resolvable[@]}"; do
+        pacstrap "$TARGET" "$pkg" >>"$LOG_FILE" 2>&1 || PKG_FAILURES+=("$pkg")
+      done
+    fi
+  fi
+  if ((${#base_missing[@]} > 0)); then
+    warn "Deferring AUR-only base package(s) to the yay pass: ${base_missing[*]}"
+    PKG_FAILURES+=("${base_missing[@]}")
   fi
 
   log "Installing Magikos package set (best effort)"
@@ -500,20 +713,29 @@ bootstrap_arch() {
   if (( ${#packages[@]} == 0 )); then
     die "No packages found in install/magikos-base.packages"
   fi
-  split_repo_and_aur
+
+  # Split against the target's own repo list, so the batch never contains a
+  # name pacstrap cannot resolve (that would abort the whole transaction).
+  local -A in_magikos_repo=()
+  local name
+  local -a magikos_resolvable=()
+  mapfile -t magikos_resolvable < <(packages_resolvable_in_target "${packages[@]}")
+  for name in "${magikos_resolvable[@]}"; do
+    in_magikos_repo[$name]=1
+  done
+  PACKAGE_REPO=()
+  for pkg in "${packages[@]}"; do
+    if [[ ${in_magikos_repo[$pkg]+set} ]]; then
+      PACKAGE_REPO+=("$pkg")
+    else
+      PKG_FAILURES+=("$pkg")
+    fi
+  done
   if (( ${#PACKAGE_REPO[@]} == 0 )); then
-    run mount --rbind /dev "$TARGET/dev"
-    run mount --make-rslave "$TARGET/dev"
-    run mount -t proc /proc "$TARGET/proc"
-    run mount --rbind /sys "$TARGET/sys"
-    run mount --make-rslave "$TARGET/sys"
-    run mount --rbind /run "$TARGET/run"
-    run mount --make-rslave "$TARGET/run"
     return 0
   fi
   if ! run pacstrap "$TARGET" "${PACKAGE_REPO[@]}"; then
     warn "Batch install failed for ${#PACKAGE_REPO[@]} repo package(s); retrying per-package."
-    local pkg
     for pkg in "${PACKAGE_REPO[@]}"; do
       if (( DRY_RUN )); then
         printf '[dry-run] pacstrap %s: %s\n' "$TARGET" "$pkg"
@@ -522,16 +744,6 @@ bootstrap_arch() {
       fi
     done
   fi
-
-  # Scriptlets and chroot_exec need the virtual kernels inside the target;
-  # pacstrap's own mounts live in a private namespace and vanish with it.
-  run mount --rbind /dev "$TARGET/dev"
-  run mount --make-rslave "$TARGET/dev"
-  run mount -t proc /proc "$TARGET/proc"
-  run mount --rbind /sys "$TARGET/sys"
-  run mount --make-rslave "$TARGET/sys"
-  run mount --rbind /run "$TARGET/run"
-  run mount --make-rslave "$TARGET/run"
 }
 
 
@@ -1118,6 +1330,10 @@ main() {
 
   if (( EXISTING_MODE )); then
     plant_magikos_host
+    if cachyos_wanted /etc/pacman.conf; then
+      enable_cachyos_repos "" \
+        || warn "Continuing without the CachyOS repositories."
+    fi
     install_packages_host
     install_aur_packages_host
     install_oh_my_posh_host
