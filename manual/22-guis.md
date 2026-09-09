@@ -53,12 +53,6 @@ You can also send straight from the file manager: right-click any selection in N
 
 Magikos's firewall is closed by default except for LocalSend's port, so this works out of the box on a fresh install. See [security](48-security.md).
 
-## LibreOffice
-
-[LibreOffice](https://www.libreoffice.org/) is a complete office package with word processor, spreadsheet, presentations, drawing application, and more. It's compatible with files from Microsoft Office, so this is a great way to be able to open those Word documents.
-
-You start LibreOffice via the application launcher (`Super + Space`).
-
 ## Signal
 
 [Signal](https://signal.org/) is the pioneer of E2E encrypted messaging, and a great communication option for anyone who'd prefer not to go through one of the big tech conglomerates.
