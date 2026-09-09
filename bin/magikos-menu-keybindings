@@ -366,8 +366,7 @@ prioritize_entries() {
     if (match(line, /Screenshot/))  prio = 23
     if (match(line, /Screenrecording/))  prio = 24
     if (match(line, /Tmux/)) prio = 25
-    if (match(line, /Herdr/)) prio = 26
-    if (match(line, /SUPER SHIFT.*\+.*B.*→.*Browser/)) prio = 27
+    if (match(line, /SUPER SHIFT.*\+.*B.*→.*Browser/)) prio = 26
     if (match(line, /File manager \(cwd\)/))  prio = 28
     if (match(line, /(Switch|Next|Former|Previous).*workspace/))  prio = 29
     if (match(line, /Move window to workspace/))  prio = 30
@@ -391,7 +390,10 @@ prioritize_entries() {
     if (match(line, /Apple Display/))  prio = 98
     if (match(line, /XF86/))  prio = 99
     if (match(line, /Tmux keybindings/)) prio = 100
-    if (match(line, /Herdr keybindings/)) prio = 101
+
+    # print "priority<TAB>record"
+
+    # print "priority<TAB>record"
 
     # print "priority<TAB>record"
     printf "%d\t%s\n", prio, $0

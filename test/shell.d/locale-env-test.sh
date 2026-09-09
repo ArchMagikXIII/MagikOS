@@ -6,7 +6,7 @@ source "$(dirname "$0")/base-test.sh"
 
 envs="$ROOT/default/bash/envs"
 
-# Non-login bash (SSH, herdr's remote bridge) never sources
+# Non-login bash (SSH) never sources
 # /etc/profile.d/locale.sh, so without this the shell runs in the C locale.
 lang=$(env -u LANG bash -c 'source "$1"; printf "%s" "$LANG"' bash "$envs")
 [[ -n $lang ]] || fail "bash env sets a locale when none is inherited"

@@ -22,12 +22,6 @@ You stop a container using `s` or start/restart it using `r`. See all commands u
 
 Magikos calls it Activity, and you start it by hitting `Super + Ctrl + T`. It opens as a floating window, which you can tile with `Super + T`.
 
-## Herdr
-
-[Herdr](https://github.com/omacom-io/herdr) is a terminal workspace manager that gives you workspaces, tabs, and panes, and keeps them all running in a persistent session you can detach from and come back to later.
-
-You start it (or reattach to your existing session) with `Super + Ctrl + Return`. Magikos ships a Herdr configuration that mirrors its Tmux config, so the prefix key is `Ctrl + Space` here too. You can browse all the keybindings with `Super + Ctrl + K`.
-
 ## Fastfetch
 
 [Fastfetch](https://github.com/fastfetch-cli/fastfetch) shows system information, like kernel version, uptime, theme, CPU, memory, and more. It's a successor to the popular neofetch tool.

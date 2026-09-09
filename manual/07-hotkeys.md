@@ -98,7 +98,6 @@ You can see all the main keyboard bindings with `Super + K` (Tmux bindings with 
 | ----------------------- | --------------------- |
 | `Super + Return`           | Terminal    |
 | `Super + Alt + Return` | Tmux terminal |
-| `Super + Ctrl + Return` | Herdr (agent manager) |
 | `Super + Shift + Return`           | Browser    |
 | `Super + Shift + Alt + B`           | Browser (private/incognito)    |
 | `Super + Shift + F`           | File manager    |

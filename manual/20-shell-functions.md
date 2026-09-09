@@ -21,8 +21,6 @@ Instant multi-pane development layouts for tmux:
 - `tdlm [ai]`: Create a `tdl` window for every subdirectory in the current directory.
 - `tsl [count] [command]`: Create a swarm of panes tiled in a grid, all running the same command (great for AI agents).
 
-The same layouts are available for Herdr as `hdl`, `hds`, `hdlm`, and `hsl`.
-
 ## Git worktrees
 
 - `ga [branch]`: Create a new worktree and branch next to the current repository and jump into it.
@@ -46,4 +44,4 @@ Say you start a dev server on port `3000` on a machine accessible as `nyc-dev`, 
 
 ## SSH reconnection
 
-`ssh` itself is wrapped in a function that cleans up the terminal if a connection dies while a remote tmux, Herdr, or editor has claimed it, and then automatically reconnects when an interactive session drops (Ctrl-C stops the retry loop).
+`ssh` itself is wrapped in a function that cleans up the terminal if a connection dies while a remote tmux or editor has claimed it, and then automatically reconnects when an interactive session drops (Ctrl-C stops the retry loop).
