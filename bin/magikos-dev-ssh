@@ -84,7 +84,7 @@ pub_contents=$(tr -d '\n' < "$pub")
 # --- 2. optionally register with GitHub -------------------------------------
 if (( register )); then
   token="${GITHUB_TOKEN:-}"
-  if [[ -z $token ]] && command -v gh >/dev/null 2>&1; then
+  if [[ -z $token ]] && ! magikos-cmd-missing gh; then
     token=$(gh auth token 2>/dev/null || true)
   fi
 
@@ -139,7 +139,7 @@ case "$current" in
 esac
 
 # --- verify with openssh if it is installed --------------------------------
-if command -v timeout >/dev/null 2>&1 && command -v ssh-keyscan >/dev/null 2>&1 && command -v ssh-keygen >/dev/null 2>&1; then
+if ! magikos-cmd-missing timeout && ! magikos-cmd-missing ssh-keyscan && ! magikos-cmd-missing ssh-keygen; then
   echo
   echo "Verifying github.com host key ..."
   timeout 15 ssh-keyscan github.com 2>/dev/null | ssh-keygen -lf - 2>/dev/null | sed 's/^/  /' \
