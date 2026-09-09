@@ -59,12 +59,6 @@ Magikos's firewall is closed by default except for LocalSend's port, so this wor
 
 You start LibreOffice via the application launcher (`Super + Space`).
 
-## Omacalc
-
-[Omacalc](https://github.com/omacom-io/omacalc) is Magikos's own dead-simple calculator, which opens in a floating window.
-
-You start Omacalc with `Super + Ctrl + Q` (or the calculator key, if your keyboard has one).
-
 ## Signal
 
 [Signal](https://signal.org/) is the pioneer of E2E encrypted messaging, and a great communication option for anyone who'd prefer not to go through one of the big tech conglomerates.
