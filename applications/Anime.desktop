@@ -1,0 +1,9 @@
+[Desktop Entry]
+Version=1.0
+Name=Anime
+Comment=Anime
+Exec=magikos-launch-webapp https://wcoflix.tv
+Terminal=false
+Type=Application
+Icon=anime
+StartupNotify=true

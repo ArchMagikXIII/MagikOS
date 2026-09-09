@@ -1,8 +1,0 @@
-[Desktop Entry]
-Version=1.0
-Name=Discord
-Exec=magikos-launch-webapp https://discord.com/channels/@me
-Terminal=false
-Type=Application
-Icon=magikos-discord
-StartupNotify=true

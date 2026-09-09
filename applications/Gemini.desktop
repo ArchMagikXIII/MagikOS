@@ -1,0 +1,9 @@
+[Desktop Entry]
+Version=1.0
+Name=Gemini
+Comment=Gemini
+Exec=magikos-launch-webapp https://Gemini.google.com
+Terminal=false
+Type=Application
+Icon=gemini
+StartupNotify=true
