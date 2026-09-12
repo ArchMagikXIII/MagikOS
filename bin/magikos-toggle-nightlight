@@ -9,8 +9,9 @@ OFF_TEMP=6500
 IDENTITY_TEMP=6000
 
 # wlsunset cannot be queried live; the running daemon's own arguments are the
-# source of truth. Equal -t/-T values pin a constant temperature immediately,
-# so the daemon is always started with both flags set to the same value.
+# source of truth. It rejects equal -t/-T values, so the pair is kept 1K apart
+# and the day/night interpolation between them is imperceptible — the target
+# temperature reads as constant either way.
 current_temp() {
   local line
   line=$(pgrep -ax wlsunset 2>/dev/null | head -n1) || return
@@ -18,7 +19,7 @@ current_temp() {
 }
 
 start_nightlight() {
-  setsid uwsm-app -- wlsunset -t "$1" -T "$1" >/dev/null 2>&1 &
+  setsid uwsm-app -- wlsunset -t "$1" -T "$(( $1 + 1 ))" >/dev/null 2>&1 &
 }
 
 stop_nightlight() {

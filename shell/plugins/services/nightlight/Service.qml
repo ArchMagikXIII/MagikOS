@@ -45,11 +45,14 @@ Item {
 
   function runApply(temp) {
     // wlsunset speaks the standard wlr gamma protocol, so this works on any
-    // compositor. Equal low/high temps pin a constant value immediately;
-    // killing the daemon restores native daylight.
+    // compositor, but it rejects equal low/high temperatures. Keeping the
+    // pair 1K apart makes the day/night interpolation imperceptible, so the
+    // night temperature reads as constant; killing the daemon restores
+    // native daylight.
     var cmd = "pkill -x wlsunset 2>/dev/null; "
     if (Number(temp) < dayTemperature) {
-      cmd += "sleep 0.3; setsid wlsunset -t " + Number(temp) + " -T " + Number(temp) + " >/dev/null 2>&1 &"
+      var high = Number(temp) + 1
+      cmd += "sleep 0.3; setsid wlsunset -t " + Number(temp) + " -T " + high + " >/dev/null 2>&1 &"
     }
     applyProcess.command = ["bash", "-c", cmd]
     applyProcess.running = true
