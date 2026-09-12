@@ -1,0 +1,12 @@
+#!/bin/bash
+
+# magikos:summary=Detect whether a Logitech G435 Wireless Gaming Headset is connected.
+
+for dev in /sys/bus/usb/devices/*; do
+  if [[ -r $dev/idVendor && -r $dev/idProduct ]]; then
+    if [[ $(cat "$dev/idVendor") == "046d" && $(cat "$dev/idProduct") == "0acb" ]]; then
+      exit 0
+    fi
+  fi
+done
+exit 1

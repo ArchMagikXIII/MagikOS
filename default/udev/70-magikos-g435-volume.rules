@@ -1,0 +1,1 @@
+SUBSYSTEM=="sound", KERNEL=="card*", ATTR{id}=="Headset", ATTRS{idVendor}=="046d", ATTRS{idProduct}=="0acb", RUN+="/usr/share/magikos/default/udev/g435-volume.sh"
