@@ -65,7 +65,7 @@ Item {
     command: ["bash", "-c", "pgrep -ax wlsunset | head -n1 | awk '{for(i=2;i<NF;i++) if($i==\"-t\"){print $(i+1); exit}}'"]
     stdout: StdioCollector {
       waitForEnd: true
-      onStreamFinished: function(text) {
+      onStreamFinished: {
         root.temperature = NightlightModel.temperatureFromOutput(text)
         root.stateLoaded = true
       }
