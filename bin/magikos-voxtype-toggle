@@ -1,0 +1,17 @@
+#!/bin/bash
+
+# magikos:summary=Toggle voxtype dictation on/off
+# magikos:args=[start|stop|toggle]
+# magikos:examples=magikos voxtype-toggle | magikos voxtype-toggle start
+
+if magikos-cmd-missing voxtype; then
+  magikos-notification-send -g "" "Voxtype not installed" "Install it from the AI menu (Dictation) or run magikos-voxtype-install." -t 5000
+  exit 1
+fi
+
+case "${1:-toggle}" in
+  start) voxtype record start ;;
+  stop) voxtype record stop ;;
+  toggle) voxtype record toggle ;;
+  *) echo "Usage: magikos-voxtype-toggle [start|stop|toggle]" >&2; exit 1 ;;
+esac
