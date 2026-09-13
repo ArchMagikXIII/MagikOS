@@ -68,6 +68,7 @@ printf 'password=%s\n' "${password:-}"
 printf 'password_confirmation=%s\n' "${password_confirmation:-}"
 printf 'full_name=%s\n' "${full_name:-}"
 printf 'email_address=%s\n' "${email_address:-}"
+printf 'autologin=%s\n' "${autologin:-0}"
 printf 'hostname=%s\n' "${hostname:-}"
 printf 'timezone=%s\n' "${timezone:-}"
 EOF
@@ -190,6 +191,24 @@ run_prompt magikos_prompt_identity "0:David" "1:"
 assert_status "$MAGIKOS_FORM_BACK" "identity prompt reports Esc on the email as back"
 assert_returned "identity prompt survives Esc under set -e"
 pass "identity prompt propagates Esc from its second field"
+
+# Autologin — opt-in, defaulting to the password prompt
+
+run_prompt magikos_prompt_autologin "0:true"
+assert_status 0 "autologin prompt accepts an opt-in answer"
+[[ $(field autologin) == 1 ]] || fail "autologin prompt records an explicit choice to skip the password"
+assert_returned "autologin prompt resolves without dying under set -e"
+pass "autologin prompt records an explicit opt-in"
+
+run_prompt magikos_prompt_autologin "1:false"
+assert_status 0 "autologin prompt survives a decline under set -e"
+[[ $(field autologin) == 0 ]] || fail "autologin prompt keeps the password login when declined"
+pass "autologin prompt defaults to the password login when declined"
+
+run_prompt magikos_prompt_autologin "1:"
+assert_status 0 "autologin prompt survives a cancelled confirm under set -e"
+[[ $(field autologin) == 0 ]] || fail "autologin prompt treats a cancel as the password-login default"
+pass "autologin prompt treats cancel as declining"
 
 # Hostname
 

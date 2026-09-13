@@ -35,6 +35,7 @@ Full options:
 | `--timezone TZ` | IANA timezone (default: the live media's; ignored with `--existing`). |
 | `--no-encrypt` | Skip LUKS2 encryption of the root partition. |
 | `--cachyos-repos` | Add the CachyOS repositories before the package install. On any base without them (e.g. stock Arch), they are auto-added and — when the terminal allows it — the installer asks first. `--no-cachyos-repos` forces them off. |
+| `--autologin` | Log the user in automatically at the MagikOS login screen (default: the MagikOS password prompt at every boot). |
 | `--yes` | Do not ask before wiping. |
 | `--dry-run` | Print every action without touching anything. |
 

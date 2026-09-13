@@ -642,6 +642,7 @@ user_form() {
 
   magikos_prompt_password || return $?
   magikos_prompt_identity || return $?
+  magikos_prompt_autologin
 
   # Hostname and timezone are deferred to first boot with the rest of the user
   # step: the deferred install seeds neutral placeholders (magikos/UTC) and the
@@ -655,12 +656,15 @@ user_form() {
 confirm_form() {
   clear_logo
   echo
+  local autologin_label="No"
+  [[ ${autologin:-0} == 1 ]] && autologin_label="Yes"
   echo -e "Field,Value
 Keyboard,${keyboard_label:-English (US)}
 Username,$username
 Password,$(printf "%${#password}s" | tr ' ' '*')
 Full name,${full_name:-[Skipped]}
 Email address,${email_address:-[Skipped]}
+Autologin,$autologin_label
 Hostname,${hostname:-magikos}
 Timezone,${timezone:-UTC}" |
     gum table -s "," -p | sed "s/^/${PADDING_LEFT_SPACES}/"
@@ -709,10 +713,6 @@ luks_device() {
   return 1
 }
 
-encrypted_install() {
-  luks_device >/dev/null 2>&1
-}
-
 create_user() {
   # Pin the username so a retry after a later failure resumes this exact
   # account rather than creating a second privileged one.
@@ -749,49 +749,21 @@ install_authorized_keys() {
   chown -R "$username:$username" "$ssh_dir"
 }
 
+# Autologin is opt-in and off by default: the normal state matches the stock
+# MagikOS login — the SDDM magikos theme with the password prompt — and no
+# drop-in is written unless the owner picked "log me in automatically" in the
+# form. An opted-in drop-in is permanent; on encrypted installs the LUKS prompt
+# stays the boot auth boundary either way. The default (off) also means a
+# freshly finished setup never skips the password screen, so the disk isn't
+# left unguarded on machines that never chose autologin.
 configure_login() {
   mkdir -p /var/lib/sddm
   printf '[Last]\nSession=sway\nUser=%s\n' "$username" >/var/lib/sddm/state.conf
   chown -R sddm:sddm /var/lib/sddm 2>/dev/null || true
 
-  # Autologin straight into the desktop after first-boot setup — the owner just
-  # authenticated in the form, so we don't make them retype at SDDM.
+  [[ ${autologin:-0} == 1 ]] || return 0
   mkdir -p /etc/sddm.conf.d
   printf '[Autologin]\nUser=%s\nSession=sway\n' "$username" >/etc/sddm.conf.d/autologin.conf
-
-  # Encrypted installs keep autologin permanently (the LUKS prompt is the auth
-  # boundary). Unencrypted installs autologin only this first boot, then a
-  # one-shot service removes the drop-in so later boots use the normal SDDM
-  # login and the disk isn't left permanently open.
-  encrypted_install || install_autologin_once_cleanup
-}
-
-# Install a self-removing service that makes the autologin last exactly one
-# boot — this one, where the owner just authenticated in the wizard. The unit is
-# created now, but graphical.target's job for THIS boot is already computed, so
-# it won't run this boot (this boot autologins). On the NEXT boot it's in the
-# fresh transaction, ordered Before the display manager, so it runs before SDDM
-# reads its config: it removes the autologin drop-in (that boot shows the normal
-# login) and deletes its own unit and enablement symlink. Ordering Before= (not
-# After=) is what makes it deterministic — no sleep/race against SDDM's startup.
-install_autologin_once_cleanup() {
-  local unit=magikos-provision-autologin-once.service
-  cat >"/etc/systemd/system/$unit" <<UNIT
-[Unit]
-Description=Drop the first-boot autologin before the next login
-Before=display-manager.service
-ConditionPathExists=/etc/sddm.conf.d/autologin.conf
-
-[Service]
-Type=oneshot
-ExecStart=/usr/bin/rm -f /etc/sddm.conf.d/autologin.conf
-ExecStartPost=/usr/bin/rm -f /etc/systemd/system/graphical.target.wants/$unit /etc/systemd/system/$unit
-
-[Install]
-WantedBy=graphical.target
-UNIT
-  mkdir -p /etc/systemd/system/graphical.target.wants
-  ln -sf "../$unit" "/etc/systemd/system/graphical.target.wants/$unit"
 }
 
 # Apply the owner's hostname, deferred to first boot with the rest of the user
@@ -1081,11 +1053,12 @@ run_setup() {
   fi
 
   # Deferred first boot hands straight off to the display manager: SDDM starts
-  # the moment this oneshot exits (Before=display-manager.service) and autologs
-  # in on encrypted installs. No timed celebration screen and no "start" button
-  # here — that send-off belongs to a direct install, not first-boot setup. The
-  # finished progress bar is the last frame; clearing it for a "Starting
-  # Magikos..." card would only add a flash of screen before the handoff.
+  # the moment this oneshot exits (Before=display-manager.service) and lands on
+  # the MagikOS login with the password prompt unless the owner opted into
+  # autologin. No timed celebration screen and no "start" button here — that
+  # send-off belongs to a direct install, not first-boot setup. The finished
+  # progress bar is the last frame; clearing it for a "Starting Magikos..." card
+  # would only add a flash of screen before the handoff.
 }
 
 # A failed first-boot setup must not strand the machine at a user-less login

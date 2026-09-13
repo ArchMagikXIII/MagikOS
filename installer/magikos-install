@@ -25,6 +25,7 @@ INSTALL_USER=""
 HOSTNAME=""
 TIMEZONE=""
 ENCRYPT=1
+AUTOLOGIN=0
 BACKEND="${MAGIKOS_PKG_BACKEND:-}"
 ASSUME_YES=0
 DRY_RUN=0
@@ -73,6 +74,8 @@ Options:
   --hostname NAME   Target hostname (default: magikos; ignored with --existing)
   --timezone TZ     IANA timezone (default: the live media's timezone; ignored with --existing)
   --no-encrypt      Skip LUKS2 encryption of the root partition
+  --autologin       Log the user in automatically at the MagikOS login screen
+                    (default: ask for the password at every boot)
   --backend BE      pacman | auto (default: auto-detect on the live media)
   --cachyos-repos   Add the CachyOS repositories before packages are installed.
                     Auto-enabled when they are missing and a confirmation was
@@ -93,6 +96,7 @@ while (($#)); do
     --hostname) HOSTNAME="$2"; shift 2 ;;
     --timezone) TIMEZONE="$2"; shift 2 ;;
     --no-encrypt) ENCRYPT=0; shift ;;
+    --autologin) AUTOLOGIN=1; shift ;;
     --backend) BACKEND="$2"; shift 2 ;;
     --cachyos-repos) CACHYOS_REPOS=1; shift ;;
     --no-cachyos-repos) CACHYOS_REPOS=0; shift ;;
@@ -809,6 +813,26 @@ sync_etc_dropins() {
   fi
 }
 
+# Autologin at the login screen is opt-in (default off, matching the stock
+# Magikos SDDM password login). The tree ships no autologin drop-in, so a
+# default install gets the password prompt; only --autologin writes one, and
+# adopting an existing system clears any drop-in the previous setup left behind
+# unless the flag was passed.
+seed_autologin() {
+  local dest="$1" user="$2"
+  if (( AUTOLOGIN )); then
+    write_file "$dest/sddm.conf.d/autologin.conf" \
+      "$(cat <<EOF
+[Autologin]
+User=$user
+Session=sway
+EOF
+)"$'\n'
+  else
+    run rm -f "$dest/sddm.conf.d/autologin.conf"
+  fi
+}
+
 # The planted tree is the only source of magikos-* commands on an
 # installer-built system (the magikos package that normally ships them into
 # /usr/bin is not installed here). Expose every command through /usr/local/bin,
@@ -1361,6 +1385,7 @@ main() {
     install_aur_packages_host
     install_oh_my_posh_host
     adopt_user
+    seed_autologin /etc "$INSTALL_USER"
     run_apply_system_host
     seed_user_home
     finish_existing
@@ -1383,6 +1408,7 @@ main() {
   configure_target
   step "Creating user $INSTALL_USER"
   create_user
+  seed_autologin "$TARGET/etc" "$INSTALL_USER"
   step "Installing AUR packages (yay)"
   install_aur_packages_target
   step "Installing the bootloader"

@@ -19,7 +19,8 @@
 #
 # Callers supply `notice <message> <seconds>` for validation feedback, and set
 # the variables these prompts write: keyboard, keyboard_label, username,
-# password, password_confirmation, full_name, email_address, hostname, timezone.
+# password, password_confirmation, full_name, email_address, hostname, timezone,
+# autologin.
 
 MAGIKOS_FORM_BACK=1
 MAGIKOS_FORM_SIGNAL=130
@@ -147,6 +148,21 @@ magikos_prompt_identity() {
   ((status == 0)) || return $status
   email_address=$(gum input --placeholder "Used for git authentication (hit return to skip)" --prompt.foreground="#845DF9" --prompt "Email address> ") && status=0 || status=$?
   return $status
+}
+
+# Autologin is an opt-in convenience, not the Magikos default — the default is
+# the MagikOS SDDM login with the password prompt. gum confirm prints the
+# answer and exits 1 for both "No" and cancel, so a decline and an Esc read the
+# same way and the function always resolves (never unwinds the form to a back
+# step); password login is the safe fallback either way.
+magikos_prompt_autologin() {
+  local reply status
+  reply=$(gum confirm --default=false \
+    --affirmative "Yes, log me in automatically" \
+    --negative "No, show the password prompt" \
+    "Log in automatically after boot (no password prompt at the login screen)?") && status=0 || status=$?
+  [[ $reply == "true" ]] && autologin=1 || autologin=0
+  return 0
 }
 
 magikos_prompt_hostname() {
