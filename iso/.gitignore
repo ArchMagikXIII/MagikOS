@@ -1,0 +1,3 @@
+# ISO build and VM-test outputs (multigigabyte, regenerated every run)
+release/
+test-runs/

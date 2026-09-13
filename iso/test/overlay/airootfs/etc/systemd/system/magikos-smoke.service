@@ -1,0 +1,11 @@
+[Unit]
+Description=MagikOS ISO smoke check
+After=systemd-remount-fs.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/bash /opt/magikos-smoke.sh
+
+[Install]
+WantedBy=multi-user.target

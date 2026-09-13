@@ -1,0 +1,10 @@
+MagikOS live install medium
+
+This ISO boots a minimal live environment with the MagikOS source tree bundled
+at /root/magikos. To install MagikOS on a whole disk, run:
+
+    bash /root/magikos/installer/magikos-install --disk /dev/sda --user you
+
+To adopt the currently running system instead, pass --existing. Network access
+is required: the installer pacstraps the target from the Arch and CachyOS
+repositories.

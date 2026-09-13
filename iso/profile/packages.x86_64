@@ -1,0 +1,30 @@
+# Minimal MagikOS live environment: everything magikos-install needs, nothing
+# else. The installer pacstraps the target from the Arch + CachyOS repos over
+# the network, so the live image itself stays small.
+amd-ucode
+arch-install-scripts
+base
+base-devel
+btrfs-progs
+cryptsetup
+dhcpcd
+dosfstools
+e2fsprogs
+git
+gptfdisk
+gum
+intel-ucode
+iwd
+less
+linux
+linux-firmware
+mkinitcpio
+mkinitcpio-archiso
+nano
+parted
+reflector
+sudo
+syslinux
+systemd-resolvconf
+vim
+wpa_supplicant
