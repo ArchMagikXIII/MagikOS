@@ -150,6 +150,7 @@ pv
 python
 python-defusedxml
 python-packaging
+qt6-imageformats
 quickshell
 realtime-privileges
 rebuild-detector
