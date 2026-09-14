@@ -3,6 +3,8 @@
 # magikos:summary=Copy a shipped user config from $MAGIKOS_PATH/config into ~/.config (backs up your version).
 # magikos:args=<config-path>
 
+export MAGIKOS_PATH="${MAGIKOS_PATH:-/usr/share/magikos}"
+
 config_file=${1:-}
 
 if [[ -z $config_file ]]; then

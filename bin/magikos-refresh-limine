@@ -3,6 +3,9 @@
 # magikos:summary=Overwrite the user config for the Limine bootloader and rebuild it.
 # magikos:requires-sudo=true
 
+export MAGIKOS_PATH="${MAGIKOS_PATH:-/usr/share/magikos}"
+set -euo pipefail
+
 legacy_uki="/boot/EFI/Linux/$(cat /etc/machine-id)_linux.efi"
 
 if sudo test -f /boot/EFI/Linux/magikos_linux.efi && sudo test -f "$legacy_uki"; then
@@ -11,9 +14,12 @@ if sudo test -f /boot/EFI/Linux/magikos_linux.efi && sudo test -f "$legacy_uki";
 fi
 echo "Resetting limine config"
 
-sudo mv /boot/limine.conf /boot/limine.conf.bak
-
-sudo cp "$MAGIKOS_PATH/default/limine/limine.conf" /boot/limine.conf
+# Stage the replacement before touching the live config so a failure in the
+# copy leaves the current bootable /boot/limine.conf untouched instead of
+# silently dropping the Magikos default and regenerating a bare stub.
+sudo cp "$MAGIKOS_PATH/default/limine/limine.conf" /boot/limine.conf.new
+sudo mv /boot/limine.conf /boot/limine.conf.bak 2>/dev/null || true
+sudo mv /boot/limine.conf.new /boot/limine.conf
 
 sudo limine-update
 sudo limine-snapper-sync

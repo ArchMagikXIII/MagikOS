@@ -2,6 +2,8 @@
 
 # magikos:summary=Ensure default application launchers and mise wrappers are installed.
 
+export MAGIKOS_PATH="${MAGIKOS_PATH:-/usr/share/magikos}"
+
 # Copy .desktop declarations
 mkdir -p ~/.local/share/applications
 cp "$MAGIKOS_PATH"/applications/*.desktop ~/.local/share/applications/

@@ -3,6 +3,8 @@
 # magikos:summary=Overwrite the package configuration for /etc/pacman with the Magikos default of using its dedicated mirrors and repositories, then update all packages.
 # magikos:requires-sudo=true
 
+export MAGIKOS_PATH="${MAGIKOS_PATH:-/usr/share/magikos}"
+
 source magikos-pkg-backend
 
 sudo cp -f /etc/pacman.conf /etc/pacman.conf.bak

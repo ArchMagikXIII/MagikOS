@@ -3,5 +3,7 @@
 # magikos:summary=Refresh the SDDM theme from default
 # magikos:requires-sudo=true
 
+export MAGIKOS_PATH="${MAGIKOS_PATH:-/usr/share/magikos}"
+
 sudo rm -rf /usr/share/sddm/themes/magikos
 sudo cp -r "$MAGIKOS_PATH/default/sddm/magikos" /usr/share/sddm/themes/magikos

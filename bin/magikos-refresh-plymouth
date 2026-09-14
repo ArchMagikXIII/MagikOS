@@ -3,6 +3,8 @@
 # magikos:summary=Overwrite the user config for the Plymouth drive decryption and boot sequence with the Magikos default and rebuild it.
 # magikos:requires-sudo=true
 
+export MAGIKOS_PATH="${MAGIKOS_PATH:-/usr/share/magikos}"
+
 sudo cp -r "$MAGIKOS_PATH/default/plymouth/." /usr/share/plymouth/themes/magikos/
 sudo plymouth-set-default-theme magikos
 

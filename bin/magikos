@@ -3,6 +3,9 @@
 set -o pipefail
 
 MAGIKOS_BIN_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+# The session normally exports MAGIKOS_PATH, but pkexec launches strip the
+# environment; provide the canonical default so dispatched commands still work.
+export MAGIKOS_PATH="${MAGIKOS_PATH:-/usr/share/magikos}"
 METADATA_SCAN_LIMIT=80
 
 COMMAND_KEYS=()
