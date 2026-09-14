@@ -3,6 +3,9 @@
 # magikos:summary=Install and configure Voxtype dictation
 # magikos:requires-sudo=true
 
+
+export MAGIKOS_PATH="${MAGIKOS_PATH:-/usr/share/magikos}"
+
 set -e
 
 # Install voxtype and configure it for use.

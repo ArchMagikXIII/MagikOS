@@ -3,6 +3,9 @@
 # magikos:summary=Shared helpers for editing ~/.config/magikos/shell.json (source this, don't run it).
 # magikos:hidden=true
 
+
+export MAGIKOS_PATH="${MAGIKOS_PATH:-/usr/share/magikos}"
+
 CONFIG_FILE="$HOME/.config/magikos/shell.json"
 DEFAULTS_FILE="$MAGIKOS_PATH/config/magikos/shell.json"
 

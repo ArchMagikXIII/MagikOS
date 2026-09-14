@@ -4,6 +4,9 @@
 # magikos:requires-sudo=true
 # magikos:args=[--force] [--no-rebuild]
 
+
+export MAGIKOS_PATH="${MAGIKOS_PATH:-/usr/share/magikos}"
+
 FORCE=false
 NO_REBUILD=false
 for arg in "$@"; do

@@ -4,6 +4,9 @@
 # magikos:args=<stable|rc|edge|dev>
 # magikos:requires-sudo=true
 
+
+export MAGIKOS_PATH="${MAGIKOS_PATH:-/usr/share/magikos}"
+
 set -euo pipefail
 
 usage() { echo "Usage: magikos-channel-set [stable|rc|edge|dev]"; }

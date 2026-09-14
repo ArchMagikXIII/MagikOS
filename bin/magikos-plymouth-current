@@ -5,6 +5,9 @@
 
 # magikos-plymouth-set installs the theme's unlock.png as a byte-for-byte
 # copy of logo.png, so matching it back identifies the current theme.
+
+export MAGIKOS_PATH="${MAGIKOS_PATH:-/usr/share/magikos}"
+
 installed_logo=/usr/share/plymouth/themes/magikos/logo.png
 
 if cmp -s "$MAGIKOS_PATH/default/plymouth/logo.png" "$installed_logo"; then

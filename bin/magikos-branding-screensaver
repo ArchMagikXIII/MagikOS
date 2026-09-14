@@ -1,4 +1,7 @@
 #!/bin/bash
 # magikos-branding-screensaver — show MagikOS screensaver art
 # magikos:summary=Show the MagikOS screensaver ASCII art
+
+export MAGIKOS_PATH="${MAGIKOS_PATH:-/usr/share/magikos}"
+
 cat "$MAGIKOS_PATH/config/branding/screensaver.txt" 2>/dev/null || echo "MagikOS"

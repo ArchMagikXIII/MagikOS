@@ -3,6 +3,9 @@
 # magikos:summary=List themes that can style the Plymouth boot screen
 # magikos:examples=magikos plymouth list
 
+
+export MAGIKOS_PATH="${MAGIKOS_PATH:-/usr/share/magikos}"
+
 {
   find ~/.config/magikos/themes/ -mindepth 1 -maxdepth 1 \( -type d -o -type l \) -printf '%f\n' 2>/dev/null
   find "$MAGIKOS_PATH/themes/" -mindepth 1 -maxdepth 1 -type d -printf '%f\n'

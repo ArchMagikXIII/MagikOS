@@ -3,6 +3,9 @@
 # magikos:summary=Install Battle.net standalone via umu-launcher + GE-Proton (no Steam, no Lutris, no Heroic).
 # magikos:requires-sudo=true
 
+
+export MAGIKOS_PATH="${MAGIKOS_PATH:-/usr/share/magikos}"
+
 set -e
 
 PREFIX="$HOME/Games/battlenet"

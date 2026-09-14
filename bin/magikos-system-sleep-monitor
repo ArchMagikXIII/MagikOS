@@ -4,6 +4,9 @@
 # magikos:group=system
 # magikos:hidden=true
 
+
+export MAGIKOS_PATH="${MAGIKOS_PATH:-/usr/share/magikos}"
+
 consume_sleep_events() {
   local line sleep_lock
   sleep_lock="$MAGIKOS_PATH/bin/magikos-system-sleep-lock"

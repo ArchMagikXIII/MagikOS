@@ -9,6 +9,9 @@
 # edited in one place and works with whichever agent is default; this only
 # gathers the facts and points at it.
 
+
+export MAGIKOS_PATH="${MAGIKOS_PATH:-/usr/share/magikos}"
+
 set -euo pipefail
 
 pid=${1:?usage: magikos-agent-crash <pid> [comm] [exe] [signal]}

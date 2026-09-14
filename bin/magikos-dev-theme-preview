@@ -4,6 +4,9 @@
 # magikos:args=[theme-name|theme-dir|colors.toml] [--no-color] [--no-osc|--osc]
 # magikos:examples=magikos dev theme-preview | magikos dev theme-preview tokyo-night | magikos dev theme-preview themes/gruvbox/colors.toml --no-color --no-osc
 
+
+export MAGIKOS_PATH="${MAGIKOS_PATH:-/usr/share/magikos}"
+
 set -o pipefail
 
 CURRENT_THEME_PATH="$HOME/.local/state/magikos/current/theme"

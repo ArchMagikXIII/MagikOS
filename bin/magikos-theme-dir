@@ -4,6 +4,9 @@
 # magikos:args=<theme-name>
 # magikos:examples=magikos theme dir tokyo-night
 
+
+export MAGIKOS_PATH="${MAGIKOS_PATH:-/usr/share/magikos}"
+
 theme="${1:-}"
 
 if [[ -z $theme ]]; then

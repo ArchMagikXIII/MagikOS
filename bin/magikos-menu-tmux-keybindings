@@ -3,6 +3,9 @@
 # magikos:summary=Display annotated Tmux keybindings using an interactive search menu.
 # magikos:args=[--print|-p] [--config <path>]
 
+
+export MAGIKOS_PATH="${MAGIKOS_PATH:-/usr/share/magikos}"
+
 print_only=false
 config_file="${TMUX_CONF:-$HOME/.config/tmux/tmux.conf}"
 

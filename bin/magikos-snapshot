@@ -4,6 +4,9 @@
 # magikos:args=<create|restore>
 # magikos:requires-sudo=true
 
+
+export MAGIKOS_PATH="${MAGIKOS_PATH:-/usr/share/magikos}"
+
 set -e
 
 COMMAND="$1"

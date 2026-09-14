@@ -10,6 +10,9 @@
 # single source of truth used by bar selection and plugin enable/clone, so
 # those commands never re-implement manifest walking.
 
+
+export MAGIKOS_PATH="${MAGIKOS_PATH:-/usr/share/magikos}"
+
 set -o pipefail
 
 paths=()

@@ -5,6 +5,9 @@
 # magikos:group=audio
 # magikos:examples=magikos audio tuning status | magikos audio tuning on | magikos audio tuning off
 
+
+export MAGIKOS_PATH="${MAGIKOS_PATH:-/usr/share/magikos}"
+
 set -uo pipefail
 
 tunings_dir="$MAGIKOS_PATH/default/audio/tunings"

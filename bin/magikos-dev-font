@@ -2,6 +2,7 @@
 # magikos:summary=Add branded glyphs to the Magikos icon font
 # magikos:args=[list|add] <name> <svg-file-or-url> [--codepoint U+E9xx] [--font PATH]
 # magikos:examples=magikos dev font list | magikos dev font add ollama https://simpleicons.org/icons/ollama.svg
+
 """Append monochrome SVG marks to default/fonts/magikos/magikos.ttf.
 
 The font is a private-use icon font: the menu renders a mark by setting
@@ -574,9 +575,7 @@ def svg_contours(svg, location):
 
 
 def default_font():
-    root = os.environ.get('MAGIKOS_PATH')
-    if not root:
-        sys.exit('MAGIKOS_PATH is not set')
+    root = os.environ.get('MAGIKOS_PATH', '/usr/share/magikos')
     return os.path.join(root, 'default/fonts/magikos/magikos.ttf')
 
 

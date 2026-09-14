@@ -4,6 +4,9 @@
 # magikos:args=<alacritty|foot|ghostty|kitty>
 # magikos:requires-sudo=true
 
+
+export MAGIKOS_PATH="${MAGIKOS_PATH:-/usr/share/magikos}"
+
 if (($# == 0)); then
   echo "Usage: magikos-install-terminal [alacritty|foot|ghostty|kitty]"
   exit 1

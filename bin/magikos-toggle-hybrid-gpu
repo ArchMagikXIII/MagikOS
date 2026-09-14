@@ -3,6 +3,9 @@
 # magikos:summary=Toggle dedicated vs integrated GPU mode via supergfxd (for hybrid gpu laptops, like Asus G14).
 # magikos:requires-sudo=true
 
+
+export MAGIKOS_PATH="${MAGIKOS_PATH:-/usr/share/magikos}"
+
 if magikos-cmd-missing supergfxctl; then
   magikos-pkg-add supergfxctl
 

@@ -5,6 +5,9 @@
 # magikos:args=[log-lines]
 # magikos:examples=magikos debug idle | magikos-debug-idle 400
 
+
+export MAGIKOS_PATH="${MAGIKOS_PATH:-/usr/share/magikos}"
+
 lines=${1:-200}
 if [[ ! $lines =~ ^[0-9]+$ ]]; then
   lines=200

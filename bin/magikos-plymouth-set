@@ -10,6 +10,9 @@
 # rebuilds the initramfs. Also syncs the SDDM login screen (the post-logout
 # screen) with the same colors and logo so boot/login stay visually unified.
 
+
+export MAGIKOS_PATH="${MAGIKOS_PATH:-/usr/share/magikos}"
+
 if (( $# != 3 )); then
   echo "Usage: magikos-plymouth-set <background-hex> <text-hex> <path-to-logo.png>" >&2
   exit 1

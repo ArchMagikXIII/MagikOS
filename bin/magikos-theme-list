@@ -3,6 +3,9 @@
 # magikos:summary=List available themes
 # magikos:examples=magikos theme list | magikos theme set "Tokyo Night"
 
+
+export MAGIKOS_PATH="${MAGIKOS_PATH:-/usr/share/magikos}"
+
 {
   find ~/.config/magikos/themes/ -mindepth 1 -maxdepth 1 \( -type d -o -type l \) -printf '%f\n'
   find "$MAGIKOS_PATH/themes/" -mindepth 1 -maxdepth 1 -type d -printf '%f\n'

@@ -4,6 +4,9 @@
 # magikos:args=[--force]
 # magikos:hidden=true
 
+
+export MAGIKOS_PATH="${MAGIKOS_PATH:-/usr/share/magikos}"
+
 set -e
 
 usage() {

@@ -2,6 +2,9 @@
 
 # magikos:summary=Open the Magikos theme switcher
 
+
+export MAGIKOS_PATH="${MAGIKOS_PATH:-/usr/share/magikos}"
+
 preload=false
 
 if [[ $1 == "--preload" ]]; then

@@ -2,6 +2,9 @@
 
 # magikos:summary=Open the Plymouth unlock screen switcher
 
+
+export MAGIKOS_PATH="${MAGIKOS_PATH:-/usr/share/magikos}"
+
 preview_dir="${XDG_CACHE_HOME:-$HOME/.cache}/magikos/unlock-selector/previews"
 
 rm -rf "$preview_dir"

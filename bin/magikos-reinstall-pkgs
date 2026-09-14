@@ -3,6 +3,9 @@
 # magikos:summary=Reinstall all default Magikos packages from the stable channel
 # magikos:requires-sudo=true
 
+
+export MAGIKOS_PATH="${MAGIKOS_PATH:-/usr/share/magikos}"
+
 set -e
 
 source magikos-pkg-backend

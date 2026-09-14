@@ -7,6 +7,9 @@
 # Render a Plymouth login-screen preview PNG by compositing the staged magikos
 # theme assets (recolored with the given text color) onto the background.
 
+
+export MAGIKOS_PATH="${MAGIKOS_PATH:-/usr/share/magikos}"
+
 if (( $# != 4 )); then
   echo "Usage: magikos-plymouth-preview <background-hex> <text-hex> <path-to-logo.png> <output-path>" >&2
   exit 1

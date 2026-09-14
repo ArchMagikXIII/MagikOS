@@ -3,6 +3,9 @@
 # magikos:summary=Generate themed config files from Magikos templates
 # magikos:hidden=true
 
+
+export MAGIKOS_PATH="${MAGIKOS_PATH:-/usr/share/magikos}"
+
 TEMPLATES_DIR="$MAGIKOS_PATH/default/themed"
 USER_TEMPLATES_DIR="$HOME/.config/magikos/themed"
 NEXT_THEME_DIR="$HOME/.local/state/magikos/current/next-theme"

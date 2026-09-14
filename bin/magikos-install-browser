@@ -4,6 +4,9 @@
 # magikos:args=<chromium|chrome|brave|brave-origin|edge|firefox|zen>
 # magikos:examples=magikos install browser chromium | magikos install browser firefox
 
+
+export MAGIKOS_PATH="${MAGIKOS_PATH:-/usr/share/magikos}"
+
 set -e
 
 setup_policy_directory() {
