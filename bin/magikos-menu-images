@@ -72,10 +72,25 @@ if (( ${#image_dirs[@]} == 0 )); then
   exit 1
 fi
 
+# The selector handshakes back to its caller through scratch files. A shared
+# /tmp that fills up (large package caches, ISO builds) makes mktemp fail, the
+# picker then opens with no selection/done files, a click just dismisses it,
+# and this script spins forever on an empty done-file path. Route the scratch
+# space to the user's cache dir unless TMPDIR was already pointed somewhere
+# deliberate, and fail loudly instead of hanging if even that is unwritable.
+if [[ -z $TMPDIR || $TMPDIR == "/tmp" ]]; then
+  export TMPDIR="${XDG_CACHE_HOME:-$HOME/.cache}/magikos/selector-tmp"
+  mkdir -p "$TMPDIR"
+fi
+
+if ! mktemp >/dev/null 2>&1; then
+  echo "magikos-menu-images: no writable scratch space (TMPDIR=$TMPDIR)" >&2
+  exit 1
+fi
+
 selection_file=$(mktemp)
 done_file=$(mktemp)
 pending_file=$(mktemp)
-rm -f "$done_file"
 trap 'rm -f "$selection_file" "$done_file" "$pending_file"' EXIT
 
 image_dirs_env=""
