@@ -964,11 +964,15 @@ bootstrap_arch() {
 # becomes the dotfile, and shipped desktop entries land in .local/share.
 assemble_skeleton() {
   local skel="$1"
-  run mkdir -p "$skel/.config" "$skel/.local/share/applications"
+  run mkdir -p "$skel/.config" "$skel/.local/share/applications" "$skel/Pictures/Wallpapers"
   run cp -a "$ROOT/config/." "$skel/.config/"
   run cp -a "$ROOT/default/bashrc" "$skel/.bashrc"
   if [[ -d $ROOT/applications ]]; then
     run cp -a "$ROOT/applications/." "$skel/.local/share/applications/"
+  fi
+  # Ship default wallpapers so the sway config (output * bg ~/Pictures/Wallpapers/Osaka.jpg) works immediately
+  if [[ -d $ROOT/wallpapers ]]; then
+    run cp -a "$ROOT/wallpapers/." "$skel/Pictures/Wallpapers/"
   fi
   # Magikos always launches the shell with an explicit path, but a bare
   # `quickshell` should still find it; point the default config at the tree.
