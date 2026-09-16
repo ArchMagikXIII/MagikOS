@@ -22,11 +22,13 @@ LUKS_NAME="cryptroot"
 
 DISK=""
 INSTALL_USER=""
+INSTALL_PASSWORD=""
 HOSTNAME=""
 TIMEZONE=""
 ENCRYPT=1
 AUTOLOGIN=0
 BACKEND="${MAGIKOS_PKG_BACKEND:-}"
+ALLOW_BIOS=0
 ASSUME_YES=0
 DRY_RUN=0
 EXISTING_MODE=0
@@ -67,6 +69,8 @@ Usage:
 Required for full-disk install:
   --disk DEVICE     Target disk (whole device, e.g. /dev/vda). Its contents are destroyed.
   --user NAME       Non-root user to create.
+  --user-password PWD  Password for the new user (skip the interactive prompt;
+                    required for unattended/--yes installs on serial consoles)
 
 Options:
   --existing        Adopt the running system: no partitioning, no bootloader changes.
@@ -83,7 +87,8 @@ Options:
   --no-cachyos-repos  Do not add the CachyOS repositories (not recommended:
                     the Magikos package set contains CachyOS-only names that
                     would otherwise be built from the AUR).
-  --yes             Assume yes; do not ask before wiping the disk
+  --allow-bios      Let a BIOS/CSM-booted machine continue (only for OS/VM
+                    tests; a real deployment must boot UEFI for limine+ESP)
   --dry-run         Print every action without touching anything
   -h, --help        This help
 USAGE
@@ -93,6 +98,7 @@ while (($#)); do
   case "$1" in
     --disk) DISK="$2"; shift 2 ;;
     --user) INSTALL_USER="$2"; shift 2 ;;
+    --user-password) INSTALL_PASSWORD="$2"; shift 2 ;;
     --hostname) HOSTNAME="$2"; shift 2 ;;
     --timezone) TIMEZONE="$2"; shift 2 ;;
     --no-encrypt) ENCRYPT=0; shift ;;
@@ -100,6 +106,7 @@ while (($#)); do
     --backend) BACKEND="$2"; shift 2 ;;
     --cachyos-repos) CACHYOS_REPOS=1; shift ;;
     --no-cachyos-repos) CACHYOS_REPOS=0; shift ;;
+    --allow-bios) ALLOW_BIOS=1; shift ;;
     --yes) ASSUME_YES=1; shift ;;
     --dry-run) DRY_RUN=1; shift ;;
     --existing) EXISTING_MODE=1; shift ;;
@@ -163,8 +170,8 @@ ask_confirm() {
 }
 
 ask_password() {
-  local prompt="$1" pass confirm
-  while :; do
+  local prompt="$1" pass confirm attempt
+  for attempt in $(seq 1 5); do
     read -rs -p "$prompt: " pass
     echo
     read -rs -p "Confirm: " confirm
@@ -174,6 +181,7 @@ ask_password() {
     fi
     echo "Passwords empty or mismatched; try again." >&2
   done
+  [[ -n $pass && $pass == "$confirm" ]] || die "Could not obtain a matching password after 5 attempts."
   printf '%s' "$pass"
 }
 
@@ -233,7 +241,10 @@ live_media_root_disk() {
     fi
     dev=$x
   done
-  [[ -n $dev && -b $dev ]] && printf '%s' "$dev"
+  if [[ -n $dev && -b $dev ]]; then
+    printf '%s' "$dev"
+  fi
+  return 0
 }
 
 preflight() {
@@ -306,8 +317,11 @@ preflight() {
 
   require_tools cryptsetup sfdisk blkid lsblk
 
-  if [[ ! -d /sys/firmware/efi ]]; then
-    die "Machine is not booted in UEFI mode."
+  if [[ ! -d /sys/firmware/efi ]] && (( ! ALLOW_BIOS )); then
+    die "Machine is not booted in UEFI mode. (pass --allow-bios to continue anyway for testing)"
+  fi
+  if [[ ! -d /sys/firmware/efi ]] && (( ALLOW_BIOS )); then
+    warn "BIOS-boot testing mode: EFI System Partition and limine UEFI deployment will not be usable."
   fi
 
   if [[ -z $DISK || ! -b $DISK ]]; then
@@ -345,7 +359,11 @@ preflight() {
   printf '  Hostname: %s\n' "$HOSTNAME"
   printf '  Timezone: %s\n' "$TIMEZONE"
   printf '  User: %s\n' "$INSTALL_USER"
-  printf '  Encryption: %s\n' "$((ENCRYPT ? "on" : "off"))"
+  if (( ENCRYPT )); then
+    printf '  Encryption: %s\n' "on"
+  else
+    printf '  Encryption: %s\n' "off"
+  fi
   printf '\n'
 
   if ! ask_confirm "Erase ALL data on $DISK and install Magikos?"; then
@@ -355,7 +373,7 @@ preflight() {
 
 unmount_target() {
   run swapoff -a || true
-  run umount -R "$TARGET" || true
+  run umount -R "$TARGET" || run umount -lR "$TARGET" || true
   if (( ENCRYPT )); then
     run cryptsetup close "$LUKS_NAME" || true
   fi
@@ -378,6 +396,12 @@ partition_disk() {
   run sgdisk -n 1:0:+1G -t 1:ef00 -c 1:"ESP" "$DISK"
   run sgdisk -n 2:0:0 -t 2:8309 -c 2:"magikos-root" "$DISK"
   run partprobe "$DISK"
+
+  # A disk-level wipefs cannot reach signatures inside partition offsets, so a
+  # leftover header (e.g. after an aborted encrypted run) would survive and be
+  # misidentified (mount: crypto_LUKS) or make luksFormat refuse --batch-mode.
+  run wipefs -a "${DISK}1" || true
+  run wipefs -a "${DISK}2" || true
 
   run mkfs.fat -F32 -n "MAGIKOS" "${DISK}1"
 
@@ -414,7 +438,7 @@ partition_disk() {
       LUKS_UUID="00000000-0000-4000-8000-000000000002"
     fi
   else
-    ROOT_UUID=$(blkid -s UUID -o value "$ROOT_DEVICE")
+    ROOT_UUID=$(blkid -s UUID -o value "$ROOT_DEVICE" || true)
     LUKS_UUID=$(blkid -s UUID -o value "${DISK}2" || true)
     if [[ -z $ROOT_UUID ]]; then
       die "Could not read the root filesystem UUID from $ROOT_DEVICE"
@@ -434,15 +458,24 @@ seed_target_config() {
 
   # The initramfs unlocks the root from /etc/crypttab.initramfs; the kernel
   # command line carries the LUKS UUID for the systemd initramfs generator.
+  # limine-entry-tool sources the kernel parameters it writes into /boot/limine.conf
+  # and embeds into UKIs from KERNEL_CMDLINE in /etc/default/limine, falling back
+  # to /proc/cmdline. Inside an installer chroot the latter is the live medium's,
+  # so the generated entries lose the root device unless we provide it here.
+  local kernel_cmdline
   if (( ENCRYPT )); then
     write_file "$TARGET/etc/crypttab.initramfs" "$LUKS_NAME UUID=$LUKS_UUID none luks,discard"$'\n'
     write_file "$TARGET/etc/crypttab" "$LUKS_NAME UUID=$LUKS_UUID none luks,discard"$'\n'
-    write_file "$TARGET/etc/kernel/cmdline" \
-      "$(printf 'root=UUID=%s rootflags=subvol=@ rw rd.luks.uuid=%s\n' "$ROOT_UUID" "$LUKS_UUID")"
+    kernel_cmdline=$(printf 'root=UUID=%s rootflags=subvol=@ rw rd.luks.uuid=%s' "$ROOT_UUID" "$LUKS_UUID")
   else
-    write_file "$TARGET/etc/kernel/cmdline" \
-      "$(printf 'root=UUID=%s rootflags=subvol=@ rw\n' "$ROOT_UUID")"
+    kernel_cmdline=$(printf 'root=UUID=%s rootflags=subvol=@ rw' "$ROOT_UUID")
   fi
+  write_file "$TARGET/etc/kernel/cmdline" "$kernel_cmdline"$'\n'
+  write_file "$TARGET/etc/default/limine" "\
+ESP_PATH=\"/boot\"
+KERNEL_CMDLINE[default]=\"$kernel_cmdline\"
+BOOT_ORDER=\"*, *fallback, Snapshots\"
+"
 
   write_file "$TARGET/etc/hostname" "$HOSTNAME"$'\n'
   write_file "$TARGET/etc/hosts" "$(cat <<EOF
@@ -469,6 +502,30 @@ CACHYOS_SIGNING_KEY="F3B607488DB35A47"
 cachyos_configured() {
   local conf="${1:-/etc/pacman.conf}"
   grep -qE '^\s*\[cachyos[[:space:]]*\]' "$conf" 2>/dev/null
+}
+
+# Does this machine have an NVIDIA GPU? The package set ships NVIDIA-only
+# packages (proprietary driver stack, nvidia-open kernels, prime hybrid glue);
+# on AMD/Intel systems those break the desktop, so they are only installed when
+# a real NVIDIA Display/3D device is present on the PCI bus.
+nvidia_present() {
+  local dev cls ven
+  for dev in /sys/bus/pci/devices/*; do
+    [[ -r "$dev/class" ]] || continue
+    cls=$(<"$dev/class")
+    # 0x0300 VGA controller, 0x0302 3D controller, 0x0308 remote. The plain
+    # display-controller class (0x0380, virtio-gpu/bochs) is not a GPU driver
+    # target, so VMs stop here.
+    case $cls in
+      0x0300*|0x0302*|0x0308*) ;;
+      *) continue ;;
+    esac
+    ven=$(<"$dev/vendor")
+    if [[ $ven == 0x10de ]]; then
+      return 0
+    fi
+  done
+  return 1
 }
 
 # Should the installer add the CachyOS repos? Returns 0 when yes. $1 is the
@@ -537,19 +594,91 @@ EOF
 # Returns 0 once the key is received and locally signed.
 cachyos_trust_key() {
   local root="$1"
-  if [[ -z $root ]]; then
-    if run pacman-key --recv-keys "$CACHYOS_SIGNING_KEY" --keyserver keyserver.ubuntu.com; then
-      :
-    elif run pacman-key --recv-keys "$CACHYOS_SIGNING_KEY" --keyserver keys.openpgp.org; then
-      :
-    else
-      return 1
+  local fetched=0
+
+  # The live media's keyring may hold public keys but no secret one (archiso
+  # defaults to a read-only root and never runs pacman-key --init), and
+  # --lsign-key needs a secret key to sign with. Generate one when missing.
+  if [[ -z $root ]] && ! gpg --homedir /etc/pacman.d/gnupg \
+      --list-secret-keys >/dev/null 2>&1; then
+    run pacman-key --init \
+      || { warn "Could not initialize the live media keyring."; return 1; }
+  fi
+  # The target may have bootstrapped with a yes-flooded -K whose master-key
+  # generation got interrupted, leaving the keyring without a secret either.
+  if [[ -n $root ]] && ! gpg --homedir "$root/etc/pacman.d/gnupg" \
+      --list-secret-keys >/dev/null 2>&1; then
+    chroot_exec "pacman-key --init" \
+      || { warn "Could not initialize the target keyring."; return 1; }
+  fi
+
+  # Preferred path: the ISO bundles cachyos-keyring.pkg.tar.zst at
+  # /root/cachyos-keyring.pkg.tar.zst (see iso/build.sh). Import its keyring
+  # into the target's pacman keyring and lsign the signing key: no public
+  # keyserver traffic, so it works offline or behind NATs where gpg/dirmngr
+  # keyserver lookups fail (qemu slirp).
+  local bundle=/root/cachyos-keyring.pkg.tar.zst
+  if [[ -f $bundle ]]; then
+    local keyring_dir
+    keyring_dir=$(mktemp -d)
+    if tar --zstd -xOf "$bundle" \
+        usr/share/pacman/keyrings/cachyos.gpg > "$keyring_dir/cachyos.gpg" 2>/dev/null; then
+      if [[ -z $root ]]; then
+        if run pacman-key --add "$keyring_dir/cachyos.gpg" \
+            && run pacman-key --lsign-key "$CACHYOS_SIGNING_KEY"; then
+          fetched=1
+        fi
+      else
+        cp "$keyring_dir/cachyos.gpg" "$root/tmp/cachyos-keyring.gpg"
+        if chroot_exec "pacman-key --add /tmp/cachyos-keyring.gpg" \
+            && chroot_exec "pacman-key --lsign-key $CACHYOS_SIGNING_KEY"; then
+          fetched=1
+          rm -f "$root/tmp/cachyos-keyring.gpg"
+        fi
+      fi
     fi
-    run pacman-key --lsign-key "$CACHYOS_SIGNING_KEY" || return 1
-  else
-    chroot_exec "pacman-key --recv-keys $CACHYOS_SIGNING_KEY --keyserver keyserver.ubuntu.com \
-      || pacman-key --recv-keys $CACHYOS_SIGNING_KEY --keyserver keys.openpgp.org" || return 1
-    chroot_exec "pacman-key --lsign-key $CACHYOS_SIGNING_KEY" || return 1
+    rm -rf "$keyring_dir"
+  fi
+  if ((fetched)); then
+    return 0
+  fi
+
+  # Fallback: several public keyservers (hkps uses 443 which works under slirp).
+  if ! ((fetched)); then
+    local endpoints=(
+      "hkps://keys.cachyos.org"
+      "keyserver.ubuntu.com"
+      "hkps://keyserver.ubuntu.com"
+      "keys.openpgp.org"
+    )
+    local ep attempt got=0
+    if [[ -z $root ]]; then
+      for attempt in 1 2; do
+        for ep in "${endpoints[@]}"; do
+          if run pacman-key --recv-keys "$CACHYOS_SIGNING_KEY" --keyserver "$ep"; then
+            got=1
+            break 2
+          fi
+        done
+      done
+      if ((got)); then
+        run pacman-key --lsign-key "$CACHYOS_SIGNING_KEY" || return 1
+      fi
+      ((got))
+    else
+      for attempt in 1 2; do
+        for ep in "${endpoints[@]}"; do
+          if chroot_exec "pacman-key --recv-keys $CACHYOS_SIGNING_KEY --keyserver $ep"; then
+            got=1
+            break 2
+          fi
+        done
+      done
+      if ((got)); then
+        chroot_exec "pacman-key --lsign-key $CACHYOS_SIGNING_KEY" || return 1
+      fi
+      ((got))
+    fi
   fi
 }
 
@@ -593,6 +722,33 @@ enable_cachyos_repos() {
   fi
 
   write_file "$root/etc/pacman.d/cachyos-mirrorlist" "$(cachyos_mirrorlist)"
+
+  # pacstrap runs pacman against a snapshot of the LIVE /etc/pacman.conf and,
+  # on success, overwrites the target's conf with it. Unless the live media
+  # resolves [cachyos] too, pacstrap cannot see CachyOS packages and the whole
+  # batch aborts with "target not found". Mirror the repo into the live env.
+  if [[ -n $root ]] && [[ -f /etc/pacman.conf ]]; then
+    if ! grep -qE '^\s*\[cachyos[[:space:]]*\]' /etc/pacman.conf; then
+      if grep -q '^\[core\]' /etc/pacman.conf; then
+        run sed -i \
+          -e '/^\[core\]/i # CachyOS repos (added by the Magikos installer)' \
+          -e '/^\[core\]/i [cachyos]\nInclude = /etc/pacman.d/cachyos-mirrorlist' \
+          /etc/pacman.conf
+      else
+        write_file /etc/pacman.conf "$(cat /etc/pacman.conf)"$'\n[cachyos]\nInclude = /etc/pacman.d/cachyos-mirrorlist\n'
+      fi
+    fi
+    mkdir -p /etc/pacman.d
+    write_file /etc/pacman.d/cachyos-mirrorlist "$(cachyos_mirrorlist)"
+
+    # pacstrap validates the cachyos database and package signatures against
+    # the LIVE MEDIA's own keyring (not the target's), so mirroring the repo
+    # config is not enough: the CachyOS admin key must also be trusted in the
+    # host keyring or every pacstrap batch aborts with "signature is unknown
+    # trust". The target chroot keyring was already handled by cachyos_trust_key.
+    cachyos_trust_key "" \
+      || warn "Could not trust the CachyOS key in the live media keyring; the pacstrap batches may fail."
+  fi
 
   # Pull the keyring/mirrorlist packages from the repo itself so signatures
   # and mirrorlist stay exactly what CachyOS ships.
@@ -666,8 +822,33 @@ bootstrap_arch() {
     fi
   done
   if ((${#BASE_REPO[@]} == 0)); then
+    # Self-contained ISOs bundle the repo under /run/archiso/bootmnt/arch;
+    # when no local repo is present base is unresolvable offline, so fall back
+    # to syncing the live media's package DBs over the network.
+    warn "No packages resolve from the live media repos; syncing package DBs (network)."
+    if ! run pacman -Sy --noconfirm; then
+      die "Could not resolve base packages from the live media or a synced package DB."
+    fi
+    in_base_repo=()
+    while read -r name; do
+      [[ -n $name ]] && in_base_repo[$name]=1
+    done < <(pacman -Slq 2>/dev/null | sort -u)
+    BASE_REPO=() BASE_AUR=()
+    for pkg in "${base_pkgs[@]}"; do
+      if [[ ${in_base_repo[$pkg]+set} ]]; then
+        BASE_REPO+=("$pkg")
+      else
+        BASE_AUR+=("$pkg")
+      fi
+    done
+  fi
+  if ((${#BASE_REPO[@]} == 0)); then
     die "No base packages resolve from the live media repos."
   fi
+  # The base set cannot trigger the limine-mkinitcpio-hook prompt (that hook is
+  # AUR-only and gets deferred), so keep it plain: the one yes-flooded -K
+  # bootstrap run failed the whole batch right after its transaction hooks
+  # completed, which plain -K runs never did.
   if ! run pacstrap -K "$TARGET" "${BASE_REPO[@]}"; then
     warn "Base batch install failed; falling back to per-package installs."
     local pkg
@@ -719,10 +900,10 @@ bootstrap_arch() {
     log "Installing deferred base packages from the target repos"
     if (( DRY_RUN )); then
       printf '[dry-run] pacstrap %s: %s\n' "$TARGET" "${base_resolvable[*]}"
-    elif ! pacstrap "$TARGET" "${base_resolvable[@]}"; then
+    elif ! pacstrap_yes "$TARGET" "${base_resolvable[@]}"; then
       warn "Base follow-up batch failed; falling back per-package."
       for pkg in "${base_resolvable[@]}"; do
-        pacstrap "$TARGET" "$pkg" >>"$LOG_FILE" 2>&1 || PKG_FAILURES+=("$pkg")
+        pacstrap_yes "$TARGET" "$pkg" >>"$LOG_FILE" 2>&1 || PKG_FAILURES+=("$pkg")
       done
     fi
   fi
@@ -736,6 +917,13 @@ bootstrap_arch() {
   mapfile -t packages < <(grep -v '^#' "$ROOT/install/magikos-base.packages" | grep -v '^$')
   if (( ${#packages[@]} == 0 )); then
     die "No packages found in install/magikos-base.packages"
+  fi
+
+  # NVIDIA-only packages are opt-in per hardware; drop them from the set when
+  # no NVIDIA GPU is present so they cannot be pulled in by the yay pass.
+  if ! nvidia_present; then
+    # shellcheck disable=SC2207
+    mapfile -t packages < <(printf '%s\n' "${packages[@]}" | grep -vi 'nvidia')
   fi
 
   # Split against the target's own repo list, so the batch never contains a
@@ -758,12 +946,12 @@ bootstrap_arch() {
   if (( ${#PACKAGE_REPO[@]} == 0 )); then
     return 0
   fi
-  if ! run pacstrap "$TARGET" "${PACKAGE_REPO[@]}"; then
+  if ! run pacstrap_yes "$TARGET" "${PACKAGE_REPO[@]}"; then
     warn "Batch install failed for ${#PACKAGE_REPO[@]} repo package(s); retrying per-package."
     for pkg in "${PACKAGE_REPO[@]}"; do
       if (( DRY_RUN )); then
         printf '[dry-run] pacstrap %s: %s\n' "$TARGET" "$pkg"
-      elif ! pacstrap "$TARGET" "$pkg" >>"$LOG_FILE" 2>&1; then
+      elif ! pacstrap_yes "$TARGET" "$pkg" >>"$LOG_FILE" 2>&1; then
         PKG_FAILURES+=("$pkg")
       fi
     done
@@ -802,6 +990,14 @@ install_app_icons() {
 }
 
 # System drop-ins we own outright.
+# pacstrap's pacman runs post-transaction hooks; limine-mkinitcpio's asks "run
+# limine-mkinitcpio now? [Y/n]" on /dev/tty even under --noconfirm, blocking an
+# unattended install forever. Feeding a flood of "yes" pre-answers every hooks
+# prompt (pipefail keeps the real pacstrap exit status).
+pacstrap_yes() {
+  yes | pacstrap "$@"
+}
+
 sync_etc_dropins() {
   local dest="$1"
   # --chown matters: the checkout files are owned by the invoking user, and
@@ -873,6 +1069,11 @@ plant_magikos() {
   # packaged install ships this file, so recreate it here.
   run install -Dm644 "$ROOT/default/uwsm/env.d/10-magikos" \
     "$TARGET/usr/share/uwsm/env.d/10-magikos"
+
+  # systemd-environment-d-generator reads /usr/lib/environment.d/*.conf for
+  # the user session; the magikos-settings package post_install copies these.
+  run mkdir -p "$TARGET/usr/lib/environment.d"
+  run cp -a "$ROOT/default/environment.d/." "$TARGET/usr/lib/environment.d/"
 }
 
 configure_target() {
@@ -887,7 +1088,7 @@ configure_target() {
   if (( DRY_RUN )); then
     esp_uuid="00000000-0000-4000-8000-000000000003"
   else
-    esp_uuid=$(blkid -s UUID -o value "${DISK}1")
+    esp_uuid=$(blkid -s UUID -o value "${DISK}1" || true)
   fi
   root_opts="noatime,compress=zstd:1,subvol=@"
   home_opts="noatime,compress=zstd:1,subvol=@home"
@@ -904,13 +1105,44 @@ EOF
 
 install_bootloader() {
   log "Rebuilding UKIs and deploying Limine"
-  chroot_exec "mkinitcpio -P"
-  if chroot_exec "command -v limine-entry-tool" >/dev/null 2>&1; then
-    chroot_exec "limine-entry-tool deploy || limine-entry-tool update" ||
-      warn "limine-entry-tool could not deploy; verify the ESP boots before rebooting."
+  chroot_exec "mkinitcpio -P" || warn "initramfs rebuild failed"
+
+  if chroot_exec "command -v limine-update" >/dev/null 2>&1; then
+    # limine-update runs limine-install --no-efi-register (which deploys the
+    # limine loader and the ESP fallback copy) followed by limine-mkinitcpio
+    # (which rebuilds UKIs and regenerates limine.conf).
+    chroot_exec "limine-update" ||
+      warn "limine-update failed; verify the ESP has a bootloader before rebooting."
   else
-    warn "limine-entry-tool is not present; the kernel hooks should have populated the ESP."
+    warn "limine-update is not present; verify the ESP has a bootloader."
+    return
   fi
+
+  # The menu tool generates /boot/limine.conf from the installer chroot, where
+  # its root-device detection can resolve to nothing. Normalize every generated
+  # kernel command line carrying no root device to the target's own parameters
+  # so the installed kernels always boot from the right disk.
+  local cmdline
+  cmdline="$(tr -d '\r\n' < "$TARGET/etc/kernel/cmdline" 2>/dev/null || true)"
+  if [[ -f $TARGET/boot/limine.conf && -n $cmdline ]]; then
+    if awk -v c="$cmdline" '
+        /^[[:space:]]*cmdline:/ { ind=$0; sub(/[^[:space:]].*$/, "", ind) }
+        /^[[:space:]]*cmdline:/ {
+          if ($0 ~ /root=/) { print; next }
+          print ind "cmdline: " c; next
+        }
+        { print }
+      ' "$TARGET/boot/limine.conf" > "$TARGET/boot/limine.conf.tmp"; then
+      run cat "$TARGET/boot/limine.conf.tmp" > "$TARGET/boot/limine.conf" &&
+        run rm -f "$TARGET/boot/limine.conf.tmp"
+    fi
+  fi
+
+  # Best-effort: surface MagikOS in the boot menu via the deployed Limine
+  # loader. The ESP fallback path (EFI/BOOT/BOOTX64.EFI) is deliberately not
+  # created (ENABLE_LIMINE_FALLBACK=no), so point at the real loader instead.
+  chroot_exec "limine-entry-tool --add-efi 'MagikOS' /EFI/limine/limine_x64.efi --overwrite --priority 100" ||
+    warn "could not register a UEFI boot entry; the ESP fallback path is in place."
 }
 
 create_user() {
@@ -934,9 +1166,25 @@ create_user() {
   chroot_exec "useradd -m -G wheel $(printf '%q' "$INSTALL_USER")"
   if (( ! DRY_RUN )); then
     local pass
-    pass=$(ask_password "Password for $INSTALL_USER")
+    pass=${INSTALL_PASSWORD:-$(ask_password "Password for $INSTALL_USER")}
     printf '%s:%s\n' "$INSTALL_USER" "$pass" | chroot "$TARGET" chpasswd
   fi
+}
+
+ensure_chroot_dns() {
+  # The install medium resolves through systemd-resolved, so /etc/resolv.conf
+  # points at a loopback stub (127.0.0.53 / ::1). Go's resolver (the yay build)
+  # actively reads resolv.conf and refuses stalled loopback answers, aborting
+  # the AUR pass. Give the target a concrete nameserver the guest can reach:
+  # pass through any non-loopback nameservers (real networks) and default to
+  # the user-mode NAT gateway (qemu/vbox) when there are none.
+  local -a servers=() ns
+  while read -r ns; do
+    [[ $ns == 127.* || $ns == "::1" ]] && continue
+    servers+=("nameserver $ns")
+  done < <(awk '/^nameserver/{print $2}' /etc/resolv.conf 2>/dev/null)
+  ((${#servers[@]} == 0)) && servers=("nameserver 10.0.2.3")
+  printf '%s\n' "${servers[@]}" > "$TARGET/etc/resolv.conf"
 }
 
 build_yay_target() {
@@ -945,6 +1193,7 @@ build_yay_target() {
   fi
 
   log "Building yay from the AUR in the target"
+  ensure_chroot_dns
   chroot_exec "pacman -S --ask=4 --needed --noconfirm git go base-devel"
 
   local home_dir user_q
@@ -955,7 +1204,7 @@ build_yay_target() {
       git clone --depth=1 $(printf '%q' "$YAY_AUR_URL") $home_dir/yay-build" &&
     chroot_exec "runuser -u $user_q -- env HOME=$(printf '%q' "$home_dir") \
       bash -c 'cd $(printf '%q' "$home_dir")/yay-build && makepkg --noconfirm -f'" &&
-    chroot_exec "pacman -U --noconfirm --needed $home_dir/yay-build/yay-*.pkg.tar.*"; then
+    chroot_exec "yes | pacman -U --noconfirm --needed $home_dir/yay-build/yay-*.pkg.tar.*"; then
     :
   else
     warn "Could not build yay in the target; AUR packages will stay missing."
@@ -988,11 +1237,11 @@ install_aur_packages_target() {
   PKG_FAILURES=()
 
   sudoers_nopasswd_enable "$TARGET"
-  if ! chroot_exec "runuser -u $user_q -- env HOME=$(printf '%q' "$home_dir") \
+  if ! chroot_exec "yes | runuser -u $user_q -- env HOME=$(printf '%q' "$home_dir") \
       yay -S --ask=4 --needed --noconfirm $(printf '%q ' "${aur_failed[@]}")"; then
     warn "Batch AUR install failed; retrying package by package."
     for pkg in "${aur_failed[@]}"; do
-      chroot_exec "runuser -u $user_q -- env HOME=$(printf '%q' "$home_dir") \
+      chroot_exec "yes | runuser -u $user_q -- env HOME=$(printf '%q' "$home_dir") \
         yay -S --ask=4 --needed --noconfirm $(printf '%q' "$pkg")" || true
     done
   fi
@@ -1006,7 +1255,7 @@ install_aur_packages_target() {
 apply_magikos() {
   log "Running Magikos system setup in the target"
 
-  chroot_exec "env MAGIKOS_PATH=/usr/share/magikos \
+  chroot_exec "yes | env MAGIKOS_PATH=/usr/share/magikos \
     MAGIKOS_INSTALL=/usr/share/magikos/install \
     PATH=/usr/share/magikos/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
     bash /usr/share/magikos/bin/magikos-apply-system --install-user $(printf '%q' "$INSTALL_USER")"
@@ -1020,7 +1269,7 @@ finalize_user() {
   log "Finalizing per-user setup in the target"
 
   local home_dir="/home/$INSTALL_USER"
-  if ! chroot_exec "runuser -u $(printf '%q' "$INSTALL_USER") -- env \
+  if ! chroot_exec "yes | runuser -u $(printf '%q' "$INSTALL_USER") -- env \
     HOME=$(printf '%q' "$home_dir") \
     MAGIKOS_PATH=/usr/share/magikos \
     MAGIKOS_INSTALL=/usr/share/magikos/install \
@@ -1154,6 +1403,13 @@ install_packages_host() {
     die "No packages found in install/magikos-base.packages"
   fi
 
+  # NVIDIA-only packages are opt-in per hardware; drop them from the set when
+  # no NVIDIA GPU is present so they cannot be pulled in by the yay pass.
+  if ! nvidia_present; then
+    # shellcheck disable=SC2207
+    mapfile -t packages < <(printf '%s\n' "${packages[@]}" | grep -vi 'nvidia')
+  fi
+
   split_repo_and_aur
   if (( ${#PACKAGE_REPO[@]} == 0 )); then
     return 0
@@ -1185,16 +1441,19 @@ install_packages_host() {
 YAY_AUR_URL="https://aur.archlinux.org/yay.git"
 
 sudoers_nopasswd_enable() {
-  write_file "$1/etc/sudoers.d/00-magikos-installer-nopasswd" \
+  # The drop-in must sort AFTER 10-magikos-wheel (sudo picks the LAST matching
+  # rule), otherwise the wheel ALL=ALL password rule would override the
+  # NOPASSWD one and the AUR follow-up stalls on a password prompt.
+  write_file "$1/etc/sudoers.d/99-magikos-installer-nopasswd" \
     '%wheel ALL=(ALL:ALL) NOPASSWD: ALL'$'\n'
   if (( ! DRY_RUN )); then
-    chmod 440 "$1/etc/sudoers.d/00-magikos-installer-nopasswd"
+    chmod 440 "$1/etc/sudoers.d/99-magikos-installer-nopasswd"
   fi
 }
 
 sudoers_nopasswd_disable() {
   if (( ! DRY_RUN )); then
-    rm -f "$1/etc/sudoers.d/00-magikos-installer-nopasswd"
+    rm -f "$1/etc/sudoers.d/99-magikos-installer-nopasswd"
   fi
 }
 
@@ -1288,7 +1547,7 @@ adopt_user() {
   log "Creating user $INSTALL_USER"
   run useradd -m -G wheel "$INSTALL_USER"
   local pass
-  pass=$(ask_password "Password for $INSTALL_USER")
+  pass=${INSTALL_PASSWORD:-$(ask_password "Password for $INSTALL_USER")}
   printf '%s:%s\n' "$INSTALL_USER" "$pass" | run chpasswd
 }
 
@@ -1394,7 +1653,11 @@ main() {
 
   trap unmount_target EXIT
 
-  step "Partitioning $DISK (ESP + root, LUKS $((ENCRYPT ? "on" : "off")))"
+  if (( ENCRYPT )); then
+    step "Partitioning $DISK (ESP + root, LUKS on)"
+  else
+    step "Partitioning $DISK (ESP + root, LUKS off)"
+  fi
   partition_disk
   step "Seeding target configuration"
   seed_target_config
