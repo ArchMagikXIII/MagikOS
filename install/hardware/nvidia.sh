@@ -3,7 +3,7 @@ if lspci | grep -qi 'nvidia'; then
 
   # Check which kernel is installed and set the matching headers package, so
   # DKMS builds below have headers present.
-  KERNEL_PACKAGE=$(pacman -Qqs '^linux(-cachyos(-rc)?|-zen|-lts|-hardened|-t2|-ptl)?$' | head -1 || true)
+  KERNEL_PACKAGE=$(pacman -Qqs '^linux(-cachyos(-rc)?|-zen|-lts|-hardened|-t2|-ptl|-omarchy(-bore|-muqss)?)?$' | head -1 || true)
   [[ -n $KERNEL_PACKAGE ]] && magikos-pkg-add "$KERNEL_PACKAGE-headers"
 
   if magikos-hw-nvidia-gsp; then

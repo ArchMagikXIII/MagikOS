@@ -474,7 +474,7 @@ seed_target_config() {
   write_file "$TARGET/etc/default/limine" "\
 ESP_PATH=\"/boot\"
 KERNEL_CMDLINE[default]=\"$kernel_cmdline\"
-BOOT_ORDER=\"*, *fallback, Snapshots\"
+BOOT_ORDER=\"linux-t2, linux-omarchy, linux-omarchy-*, *, *fallback, Snapshots\"
 "
 
   write_file "$TARGET/etc/hostname" "$HOSTNAME"$'\n'

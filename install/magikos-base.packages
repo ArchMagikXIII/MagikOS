@@ -104,6 +104,8 @@ linux-cachyos-nvidia-open
 linux-cachyos-rc
 linux-cachyos-rc-headers
 linux-cachyos-rc-nvidia-open
+linux-omarchy
+linux-omarchy-headers
 logrotate
 lsb-release
 lsscsi
