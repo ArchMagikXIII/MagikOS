@@ -4,6 +4,7 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Services.Mpris
 import Quickshell.Services.Pipewire
+import Quickshell.Services.UPower
 import qs.Ui
 import qs.Commons
 import "Model.js" as Model
@@ -108,6 +109,93 @@ Panel {
   property var displayAudioSinks: []
   property var displayAudioSources: []
   property var displayAudioStreams: []
+  property var displayDeviceBatteries: []
+
+  // Battery-bearing peripherals that UPower actually reports: mice, keyboards,
+  // headsets, and other wireless gadgets. The G305 mouse shows up via its Logitech
+  // driver, a Bluetooth headset via upower's exposed battery — but a headset on a
+  // plain 2.4GHz receiver reports nothing to the kernel, so it has to stay absent.
+  function isPeripheralBatteryDevice(device) {
+    if (!device || !device.ready) return false
+    if (!device.isPresent) return false
+    if (device.powerSupply) return false
+    if (device.percentage < 0) return false
+    switch (device.type) {
+      case UPowerDeviceType.Mouse:
+      case UPowerDeviceType.Keyboard:
+      case UPowerDeviceType.Touchpad:
+      case UPowerDeviceType.Pen:
+      case UPowerDeviceType.Headset:
+      case UPowerDeviceType.Headphones:
+      case UPowerDeviceType.Speakers:
+      case UPowerDeviceType.MediaPlayer:
+      case UPowerDeviceType.GamingInput:
+      case UPowerDeviceType.RemoteControl:
+      case UPowerDeviceType.BluetoothGeneric:
+      case UPowerDeviceType.Wearable:
+      case UPowerDeviceType.Phone:
+        return true
+    }
+    return false
+  }
+
+  function peripheralName(device) {
+    var name = device && device.model ? String(device.model).trim() : ""
+    if (name) return name
+    var path = device && device.nativePath ? String(device.nativePath) : ""
+    return path || "Device"
+  }
+
+  function peripheralGlyph(type) {
+    switch (type) {
+      case UPowerDeviceType.Mouse:
+        return "󰍩"
+      case UPowerDeviceType.Keyboard:
+        return "󰌌"
+      case UPowerDeviceType.Touchpad:
+        return "󰟸"
+      case UPowerDeviceType.Headset:
+      case UPowerDeviceType.Headphones:
+        return "󰋋"
+      case UPowerDeviceType.Speakers:
+        return "󰓃"
+      case UPowerDeviceType.MediaPlayer:
+        return "󰝚"
+      case UPowerDeviceType.GamingInput:
+        return "󰊖"
+      case UPowerDeviceType.BluetoothGeneric:
+        return "󰂯"
+    }
+    return "󰁹"
+  }
+
+  function refreshDeviceBatteries() {
+    var devices = UPower.devices ? UPower.devices.values : []
+    var rows = []
+    for (var i = 0; i < devices.length; i++) {
+      var d = devices[i]
+      if (!isPeripheralBatteryDevice(d)) continue
+      rows.push({
+        name: peripheralName(d),
+        glyph: peripheralGlyph(d.type),
+        percent: Math.round(d.percentage * 100)
+      })
+    }
+    displayDeviceBatteries = rows
+  }
+
+  Connections {
+    target: UPower.devices
+    function onValuesChanged() { root.refreshDeviceBatteries() }
+  }
+
+  Timer {
+    interval: 60000
+    running: true
+    repeat: true
+    triggeredOnStart: true
+    onTriggered: root.refreshDeviceBatteries()
+  }
 
   // A DSP sink -- a speaker tuning, or EasyEffects -- can be the selected output
   // without being where loudness lives: changing its volume alters the level going
@@ -967,6 +1055,35 @@ Panel {
             }
           }
 
+          // ---- Connected devices with battery ----
+          PanelSeparator {
+            visible: root.displayDeviceBatteries.length > 0
+            foreground: root.bar.foreground
+          }
+
+          Column {
+            width: parent.width
+            spacing: Style.space(6)
+            visible: root.displayDeviceBatteries.length > 0
+
+            PanelSectionHeader {
+              text: "DEVICES"
+              foreground: root.bar.foreground
+              fontFamily: root.bar.fontFamily
+            }
+
+            Repeater {
+              model: root.displayDeviceBatteries
+
+              DeviceRow {
+                required property var modelData
+                required property int index
+                width: panelColumn.width
+                device: modelData
+              }
+            }
+          }
+
           // ---- Per-app streams ----
           PanelSeparator {
             visible: root.displayAudioStreams.length > 0
@@ -1120,6 +1237,57 @@ Panel {
         root.selectedIndex = sourceRow.rowIndex
       }
       onClicked: root.setDefaultSource(sourceRow.node)
+    }
+  }
+
+  // Connected device battery row — read-only sibling of SinkRow/SourceRow.
+  // Nothing to control here: UPower only reports what drivers expose, and
+  // this row is display-only, so it is not a cursor target.
+  component DeviceRow: Item {
+    id: deviceRow
+    required property var device
+    implicitHeight: deviceInner.implicitHeight + Style.spacing.xl
+
+    Row {
+      id: deviceInner
+      anchors.left: parent.left
+      anchors.right: parent.right
+      anchors.verticalCenter: parent.verticalCenter
+      anchors.leftMargin: Style.space(6)
+      anchors.rightMargin: Style.space(6)
+      spacing: Style.space(8)
+
+      Text {
+        text: deviceRow.device.glyph
+        color: root.bar.foreground
+        font.family: root.bar.fontFamily
+        font.pixelSize: Style.font.title
+        width: Style.space(22)
+        horizontalAlignment: Text.AlignHCenter
+        anchors.verticalCenter: parent.verticalCenter
+      }
+
+      Text {
+        text: deviceRow.device.name
+        color: root.bar.foreground
+        font.family: root.bar.fontFamily
+        font.pixelSize: Style.font.body
+        elide: Text.ElideRight
+        width: parent.width - Style.space(22) - devicePercent.width - Style.space(16)
+        anchors.verticalCenter: parent.verticalCenter
+      }
+
+      Text {
+        id: devicePercent
+        text: deviceRow.device.percent + "%"
+        color: Qt.darker(root.bar.foreground, 1.5)
+        font.family: root.bar.fontFamily
+        font.pixelSize: Style.font.caption
+        font.bold: true
+        width: Style.space(36)
+        horizontalAlignment: Text.AlignRight
+        anchors.verticalCenter: parent.verticalCenter
+      }
     }
   }
 
