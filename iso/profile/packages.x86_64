@@ -10,11 +10,13 @@ cryptsetup
 dhcpcd
 dosfstools
 e2fsprogs
+efibootmgr
 git
 gptfdisk
 gum
 intel-ucode
 iwd
+jq
 less
 linux
 linux-firmware
@@ -23,6 +25,7 @@ mkinitcpio-archiso
 nano
 parted
 reflector
+rsync
 sudo
 syslinux
 systemd-resolvconf

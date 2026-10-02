@@ -12,7 +12,8 @@ echo "==> Building the smoke-test ISO variant"
 "$REPO/iso/build.sh" \
   --out-dir "$RUN_DIR" \
   --extra-overlay "$REPO/iso/test/overlay" \
-  --boot-console ttyS0
+  --boot-console ttyS0 \
+  --live-root-password magikos
 
 shopt -s nullglob
 iso_files=("$RUN_DIR"/*.iso)

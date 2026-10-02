@@ -19,4 +19,5 @@ file_permissions=(
   ["/root"]="0:0:750"
   ["/root/.automated_script.sh"]="0:0:755"
   ["/root/.gnupg"]="0:0:700"
+  ["/usr/local/bin/MagikOS-Install"]="0:0:755"
 )

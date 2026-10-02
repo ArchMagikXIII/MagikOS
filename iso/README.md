@@ -8,8 +8,11 @@ stock archiso `releng` profile plus the MagikOS overlay in `iso/profile/`:
   `installer/magikos-install` (pacstrap, sgdisk, mkfs.\*, cryptsetup, gum,
   git, base-devel for AUR builds on `--existing`)
 - the repo tree (committed HEAD, no `.git`) is bundled at `/root/magikos`
-- boot reaches a root tty1 autologin; the motd and `.bashrc` point at the
-  installer
+- boot reaches a tty1 root login; the motd and `.bashrc` point at the installer
+
+Stock Arch PAM rejects empty passwords, so a live root password must be stamped
+at build time — pass `--live-root-password <pwd>` or the login prompt will refuse
+root. The smoke-test build pins `magikos`.
 
 The archiso bootloader configs are releng's, so the boot menu still lists a
 couple of entries for packages the minimal set omits (memtest, speech). They
@@ -19,10 +22,18 @@ are harmless; pruning them is future polish.
 
 ```bash
 sudo pacman -S --needed archiso squashfs-tools rsync
-sudo ./iso/build.sh
+sudo ./iso/build.sh --live-root-password magikos
 ```
 
-Produces `iso/release/magikos-<version>-x86_64.iso`.
+Produces `iso/release/magikos-<version>-x86_64.iso`. Log in on the live console
+or serial line as `root` with the password you passed to `--live-root-password`.
+
+If QEMU's GTK window shows a black screen (seen on Wayland/Sway hosts — the
+syslinux splash renders, then the text console goes blank while the guest is in
+fact booting), run QEMU headless and drive it from the terminal instead:
+`-display curses` (BIOS menu is graphical and won't paint — wait ~15s for the
+default entry to auto-boot) or, for a serial-console build,
+`-display none -serial stdio`.
 
 ## Smoke-test in a VM
 
