@@ -83,15 +83,21 @@ if [[ -z $TMPDIR || $TMPDIR == "/tmp" ]]; then
   mkdir -p "$TMPDIR"
 fi
 
-if ! mktemp >/dev/null 2>&1; then
+scratch_probe=$(mktemp 2>/dev/null)
+if [[ -z $scratch_probe ]]; then
   echo "magikos-menu-images: no writable scratch space (TMPDIR=$TMPDIR)" >&2
   exit 1
 fi
+rm -f "$scratch_probe"
 
 selection_file=$(mktemp)
 done_file=$(mktemp)
 pending_file=$(mktemp)
 trap 'rm -f "$selection_file" "$done_file" "$pending_file"' EXIT
+# mktemp creates the file, but the selector only signals completion by creating
+# it. Leaving it in place makes the wait below return instantly with no
+# selection, so the picker opens and any click is discarded.
+rm -f "$done_file"
 
 image_dirs_env=""
 for dir in "${image_dirs[@]}"; do
