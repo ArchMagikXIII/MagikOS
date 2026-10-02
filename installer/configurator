@@ -1,0 +1,288 @@
+#!/bin/bash
+#
+# MagikOS install configurator: the gum-driven wizard that runs first on a
+# fresh live boot. It gathers the install intents a human would otherwise
+# pass as magikos-install flags, writes them as the same JSON sidecars the
+# orchestrator consumes (user_configuration.json + user_credentials.json),
+# then hands off to magikos-install itself. Nothing is installed here beyond
+# the two JSON files in /root.
+#
+# The wizard is the interactive front half of the omarchy-style installer
+# format: ask on screen with the MagikOS logo up front, hand a machine-readable
+# plan to the orchestrator, and let the orchestrator drive every phase. The
+# same sidecars are what an autoinstall/cidata drive supplies, so the two
+# paths never drift.
+#
+# Usage: sudo ./installer/configurator   (interactive)
+#        ./installer/configurator --dry-run   (print the JSON sidecars, touch nothing else)
+
+set -euo pipefail
+
+ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+LOGO_PATH="$ROOT/logo.txt"
+DRY_RUN=0
+if [[ ${1:-} == "--dry-run" ]]; then
+  DRY_RUN=1
+fi
+
+[[ $(id -u) == 0 ]] || {
+  echo "configurator must run as root (sudo)" >&2
+  exit 1
+}
+
+# gum is bundled on the live medium (iso/profile/packages.x86_64); on host
+# dry runs it may be absent, so every prompt falls back to a plain read.
+has_gum=false
+if command -v gum >/dev/null 2>&1; then
+  has_gum=true
+fi
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Terminal measurement + logo: remeasure at every draw because the live VT
+# resizes late (tty1 starts at the 80-column boot console and only grows once
+# the framebuffer lands, noticeably late in VMs); the logo is wider than 80
+# columns, so a first draw against the transient narrow console wraps it.
+# ─────────────────────────────────────────────────────────────────────────────
+
+LOGO_WIDTH=$(awk '{ if (length > max) max = length } END { print max+0 }' "$LOGO_PATH")
+
+TERM_WIDTH=80
+COLUMNS=${COLUMNS:-80}
+
+measure_terminal() {
+  local w
+  if $has_gum; then
+    w=$(stty size 2>/dev/null </dev/tty | awk '{print $2}')
+  else
+    w=$(stty size 2>/dev/null | awk '{print $2}')
+  fi
+  ((w > 0)) || w=${COLUMNS:-80}
+  TERM_WIDTH=$w
+}
+
+wait_for_stable_terminal() {
+  local width last="" stable=0 waited=0
+  $has_gum || return 0
+  while ((waited < 5000)); do
+    width=$(stty size 2>/dev/null </dev/tty | awk '{print $2}')
+    [[ $width =~ ^[0-9]+$ ]] || width=0
+    if ((width >= LOGO_WIDTH)); then
+      ((width == last)) && ((++stable >= 2)) && break
+      last=$width
+    fi
+    sleep 0.1
+    waited=$((waited + 100))
+  done
+  measure_terminal
+}
+
+print_logo() {
+  measure_terminal
+  local pad=$(((TERM_WIDTH - LOGO_WIDTH) / 2))
+  ((pad < 0)) && pad=0
+  local pad_spaces="$(printf '%*s' "$pad" "")"
+  local line
+  while IFS= read -r line || [[ -n $line ]]; do
+    printf '%s%s\n' "$pad_spaces" "$line"
+  done < "$LOGO_PATH"
+  printf '\n'
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Prompt helpers. Every one takes the question, and when gum is present draws
+# a styled widget; otherwise degrades to a plain read so the wizard still
+# works on hosts without gum.
+# ─────────────────────────────────────────────────────────────────────────────
+
+choose() {
+  local question="$1"; shift
+  if $has_gum; then
+    gum choose --height=12 "$@" --header "$question"
+  else
+    local v
+    read -r -p "$question " v
+    printf '%s' "$v"
+  fi
+}
+
+confirm() {
+  local question="$1" default="${2:-false}"
+  if $has_gum; then
+    gum confirm --default="$default" "$question"
+  else
+    local reply=""
+    read -r -p "$question [y/N] " reply || reply=""
+    [[ $reply == y || $reply == Y ]]
+  fi
+}
+
+input_value() {
+  local question="$1" placeholder="$2"
+  if $has_gum; then
+    gum input --placeholder "$placeholder" --prompt "$question: "
+  else
+    local v
+    read -r -p "$question: " v
+    printf '%s' "$v"
+  fi
+}
+
+input_password() {
+  local question="$1"
+  if $has_gum; then
+    gum input --password --prompt "$question: "
+  else
+    local v
+    read -rs -p "$question: " v
+    printf '\n'
+    printf '%s' "$v"
+  fi
+}
+
+# The live media's candidate target disks, one per line. Excludes virtual
+# devices (zram, loop, ram) and the disk the live media is running from.
+live_media_root_disk() {
+  command -v findmnt >/dev/null 2>&1 || return 0
+  local root dev holder x
+  root=$(findmnt -no SOURCE / 2>/dev/null || true)
+  [[ -n $root ]] || return 0
+  dev="${root%%\[*}"
+  while [[ -n $dev && -b $dev ]]; do
+    holder=$(lsblk -no PKNAME "$dev" 2>/dev/null || true)
+    case $holder in
+      /dev/*) x=$holder ;;
+      /*) x=$holder ;;
+      ?*) x="/dev/$holder" ;;
+      *) break ;;
+    esac
+    if [[ $x == "$dev" || ! -b $x ]]; then
+      break
+    fi
+    dev=$x
+  done
+  [[ -n $dev && -b $dev ]] && printf '%s' "$dev"
+}
+
+list_block_devices() {
+  local root_disk live_single
+  if command -v lsblk >/dev/null 2>&1; then
+    live_single=$(live_media_root_disk)
+    lsblk -dpno NAME,TYPE,SIZE,MODEL 2>/dev/null |
+      awk '$2=="disk" && $1 !~ /\/(zram|loop|ram)/ && $1 != ENVIRON["MAGIKOS_LIVE_ROOT"] {
+        print $1" "$3" "$4
+      }' MAGIKOS_LIVE_ROOT="$live_single"
+  fi
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# The wizard itself.
+# ─────────────────────────────────────────────────────────────────────────────
+
+wait_for_stable_terminal
+print_logo
+
+echo "Welcome to the MagikOS installer."
+echo "This wizard builds a machine-readable install plan, then hands it to the"
+echo "orchestrator. Nothing is installed or erased yet."
+echo
+echo "Available block devices (the live medium is excluded):"
+list_block_devices | sed 's/^/  /'
+echo
+
+# Disk selection: offer the plain device paths via gum filter so a long list
+# stays typeable, then confirm it is the intended target.
+local_dev="$({ list_block_devices | awk '{print $1}' | head -n 24; })"
+disk=""
+if [[ -n $local_dev ]]; then
+  disk=$(choose "Target disk to erase and install onto:" <<<"$local_dev")
+fi
+if [[ -z $disk ]]; then
+  disk=$(input_value "Target disk to erase and install onto" "/dev/sda")
+fi
+
+username=""
+while [[ -z $username || $username == "root" ]]; do
+  username=$(input_value "Non-root user to create" "alice")
+done
+
+password=""
+while [[ -z $password ]]; do
+  password=$(input_password "Password for $username (will not be echoed)")
+  echo
+  confirmation=$(input_password "Confirm password")
+  echo
+  if [[ $password != "$confirmation" ]]; then
+    echo "Passwords do not match; try again." >&2
+    password=""
+  fi
+done
+
+hostname=$(input_value "Hostname" "magikos")
+hostname=${hostname:-magikos}
+
+tz_default="UTC"
+if command -v timedatectl >/dev/null 2>&1; then
+  tz_actual=$(timedatectl show -p Timezone --value 2>/dev/null || true)
+  [[ -n $tz_actual ]] && tz_default=$tz_actual
+fi
+timezone=$(input_value "Timezone" "$tz_default")
+timezone=${timezone:-$tz_default}
+
+if confirm "Encrypt the root partition with LUKS2?" true; then
+  encrypt=true
+else
+  encrypt=false
+fi
+
+if confirm "Add the CachyOS repositories?" true; then
+  cachyos_repos=true
+else
+  cachyos_repos=false
+fi
+
+if confirm "Log the user in automatically at the login screen?" false; then
+  autologin=true
+else
+  autologin=false
+fi
+
+if confirm "Erase ALL data on $disk and install Magikos?" false; then
+  :
+else
+  echo "Aborted." >&2
+  exit 130
+fi
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Handoff: write the sidecars the orchestrator reads, then exec it.
+# ─────────────────────────────────────────────────────────────────────────────
+
+printf '\n'
+echo "Writing the install plan to /root/user_configuration.json and"
+echo "/root/user_credentials.json, then starting the orchestrator."
+echo
+
+conf="/root/user_configuration.json"
+creds="/root/user_credentials.json"
+if ((DRY_RUN)); then
+  echo "[dry-run] would write $conf:"
+  jq -n --arg d "$disk" --arg h "$hostname" --arg t "$timezone" \
+    --argjson e "$encrypt" --argjson a "$autologin" --argjson c "$cachyos_repos" \
+    '{mode:"full_disk", disk:$d, hostname:$h, timezone:$t, encrypt:$e, autologin:$a, cachyos_repos:$c}'
+  echo "[dry-run] would write $creds:"
+  jq -n --arg u "$username" --arg p "$password" '{users:[{username:$u, password:$p}]}'
+  exit 0
+fi
+
+jq -n --arg d "$disk" --arg h "$hostname" --arg t "$timezone" \
+  --argjson e "$encrypt" --argjson a "$autologin" --argjson c "$cachyos_repos" \
+  '{mode:"full_disk", disk:$d, hostname:$h, timezone:$t, encrypt:$e, autologin:$a, cachyos_repos:$c}' \
+  > "$conf"
+chmod 600 "$conf"
+jq -n --arg u "$username" --arg p "$password" '{users:[{username:$u, password:$p}]}' \
+  > "$creds"
+chmod 600 "$creds"
+
+exec bash "$ROOT/installer/magikos-install" \
+  --config-file "$conf" \
+  --creds-file "$creds"
