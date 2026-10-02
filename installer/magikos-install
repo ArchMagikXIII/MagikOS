@@ -32,11 +32,14 @@ ALLOW_BIOS=0
 ASSUME_YES=0
 DRY_RUN=0
 EXISTING_MODE=0
+CONFIG_FILE=""
+CREDS_FILE=""
 # -1 = auto (enable when the CachyOS repo is not already present); 0 = off; 1 = on.
 CACHYOS_REPOS=-1
 
 LOG_FILE="${MAGIKOS_INSTALL_LOG_FILE:-/tmp/magikos-install.log}"
 PKG_FAILURES=()
+TARGET_HOOK_MASKS=()
 
 log() {
   printf '\033[32m==> %s\033[0m\n' "$1"
@@ -46,10 +49,11 @@ warn() {
   printf '\033[33m==> %s\033[0m\n' "$1" >&2
 }
 
-# Progress banner. STEP_N is a script-global counter incremented the target
-# number of times, so the numbering stays contiguous across the main flow.
+# Progress banner. STEP_N counts through the PHASES array in main(), so the
+# numbering stays contiguous and matches the actual phase sequence (mirrors
+# the orchestrated-phase format the ISO uses).
 STEP_N=0
-TOTAL_STEPS=9
+TOTAL_STEPS=0
 step() {
   STEP_N=$((STEP_N + 1))
   printf '\n\033[1;36m[%s/%s] %s\033[0m\n' "$STEP_N" "$TOTAL_STEPS" "$1"
@@ -71,6 +75,13 @@ Required for full-disk install:
   --user NAME       Non-root user to create.
   --user-password PWD  Password for the new user (skip the interactive prompt;
                     required for unattended/--yes installs on serial consoles)
+
+Alternative to --disk/--user/--hostname/--timezone/...:
+  --config-file FILE  JSON install plan written by installer/configurator (or an
+                    autoinstall drive). Overrides every flag below except
+                    --existing/--allow-bios/--yes/--dry-run.
+  --creds-file FILE   JSON user credentials ({ "users": [{ "username": .., "password": .. }] }).
+                    Implied by the configurator handoff; required with --config-file.
 
 Options:
   --existing        Adopt the running system: no partitioning, no bootloader changes.
@@ -99,6 +110,8 @@ while (($#)); do
     --disk) DISK="$2"; shift 2 ;;
     --user) INSTALL_USER="$2"; shift 2 ;;
     --user-password) INSTALL_PASSWORD="$2"; shift 2 ;;
+    --config-file) CONFIG_FILE="$2"; shift 2 ;;
+    --creds-file) CREDS_FILE="$2"; shift 2 ;;
     --hostname) HOSTNAME="$2"; shift 2 ;;
     --timezone) TIMEZONE="$2"; shift 2 ;;
     --no-encrypt) ENCRYPT=0; shift ;;
@@ -153,6 +166,64 @@ require_tools() {
   done
   if ((${#missing[@]} > 0)); then
     die "Missing required tools on the live media: ${missing[*]}"
+  fi
+}
+
+# Load an installer/configurator handoff: two JSON files that replace the
+# interactive flag gathering. The configurator (and any autoinstall drive)
+# produces exactly these, so the two paths can never drift. The handoff is the
+# orchestrator's first act — verify it, name the broken field, and refuse to
+# proceed on anything malformed rather than surface later as a cryptic chroot
+# failure.
+load_install_config() {
+  require_tools jq
+
+  [[ -r $CONFIG_FILE ]] || die "Config file not readable: $CONFIG_FILE"
+  [[ -r $CREDS_FILE ]] || die "Credentials file not readable: $CREDS_FILE"
+
+  local jq_err config_mode creds_mode
+  config_mode=$(jq -r '.mode // "full_disk"' "$CONFIG_FILE" 2>/dev/null) ||
+    die "Config file is not valid JSON: $CONFIG_FILE"
+  creds_mode=$(jq -r 'if (.users | length) > 0 then "full_disk" else "" end' "$CREDS_FILE" 2>/dev/null) ||
+    die "Credentials file is not valid JSON: $CREDS_FILE"
+
+  case $config_mode in
+    full_disk) ;;
+    existing)
+      EXISTING_MODE=1
+      # A handcrafted --existing handoff may carry the user to adopt; also
+      # accept a creds file so the configurator-style pipes Just Work.
+      local maybe_user=""
+      maybe_user=$(jq -r '.users[0].username // ""' "$CREDS_FILE" 2>/dev/null || true)
+      [[ -z $INSTALL_USER && -n $maybe_user ]] && INSTALL_USER="$maybe_user"
+      return 0
+      ;;
+    *) die "Config file has unknown mode: $config_mode" ;;
+  esac
+
+  if [[ -z $creds_mode ]]; then
+    die "Credentials file carries no users: $CREDS_FILE"
+  fi
+
+  DISK=$(jq -r '.disk // ""' "$CONFIG_FILE")
+  HOSTNAME=$(jq -r '.hostname // ""' "$CONFIG_FILE")
+  TIMEZONE=$(jq -r '.timezone // ""' "$CONFIG_FILE")
+  ENCRYPT=$(jq -r 'if .encrypt == true then 1 else 0 end' "$CONFIG_FILE")
+  AUTOLOGIN=$(jq -r 'if .autologin == true then 1 else 0 end' "$CONFIG_FILE")
+  INSTALL_USER=$(jq -r '.users[0].username // ""' "$CREDS_FILE")
+  INSTALL_PASSWORD=$(jq -r '.users[0].password // ""' "$CREDS_FILE")
+
+  # The configurator already asked about CachyOS and the final wipe; an
+  # autoinstall drive has made its choice explicit. Never re-ask interactively
+  # downstream of a handoff.
+  CACHYOS_REPOS=$(jq -r 'if .cachyos_repos == false then 0 else 1 end' "$CONFIG_FILE")
+  ASSUME_YES=1
+
+  if [[ -z $DISK ]]; then
+    die "Config file has no disk: $CONFIG_FILE"
+  fi
+  if [[ -z $INSTALL_USER || $INSTALL_USER == "root" ]]; then
+    die "Config file has no usable username: $CREDS_FILE"
   fi
 }
 
@@ -263,6 +334,14 @@ preflight() {
 
   export MAGIKOS_INSTALL_LOG_FILE="$LOG_FILE"
 
+  # An installer/configurator (or autoinstall drive) handoff replaces the flag
+  # gathering entirely: it may even switch us into --existing mode. Load it the
+  # moment required tools for JSON parsing are known present, before any
+  # interactive branch decides what to do.
+  if [[ -n $CONFIG_FILE || -n $CREDS_FILE ]]; then
+    load_install_config
+  fi
+
   if (( EXISTING_MODE )); then
     if [[ -z $INSTALL_USER ]]; then
       INSTALL_USER=${SUDO_USER:-}
@@ -372,6 +451,9 @@ preflight() {
 }
 
 unmount_target() {
+  # Restore any deferred boot-image hooks so an interrupted run never hands
+  # back a system whose kernel packages silently skip rebuilding.
+  unmask_target_boot_hooks
   run swapoff -a || true
   run umount -R "$TARGET" || run umount -lR "$TARGET" || true
   if (( ENCRYPT )); then
@@ -598,17 +680,24 @@ cachyos_trust_key() {
 
   # The live media's keyring may hold public keys but no secret one (archiso
   # defaults to a read-only root and never runs pacman-key --init), and
-  # --lsign-key needs a secret key to sign with. Generate one when missing.
+  # --lsign-key needs a secret key to sign with. gpg's exit code says nothing
+  # about emptiness (list-secret-keys exits 0 with zero secret keys), so detect
+  # by output: generate a master key when no "sec" line is listed.
   if [[ -z $root ]] && ! gpg --homedir /etc/pacman.d/gnupg \
-      --list-secret-keys >/dev/null 2>&1; then
+      --list-secret-keys 2>/dev/null | grep -q '^sec'; then
     run pacman-key --init \
       || { warn "Could not initialize the live media keyring."; return 1; }
   fi
   # The target may have bootstrapped with a yes-flooded -K whose master-key
   # generation got interrupted, leaving the keyring without a secret either.
-  if [[ -n $root ]] && ! gpg --homedir "$root/etc/pacman.d/gnupg" \
-      --list-secret-keys >/dev/null 2>&1; then
-    chroot_exec "pacman-key --init" \
+  # The check must run INSIDE the chroot: pacstrap initializes the keyring
+  # with a gpg-agent that dies with pacstrap's private mount namespace, and a
+  # host-side gpg can disagree with the chroot's gpg about what secrets are
+  # available (the host often sees the key while the fresh chroot agent does
+  # not). Initialize in the chroot's own gpg context when it sees no secret.
+  if [[ -n $root ]] && ! chroot_exec "gpg --homedir /etc/pacman.d/gnupg \
+      --list-secret-keys 2>/dev/null | grep -q '^sec'"; then
+    chroot_exec "gpgconf --kill gpg-agent 2>/dev/null || true; pacman-key --init" \
       || { warn "Could not initialize the target keyring."; return 1; }
   fi
 
@@ -630,8 +719,12 @@ cachyos_trust_key() {
         fi
       else
         cp "$keyring_dir/cachyos.gpg" "$root/tmp/cachyos-keyring.gpg"
-        if chroot_exec "pacman-key --add /tmp/cachyos-keyring.gpg" \
-            && chroot_exec "pacman-key --lsign-key $CACHYOS_SIGNING_KEY"; then
+        # Run both steps in one chroot session: the gpg-agent the --add step
+        # spawns would otherwise be gone (separate chroot_ex call), and
+        # --lsign-key needs that agent context to see the secret master key.
+        if chroot_exec "gpgconf --kill gpg-agent 2>/dev/null || true; \
+            pacman-key --add /tmp/cachyos-keyring.gpg \
+            && pacman-key --lsign-key $CACHYOS_SIGNING_KEY"; then
           fetched=1
           rm -f "$root/tmp/cachyos-keyring.gpg"
         fi
@@ -678,6 +771,51 @@ cachyos_trust_key() {
         chroot_exec "pacman-key --lsign-key $CACHYOS_SIGNING_KEY" || return 1
       fi
       ((got))
+    fi
+  fi
+}
+
+# Enable the [multilib] repo in "$root"/etc/pacman.conf ("" = live host, $TARGET
+# = chroot). The Magikos package set carries lib32-gamemode and friends, and the
+# CachyOS gaming stack pulls lib32-* vulkan/mesa dependencies, all of which only
+# resolve from [multilib]. The stock conf ships that section commented out, so
+# the batch would otherwise fail with "unable to satisfy dependency 'lib32-*'".
+# pacstrap resolves transactions against a snapshot of the LIVE media's
+# /etc/pacman.conf, so the section must be enabled there too, not just in the
+# target.
+enable_multilib() {
+  local root="$1"
+  local conf="$root/etc/pacman.conf"
+  [[ -f $conf ]] || return 0
+  if ! grep -qE '^\s*\[multilib[[:space:]]*\]' "$conf"; then
+    run cp "$conf" "$conf.magikos-bak"
+    # Uncomment the [multilib] section header and its following Include line
+    # (and only those two lines, so any sibling comment can never be stripped).
+    run sed -i 's/^#[[:space:]]*\(\[multilib[[:space:]]*\]\)$/\1/' "$conf"
+    if grep -A1 '^\s*\[multilib[[:space:]]*\]' "$conf" | grep -qE '^\s*#\s*Include'; then
+      run sed -i '/^\s*\[multilib[[:space:]]*\]$/{n;s/^#[[:space:]]*//;}' "$conf"
+    fi
+    if grep -A1 '^\s*\[multilib[[:space:]]*\]' "$conf" | grep -q '^Include'; then
+      :
+    else
+      write_file "$conf" "$(sed '/^\s*\[multilib[[:space:]]*\]/a\
+Include = /etc/pacman.d/mirrorlist' "$conf")"
+    fi
+  fi
+  # Mirror into the live media's conf too so the pacstrap transaction (which
+  # runs from a snapshot of /etc/pacman.conf) can resolve lib32 dependencies.
+  if [[ -n $root && -f /etc/pacman.conf ]] \
+      && ! grep -qE '^\s*\[multilib[[:space:]]*\]' /etc/pacman.conf; then
+    run cp /etc/pacman.conf /etc/pacman.conf.magikos-bak
+    run sed -i 's/^#[[:space:]]*\(\[multilib[[:space:]]*\]\)$/\1/' /etc/pacman.conf
+    if grep -A1 '^\s*\[multilib[[:space:]]*\]' /etc/pacman.conf | grep -qE '^\s*#\s*Include'; then
+      run sed -i '/^\s*\[multilib[[:space:]]*\]$/{n;s/^#[[:space:]]*//;}' /etc/pacman.conf
+    fi
+    if grep -A1 '^\s*\[multilib[[:space:]]*\]' /etc/pacman.conf | grep -q '^Include'; then
+      :
+    else
+      write_file /etc/pacman.conf "$(sed '/^\s*\[multilib[[:space:]]*\]/a\
+Include = /etc/pacman.d/mirrorlist' /etc/pacman.conf)"
     fi
   fi
 }
@@ -793,13 +931,17 @@ packages_resolvable_in_target() {
 bootstrap_arch() {
   log "Bootstrapping Arch base system (pacstrap)"
 
+  # One-time package database sync for the live media so all subsequent
+  # pacstrap / pacman calls see fresh databases without repeating the sync.
+  run pacman -Sy --noconfirm --ask=1 >/dev/null
+
   # Limine goes in with the kernel so the mkinitcpio hook deploys the UKI in
   # the same transaction. limine-mkinitcpio-hook and limine-snapper-sync are
   # not in the repos on vanilla Arch media, so split the base set exactly like
   # the Magikos set: only names the active repos resolve go into the atomic
   # batch, and anything else defers to the yay pass. A single unknown name
   # would otherwise abort the whole batch and force a slow per-package loop
-  # over every base package. install_bootloader re-runs mkinitcpio -P after
+  # over every base package. finalize_limine_boot re-runs mkinitcpio -P after
   # the AUR pass, so it sees any hooks that were deferred.
   local base_pkgs=(
     base base-devel linux linux-firmware linux-headers \
@@ -826,7 +968,7 @@ bootstrap_arch() {
     # when no local repo is present base is unresolvable offline, so fall back
     # to syncing the live media's package DBs over the network.
     warn "No packages resolve from the live media repos; syncing package DBs (network)."
-    if ! run pacman -Sy --noconfirm; then
+    if ! run pacman -Sy --noconfirm --ask=1; then
       die "Could not resolve base packages from the live media or a synced package DB."
     fi
     in_base_repo=()
@@ -849,13 +991,13 @@ bootstrap_arch() {
   # AUR-only and gets deferred), so keep it plain: the one yes-flooded -K
   # bootstrap run failed the whole batch right after its transaction hooks
   # completed, which plain -K runs never did.
-  if ! run pacstrap -K "$TARGET" "${BASE_REPO[@]}"; then
+  if ! run pacstrap -K "$TARGET" "${BASE_REPO[@]}" --ask=1 --overwrite '*'; then
     warn "Base batch install failed; falling back to per-package installs."
     local pkg
     for pkg in "${BASE_REPO[@]}"; do
       if (( DRY_RUN )); then
         printf '[dry-run] pacstrap -K %s: %s\n' "$TARGET" "$pkg"
-      elif ! pacstrap -K "$TARGET" "$pkg" >>"$LOG_FILE" 2>&1; then
+      elif ! pacstrap -K "$TARGET" "$pkg" --ask=1 --overwrite '*' >>"$LOG_FILE" 2>&1; then
         PKG_FAILURES+=("$pkg")
       fi
     done
@@ -879,6 +1021,7 @@ bootstrap_arch() {
   # the package set carries CachyOS-only names (linux-cachyos, the cachyos-*
   # settings/apps, the limine hooks) that must resolve as binaries instead of
   # being compiled from the AUR.
+  enable_multilib "$TARGET"
   if cachyos_wanted "$TARGET/etc/pacman.conf"; then
     enable_cachyos_repos "$TARGET" \
       || warn "Continuing without the CachyOS repositories."
@@ -999,7 +1142,9 @@ install_app_icons() {
 # unattended install forever. Feeding a flood of "yes" pre-answers every hooks
 # prompt (pipefail keeps the real pacstrap exit status).
 pacstrap_yes() {
-  yes | pacstrap "$@"
+  # --ask=1 answers provider selection; add --overwrite '*' to resolve
+  # conflicts like zlib-ng-compat vs zlib without prompting.
+  pacstrap "$@" --ask=1 --overwrite '*'
 }
 
 sync_etc_dropins() {
@@ -1107,19 +1252,153 @@ EOF
   write_file "$TARGET/etc/fstab" "$fstab"$'\n'
 }
 
-install_bootloader() {
-  log "Rebuilding UKIs and deploying Limine"
-  chroot_exec "mkinitcpio -P" || warn "initramfs rebuild failed"
+# --- Boot-image hook masking -----------------------------------------------
+# The package phases (pacstrap, yay, magikos-apply-system's chrooted pacman)
+# each trigger limine-mkinitcpio-hook, rebuilding UKIs and limine.conf many
+# times mid-install against a cmdline/fstab that are still changing. Exactly
+# as in the omarchy orchestrator, those rebuilds are deferred: mask the
+# boot-image hooks for every package phase, then run limine-update once at
+# finalize_limine_boot when every drop-in (hibernation, hardware, autologin)
+# is in place. The masks are symlink swaps to /dev/null in both hook dirs
+# alpm reads, restored on the way out -- including on the unmount EXIT trap,
+# so an interrupted install never hands back a masked system.
+
+TARGET_DEFERRED_BOOT_HOOKS=(
+  "60-mkinitcpio-remove.hook"
+  "60-limine-mkinitcpio-remove-pre.hook"
+  "80-limine-efi-deploy.hook"
+  "90-limine-mkinitcpio-remove-post.hook"
+  "90-mkinitcpio-install.hook"
+  "90-limine-mkinitcpio.hook"
+)
+
+_is_devnull_symlink() {
+  [[ -L $1 ]] && [[ $(readlink -- "$1") == "/dev/null" ]]
+}
+
+mask_target_boot_hooks() {
+  (( DRY_RUN )) && return 0
+  local dir name from backup
+  for dir in "$TARGET/etc/pacman.d/hooks" "$TARGET/usr/share/libalpm/hooks"; do
+    [[ -d $dir ]] || continue
+    for name in "${TARGET_DEFERRED_BOOT_HOOKS[@]}"; do
+      from="$dir/$name"
+      [[ -e $from || -L $from ]] || continue
+      _is_devnull_symlink "$from" && continue
+      backup="$from.magikos-backup"
+      rm -f -- "$backup"
+      mv -- "$from" "$backup"
+      ln -s /dev/null "$from"
+      TARGET_HOOK_MASKS+=("$from")
+    done
+  done
+}
+
+unmask_target_boot_hooks() {
+  (( DRY_RUN )) && return 0
+  local from backup
+  for from in "${TARGET_HOOK_MASKS[@]:-}"; do
+    backup="$from.magikos-backup"
+    _is_devnull_symlink "$from" && rm -f -- "$from"
+    [[ -e $backup || -L $backup ]] && mv -f -- "$backup" "$from"
+  done
+  TARGET_HOOK_MASKS=()
+}
+
+assert_boot_hooks_restored() {
+  local dir name from
+  for dir in "$TARGET/etc/pacman.d/hooks" "$TARGET/usr/share/libalpm/hooks"; do
+    [[ -d $dir ]] || continue
+    for name in "${TARGET_DEFERRED_BOOT_HOOKS[@]}"; do
+      from="$dir/$name"
+      backup="$from.magikos-backup"
+      if _is_devnull_symlink "$from"; then
+        die "boot hook still masked: $from"
+      fi
+      if [[ -e $backup || -L $backup ]]; then
+        die "boot hook backup left behind: $backup"
+      fi
+    done
+  done
+}
+
+# Register MagikOS as the UEFI boot entry on the ESP, from the live side so
+# efibootmgr talks to the running firmware (the same machine the target will
+# boot on). Replaces the earlier limine-entry-tool --add-efi sandwhich, which
+# was a silent no-op: inside the chroot the tool wants the OS-mount path, and
+# the hooks already copied the loader -- but nothing verifiably created a
+# boot entry. Delete stale MagikOS/Limine entries, create a fresh one
+# pointed at the real loader, and put it first in the boot order.
+register_uefi_entry() {
+  (( DRY_RUN )) && return 0
+  [[ -d /sys/firmware/efi ]] || {
+    warn "not UEFI; skipping UEFI boot-entry registration."
+    return 0
+  }
+  command -v efibootmgr >/dev/null 2>&1 || {
+    warn "efibootmgr is not on the live media; skipping UEFI boot-entry registration."
+    return 0
+  }
+
+  local loader="\\EFI\\limine\\limine_x64.efi"
+
+  # efibootmgr lists entries as "Boot0009* Limine x64": $1 is "Boot0009*".
+  # Pull the numeric boot number out (hex digits only) so --bootnum can
+  # address it later, dropping both the "Boot" tag and the active "*".
+  local bootnums num
+  bootnums() {
+    efibootmgr 2>/dev/null | sed -nE 's/^Boot([0-9A-F]+)[* ] .*/\1/p'
+  }
+  for num in $(bootnums); do
+    case "$(efibootmgr 2>/dev/null | grep -iE "Boot${num}[* ] " |
+        sed -nE 's/^Boot[0-9A-F]+[* ] //p')" in
+      MagikOS*|Limine*) efibootmgr --bootnum "$num" --delete-bootnum >/dev/null 2>&1 || true ;;
+    esac
+  done
+
+  if efibootmgr --create --disk "${DISK}" --part 1 --label "MagikOS" \
+      --loader "$loader" --unicode; then
+    log "Registered UEFI boot entry 'MagikOS'"
+  else
+    warn "efibootmgr --create failed; the ESP fallback (if any) or firmware boot menu must select the loader."
+    return 0
+  fi
+
+  local new_num
+  new_num=$(grep -iE 'MagikOS|Limine' <(efibootmgr 2>/dev/null) | sed -nE 's/^Boot([0-9A-F]+)[* ] MagikOS.*/\1/p' | head -1)
+  local order current left
+  if [[ -n $new_num ]]; then
+    current=$(efibootmgr 2>/dev/null | sed -n 's/^BootOrder: //p')
+    order="$new_num"
+    for left in ${current//,/}; do
+      [[ $left == "$new_num" ]] && continue
+      order="$order,$left"
+    done
+    efibootmgr --bootorder "$order" >/dev/null 2>&1 || true
+  fi
+}
+
+finalize_limine_boot() {
+  log "Rebuilding UKIs and deploying Limine (single final build)"
+
+  # All package phases are done; the cmdline, fstab, snapper limits, and any
+  # system-finalizer drop-ins are final. Unmask the boot hooks and build once.
+  unmask_target_boot_hooks
+  assert_boot_hooks_restored
+
+  chroot_exec "mkinitcpio -P" || { unmask_target_boot_hooks; die "initramfs rebuild failed"; }
 
   if chroot_exec "command -v limine-update" >/dev/null 2>&1; then
     # limine-update runs limine-install --no-efi-register (which deploys the
     # limine loader and the ESP fallback copy) followed by limine-mkinitcpio
     # (which rebuilds UKIs and regenerates limine.conf).
-    chroot_exec "limine-update" ||
-      warn "limine-update failed; verify the ESP has a bootloader before rebooting."
+    chroot_exec "limine-update" || {
+      unmask_target_boot_hooks
+      die "limine-update failed; verify the ESP has a bootloader before rebooting."
+    }
   else
-    warn "limine-update is not present; verify the ESP has a bootloader."
-    return
+    unmask_target_boot_hooks
+    die "limine-update is not present; verify the ESP has a bootloader."
   fi
 
   # The menu tool generates /boot/limine.conf from the installer chroot, where
@@ -1142,11 +1421,106 @@ install_bootloader() {
     fi
   fi
 
-  # Best-effort: surface MagikOS in the boot menu via the deployed Limine
-  # loader. The ESP fallback path (EFI/BOOT/BOOTX64.EFI) is deliberately not
-  # created (ENABLE_LIMINE_FALLBACK=no), so point at the real loader instead.
-  chroot_exec "limine-entry-tool --add-efi 'MagikOS' /EFI/limine/limine_x64.efi --overwrite --priority 100" ||
-    warn "could not register a UEFI boot entry; the ESP fallback path is in place."
+  register_uefi_entry
+}
+
+# Hard boot-setup gate (the omarchy validate_boot): refuse to "finish" an
+# install whose boot path cannot actually boot. Checked from the live side
+# against the mounted target. Returns nonzero when a gate fails so the phase
+# loop can die with a precise reason instead of handing the user a brick.
+validate_boot() {
+  log "Validating boot setup"
+  (( DRY_RUN )) && { printf '[dry-run] validate boot setup of %s\n' "$TARGET"; return 0; }
+
+  local failures=()
+
+  local cmdline
+  cmdline="$(tr -d '\r\n' < "$TARGET/etc/kernel/cmdline" 2>/dev/null || true)"
+  if [[ -z $cmdline || $cmdline != *"root="* || $cmdline == *"root=@@"* ]]; then
+    failures+=("missing or empty root= in /etc/kernel/cmdline ($cmdline)")
+  fi
+
+  local default_limine="$TARGET/etc/default/limine"
+  if [[ -f $default_limine ]] && grep -q 'ESP_PATH=' "$default_limine"; then
+    :
+  else
+    failures+=("no usable ESP_PATH in /etc/default/limine")
+  fi
+
+  local limine_conf="$TARGET/boot/limine.conf"
+  local esp_loader="$TARGET/boot/EFI/limine/limine_x64.efi"
+  if [[ -s $limine_conf ]]; then
+    local mod
+    for mod in "$TARGET"/usr/lib/modules/*/; do
+      [[ -d $mod ]] || continue
+      [[ -f "$mod/pkgbase" ]] || continue
+      local pkgbase_name mod_ver
+      # The package storing a kernel exposes its base name via Linux's pkgbase
+      # file inside the module dir; match the generated menu entry to it.
+      mod_ver=$(basename "$mod")
+      pkgbase_name=$(<"$mod/pkgbase")
+      local uki="$TARGET/boot/EFI/Linux/magikos_${pkgbase_name}.efi"
+      if [[ -f $uki && -s $uki ]] && grep -q "$pkgbase_name" "$limine_conf"; then
+        :
+      else
+        failures+=("no generated menu entry/UKI for kernel $pkgbase_name ($mod_ver)")
+      fi
+    done
+  else
+    failures+=("missing empty boot/limine.conf")
+  fi
+  if [[ ! -s $esp_loader ]]; then
+    failures+=("limine loader missing at boot/EFI/limine/limine_x64.efi")
+  fi
+
+  assert_boot_hooks_restored
+
+  # UEFI boot-entry gate, only when this is really a UEFI machine with efivars.
+  if [[ -d /sys/firmware/efi ]] && command -v efibootmgr >/dev/null 2>&1; then
+    if ! efibootmgr 2>/dev/null | grep -qiE 'MagikOS|Limine'; then
+      failures+=("no MagikOS/Limine entry in the UEFI boot order")
+    fi
+  fi
+
+  if ((${#failures[@]} > 0)); then
+    die "Boot validation failed:
+$(printf '  - %s\n' "${failures[@]}")"
+  fi
+  log "Boot setup looks good; $(( $(ls "$TARGET"/usr/lib/modules/ 2>/dev/null | wc -l) )) kernel(s), Limine and any UKI entries verified."
+}
+
+# Freeze the freshly installed @ subvolume as @factory (read-only), the same
+# origin the omarchy format freezes at the end of a successful install. Snapper
+# (limine-snapper-sync / magikos snapshots) then diffs every later snapshot
+# against this clean baseline instead of the first boot state.
+create_factory_snapshot() {
+  log "Freezing the factory snapshot (@factory)"
+  (( DRY_RUN )) && { printf '[dry-run] btrfs subvolume snapshot -r <#/@> <#/@factory>\n'; return 0; }
+
+  local dev="$ROOT_DEVICE"
+  [[ -n $dev ]] || { warn "No root device known; skipping the factory snapshot."; return 0; }
+
+  local toplevel
+  toplevel=$(mktemp -d)
+  if ! run mount -o subvol=/ "$dev" "$toplevel"; then
+    warn "Could not mount the btrfs top level; skipping the factory snapshot."
+    rm -rf "$toplevel"
+    return 0
+  fi
+
+  if [[ -d $toplevel/@ && ! -e $toplevel/@factory ]]; then
+    if btrfs subvolume snapshot -r "$toplevel/@/" "$toplevel/@factory" >/dev/null 2>&1; then
+      btrfs property set -f -ts "$toplevel/@factory" ro true 2>/dev/null || true
+      log "Created read-only factory snapshot @factory."
+    else
+      warn "Could not snapshot @ as @factory; continuing."
+    fi
+  else
+    warn "Skipping factory snapshot: @ missing or @factory already present."
+  fi
+
+  run umount "$toplevel" || true
+  rm -rf "$toplevel"
 }
 
 create_user() {
@@ -1171,7 +1545,16 @@ create_user() {
   if (( ! DRY_RUN )); then
     local pass
     pass=${INSTALL_PASSWORD:-$(ask_password "Password for $INSTALL_USER")}
-    printf '%s:%s\n' "$INSTALL_USER" "$pass" | chroot "$TARGET" chpasswd
+    # Stock PAM (no nullok) inside a freshly pacstrapped chroot is flaky:
+    # chpasswd drives the full PAM stack and a missing /run/systemd or pending
+    # shadow-euid state aborts with an opaque "authentication token
+    # manipulation error". Write the token directly with SHA-512 instead of
+    # trusting PAM to take it, so the username is verified and the password
+    # lands atomically. Empty tokens are rejected here, never piped to chpasswd.
+    [[ -n $pass ]] || die "Empty password for $INSTALL_USER; refusing to continue."
+    printf '%s:%s\n' "$INSTALL_USER" "$pass" \
+      | chroot "$TARGET" chpasswd -c SHA512 \
+      || die "Could not set the password for $INSTALL_USER (chpasswd failed)."
   fi
 }
 
@@ -1198,7 +1581,7 @@ build_yay_target() {
 
   log "Building yay from the AUR in the target"
   ensure_chroot_dns
-  chroot_exec "pacman -S --ask=4 --needed --noconfirm git go base-devel"
+  chroot_exec "pacman -S --ask=4 --needed --noconfirm --overwrite '*' git go base-devel"
 
   local home_dir user_q
   user_q=$(printf '%q' "$INSTALL_USER")
@@ -1421,13 +1804,14 @@ install_packages_host() {
   # --ask=4 answers the "remove conflicting package?" prompt (yes), so a stale
   # legacy package such as chwd-db is auto-removed instead of aborting the
   # otherwise --noconfirm batch with an unresolvable conflict.
-  if ! run pacman -S --ask=4 --needed --noconfirm "${PACKAGE_REPO[@]}"; then
+  # --overwrite '*' resolves conflicts like zlib-ng-compat vs zlib.
+  if ! run pacman -S --ask=4 --needed --noconfirm --overwrite '*' "${PACKAGE_REPO[@]}"; then
     warn "Batch install failed for ${#PACKAGE_REPO[@]} repo package(s); retrying per-package."
     local pkg
     for pkg in "${PACKAGE_REPO[@]}"; do
       if (( DRY_RUN )); then
         printf '[dry-run] pacman -S --ask=4 --needed %s\n' "$pkg"
-      elif ! pacman -S --ask=4 --needed --noconfirm "$pkg" >>"$LOG_FILE" 2>&1; then
+      elif ! pacman -S --ask=4 --needed --noconfirm --overwrite '*' "$pkg" >>"$LOG_FILE" 2>&1; then
         PKG_FAILURES+=("$pkg")
       fi
     done
@@ -1483,7 +1867,7 @@ build_yay_host() {
   fi
 
   log "Building yay from the AUR (not present on this system)"
-  run pacman -S --ask=4 --needed --noconfirm git go base-devel >>"$LOG_FILE" 2>&1 || true
+  run pacman -S --ask=4 --needed --noconfirm --overwrite '*' git go base-devel >>"$LOG_FILE" 2>&1 || true
 
   local home_dir tmp
   home_dir=$(getent passwd "$INSTALL_USER" | cut -d: -f6)
@@ -1552,7 +1936,9 @@ adopt_user() {
   run useradd -m -G wheel "$INSTALL_USER"
   local pass
   pass=${INSTALL_PASSWORD:-$(ask_password "Password for $INSTALL_USER")}
-  printf '%s:%s\n' "$INSTALL_USER" "$pass" | run chpasswd
+  [[ -n $pass ]] || die "Empty password for $INSTALL_USER; refusing to continue."
+  printf '%s:%s\n' "$INSTALL_USER" "$pass" | run chpasswd -c SHA512 \
+    || die "Could not set the password for $INSTALL_USER (chpasswd failed)."
 }
 
 run_apply_system_host() {
@@ -1640,6 +2026,7 @@ main() {
 
   if (( EXISTING_MODE )); then
     plant_magikos_host
+    enable_multilib ""
     if cachyos_wanted /etc/pacman.conf; then
       enable_cachyos_repos "" \
         || warn "Continuing without the CachyOS repositories."
@@ -1657,33 +2044,71 @@ main() {
 
   trap unmount_target EXIT
 
+  # Orchestrated phases, in the same spirit as the orchestrator scripts the
+  # packaged ISO uses: every boot-image-affecting phase is explicitly ordered
+  # so UKIs are built exactly once, by finalize_limine_boot, after the last
+  # drop-in (CachyOS, autologin, Magikos system setup) has landed and after the
+  # per-user pass. The target's limine/mkinitcpio hooks are masked from just
+  # after pacstrap through every chrooted package phase (AUR pass, Magikos
+  # system + per-user setup) so pacman cannot rebuild UKIs mid-install against
+  # a cmdline that is still changing; validate_boot then refuses to call the
+  # install finished on a setup that cannot boot.
+  local -A PHASES=()
+  local -a PHASE_ORDER=()
+
+  local enc_label
   if (( ENCRYPT )); then
-    step "Partitioning $DISK (ESP + root, LUKS on)"
+    enc_label="Partitioning $DISK (ESP + root, LUKS on)|partition_disk"
   else
-    step "Partitioning $DISK (ESP + root, LUKS off)"
+    enc_label="Partitioning $DISK (ESP + root, LUKS off)|partition_disk"
   fi
-  partition_disk
-  step "Seeding target configuration"
-  seed_target_config
 
-  step "Bootstrapping the Arch base system"
-  bootstrap_arch
+  # key:label|fn is stored for step numbering; phase order defines execution.
+  add_phase() {
+    local key="$1" label_fn="$2"
+    PHASES[$key]="$label_fn"
+    PHASE_ORDER+=("$key")
+  }
 
-  step "Planting the Magikos tree in the target"
-  plant_magikos
-  step "Configuring the target"
-  configure_target
-  step "Creating user $INSTALL_USER"
-  create_user
-  seed_autologin "$TARGET/etc" "$INSTALL_USER"
-  step "Installing AUR packages (yay)"
-  install_aur_packages_target
-  step "Installing the bootloader"
-  install_bootloader
-  step "Applying Magikos system setup"
-  apply_magikos
-  step "Finalizing per-user setup"
-  finalize_user
+  add_phase part "$enc_label"
+  add_phase seed "Seeding the target configuration|seed_target_config"
+  add_phase bootstrap "Bootstrapping the Arch base system|bootstrap_arch"
+  add_phase plant "Planting the Magikos tree in the target|plant_magikos"
+  add_phase configure "Configuring the target|configure_target"
+  add_phase user "Creating user $INSTALL_USER|create_user"
+  add_phase aur "Installing AUR packages (yay)|install_aur_packages_target"
+  add_phase apply "Applying Magikos system setup|apply_magikos"
+  add_phase finalize "Finalizing per-user setup|finalize_user"
+  add_phase limine "Finalizing the Limine bootloader|finalize_limine_boot"
+  add_phase validate "Validating the boot setup|validate_boot"
+  add_phase snapshot "Freezing the factory snapshot|create_factory_snapshot"
+
+  TOTAL_STEPS=${#PHASE_ORDER[@]}
+  local key entry label fn
+  for key in "${PHASE_ORDER[@]}"; do
+    entry=${PHASES[$key]}
+    label=${entry%%|*}
+    fn=${entry#*|}
+
+    # The target's hook tree only exists once pacstrap has run; masking before
+    # then is a no-op. The very first chrooted package phase is where repeated
+    # mid-install UKI rebuilds would otherwise start, so mask right before it.
+    if [[ $key == "aur" ]]; then
+      mask_target_boot_hooks
+    fi
+
+    step "$label"
+    case $fn in
+      create_user)
+        create_user
+        seed_autologin "$TARGET/etc" "$INSTALL_USER"
+        ;;
+      *)
+        "$fn"
+        ;;
+    esac
+  done
+
   trap - EXIT
   finish
 }
