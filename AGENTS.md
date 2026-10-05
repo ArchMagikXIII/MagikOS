@@ -131,3 +131,48 @@ magikos-refresh-config sway/input.conf
 This copies `$MAGIKOS_PATH/config/sway/input.conf` to `~/.config/sway/input.conf`. The argument
 is interpolated into both paths and only checked with `[[ -e ]]`, so pass a plain relative path: a
 name containing `..` resolves and copies, landing outside `~/.config` rather than being rejected.
+
+# Main Desktop
+
+This system is the user's main desktop — the primary machine where changes that matter take place.
+All customizations, fixes, and improvements are tested here first before being committed upstream.
+
+## System Profile
+
+- **OS**: CachyOS (Arch-based) with Magikos shell installed
+- **CPU**: AMD Ryzen 7 3700X (8c/16t)
+- **RAM**: 39 GB
+- **GPU**: AMD Radeon RX 6700 XT (Navi 22)
+- **Storage**: 2x NVMe (256GB + 512GB) + SATA SSD + USB
+- **Network**: Realtek ethernet (`enp42s0`) + WiFi (`wlan0`)
+- **Session**: Sway (via Magikos shell)
+
+## Local Customizations
+
+### Cloned Plugins
+
+- `magikxiii.network` — cloned from `magikos.network`, includes ethernet detection fix
+- `magikxiii.workspaces` — custom workspaces plugin
+
+### shell.json
+
+- `birthYear: 1992`, `lifeExpectancy: 90` (for the clock widget)
+- `keyboard-layout` widget added
+- `verticalFormat` with em-dash
+- Plugin IDs switched to cloned versions
+
+## Fixes Committed Upstream
+
+### Network Ethernet Detection (2025-10-04)
+
+The upstream `magikos.network` plugin relied solely on `Networking.devices` to detect
+the active connection type. The packaged Quickshell fork never lists wired devices in
+`Networking.devices`, so ethernet connections were never detected on this system.
+
+**Fix**: Added a `liveKind` property and `statusProc` process that polls
+`magikos-network-status` every 5 seconds while the panel is closed. The `kind` property
+now checks `liveKind` and `info.type` before falling back to `Networking.devices`.
+
+**Files changed**: `shell/plugins/panels/network/Panel.qml`
+
+**Commit**: Already on `main` branch
