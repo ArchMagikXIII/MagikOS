@@ -88,6 +88,15 @@ export PATH="$MAGIKOS_PATH/bin:$PATH"
 source "$MAGIKOS_INSTALL/helpers/logging.sh"
 start_install_log
 
+# magikos-apply-system already elevates to root, but leaf scripts call sudo
+# for their privilege steps. A minimal target (installer chroot, debootstrap
+# without sudo) has no sudo binary, which fails every such step; when we are
+# root already, make it a pass-through.
+if (( EUID == 0 )) && magikos-cmd-missing sudo; then
+  sudo() { "$@"; }
+  export -f sudo
+fi
+
 source "$MAGIKOS_INSTALL/config/all.sh"
 
 if (( defer_provisioning )); then
