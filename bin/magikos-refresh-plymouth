@@ -8,8 +8,21 @@ export MAGIKOS_PATH="${MAGIKOS_PATH:-/usr/share/magikos}"
 sudo cp -r "$MAGIKOS_PATH/default/plymouth/." /usr/share/plymouth/themes/magikos/
 sudo plymouth-set-default-theme magikos
 
+# Rebuild the initramfs so the new theme is actually in it, using whichever
+# generator this distribution ships. plymouthd reads the theme from inside the
+# initramfs, so skipping the rebuild leaves the old theme booting.
 if magikos-cmd-present limine-mkinitcpio; then
   sudo limine-mkinitcpio
-else
+elif magikos-cmd-present mkinitcpio; then
   sudo mkinitcpio -P
+elif magikos-cmd-present update-initramfs; then
+  sudo update-initramfs -u
+elif magikos-cmd-present dracut; then
+  sudo dracut --force
+else
+  # The theme is installed and selected either way; only the rebuild is
+  # missing. Report it rather than aborting the caller, since a theme that
+  # needs regenerating is not worth failing a login setup or an install over.
+  echo "Warning: no initramfs generator found; plymouth will use the previous" >&2
+  echo "         theme until one is installed (mkinitcpio, dracut, or initramfs-tools)." >&2
 fi

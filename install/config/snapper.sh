@@ -4,6 +4,15 @@ template="${MAGIKOS_SNAPPER_TEMPLATE:-${MAGIKOS_PATH:-/usr/share/magikos}/defaul
 
 echo "Configuring Magikos Snapper snapshot retention"
 
+# snapper needs btrfs subvolumes to be useful and is not in every base set --
+# the Debian list leaves the root filesystem choice to the administrator. With
+# no snapper there is nothing to configure, and create-config would fail and
+# abort the chain.
+if ! command -v snapper >/dev/null 2>&1; then
+  echo "snapper not installed; skipping snapshot configuration"
+  return 0
+fi
+
 if [[ ! -f $SNAPPER_CONFIG_PATH ]]; then
   mkdir -p "$(dirname "$SNAPPER_CONFIG_PATH")"
 
@@ -21,4 +30,7 @@ printf '%s\n' 'SNAPPER_CONFIGS="root"' >"$SNAPPER_CONF_PATH"
 chmod 0644 "$SNAPPER_CONF_PATH"
 
 systemctl disable --now snapper-timeline.timer >/dev/null 2>&1 || true
-systemctl enable --now snapper-cleanup.timer limine-snapper-sync.service >/dev/null 2>&1 || true
+systemctl enable --now snapper-cleanup.timer >/dev/null 2>&1 || true
+# limine-snapper-sync is a MagikOS/CachyOS package with no Debian counterpart,
+# so enable it only where the unit exists.
+systemctl enable --now limine-snapper-sync.service >/dev/null 2>&1 || true

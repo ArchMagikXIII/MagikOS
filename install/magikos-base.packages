@@ -71,6 +71,7 @@ gst-plugin-va
 hdparm
 inetutils
 inotify-tools
+jq
 iwd
 jfsutils
 less
@@ -79,6 +80,7 @@ lib32-vulkan-radeon
 libdvdcss
 libgsf
 libopenraw
+libxkbcommon
 linux-cachyos
 linux-cachyos-headers
 linux-cachyos-nvidia-open
@@ -117,6 +119,7 @@ pacman-contrib
 pavucontrol
 perl
 plocate
+playerctl
 poppler-glib
 power-profiles-daemon
 profile-sync-daemon

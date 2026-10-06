@@ -1,0 +1,653 @@
+#!/bin/bash
+
+# Magikos installer for Debian and derivatives (Debian 13, Parrot OS).
+#
+# Adopts a running Debian system: plants the Magikos tree, installs the apt
+# package set, then hands off to the same target-side setup the Arch ISO uses
+# (magikos-apply-system). There is deliberately no partitioning, chroot, or
+# bootloader stage here -- that is installer/magikos-install's job, and it
+# pacstraps an Arch root that has no meaning on a Debian host.
+#
+# It differs from the Arch installer's --existing mode in one deliberate way:
+# /etc is never rsynced wholesale. Adopting a live Debian box means writing
+# into a /etc that dpkg owns, so only files under drop-in directories are
+# deployed, and whole-file host configuration is offered as a sidecar for the
+# administrator to merge instead of being overwritten.
+#
+# Usage: sudo ./installer/magikos-install-debian --user alice [options]
+# See installer/README.md for the full contract.
+
+set -euo pipefail
+
+ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+PLANTED="/usr/share/magikos"
+
+INSTALL_USER=""
+DRY_RUN=0
+ASSUME_YES=0
+SKIP_PACKAGES=0
+NO_ETC_DROPINS=0
+HOST_OVERRIDES=0
+
+LOG_FILE="${MAGIKOS_INSTALL_LOG_FILE:-/var/log/magikos-install-debian.log}"
+PKG_FAILURES=()
+
+log() {
+  printf '\033[32m==> %s\033[0m\n' "$1"
+}
+
+warn() {
+  printf '\033[33m==> %s\033[0m\n' "$1" >&2
+}
+
+die() {
+  printf '\033[31mError: %s\033[0m\n' "$1" >&2
+  exit 1
+}
+
+usage() {
+  cat <<USAGE
+Usage:
+  magikos-install-debian --user NAME [options]
+
+Required:
+  --user NAME       Non-root user to seed the shipped defaults into. Must
+                    already exist: this installer adopts a system, it does
+                    not create accounts.
+
+Options:
+  --skip-packages   Plant and wire up the tree but install nothing with apt.
+  --no-etc-dropins  Do not write anything under /etc.
+  --host-overrides  Also write the whole-file host configuration Magikos
+                    ships (nsswitch.conf, faillock.conf, dirmngr.conf,
+                    plymouthd.conf) as <name>.magikos-new sidecars for the
+                    administrator to review. They are never applied directly:
+                    each replaces a file dpkg owns, and a wrong resolver
+                    order or a disabled PAM lockout breaks the host.
+  --yes             Do not prompt for confirmation
+  --dry-run         Print every action without touching anything
+  -h, --help        This help
+USAGE
+}
+
+while (($#)); do
+  case "$1" in
+    --user) INSTALL_USER="$2"; shift 2 ;;
+    --skip-packages) SKIP_PACKAGES=1; shift ;;
+    --no-etc-dropins) NO_ETC_DROPINS=1; shift ;;
+    --host-overrides) HOST_OVERRIDES=1; shift ;;
+    --yes) ASSUME_YES=1; shift ;;
+    --dry-run) DRY_RUN=1; shift ;;
+    -h|--help) usage; exit 0 ;;
+    *) echo "Unknown option: $1" >&2; usage >&2; exit 1 ;;
+  esac
+done
+
+run() {
+  if (( DRY_RUN )); then
+    printf '[dry-run] %s\n' "$*"
+  else
+    "$@"
+  fi
+}
+
+# All file writes go through here so --dry-run genuinely touches nothing.
+write_file() {
+  local path="$1" content="$2"
+  if (( DRY_RUN )); then
+    printf '[dry-run] write %s (%s bytes)\n' "$path" "${#content}"
+  else
+    run mkdir -p "$(dirname "$path")"
+    printf '%s' "$content" >"$path"
+  fi
+}
+
+require_tools() {
+  local missing=()
+  local tool
+  for tool in "$@"; do
+    command -v "$tool" >/dev/null 2>&1 || missing+=("$tool")
+  done
+  if ((${#missing[@]} > 0)); then
+    die "Missing required tools: ${missing[*]}"
+  fi
+}
+
+require_root() {
+  if (( EUID != 0 )); then
+    die "Run this installer as root (sudo ./installer/magikos-install-debian --user $INSTALL_USER)"
+  fi
+}
+
+ask_confirm() {
+  local prompt="$1"
+  if (( ASSUME_YES )); then
+    return 0
+  fi
+  local reply
+  read -r -p "$prompt [y/N] " reply
+  [[ $reply == "y" || $reply == "Y" ]]
+}
+
+preflight() {
+  # A dry run writes nothing, so it does not need root and stays usable for
+  # checking the plan from an ordinary shell.
+  if (( ! DRY_RUN )); then
+    require_root
+  fi
+  require_tools rsync apt-get mountpoint mktemp
+
+  if ! command -v apt-get >/dev/null 2>&1; then
+    die "apt-get not found; this installer is for Debian and derivatives"
+  fi
+
+  if [[ -z $INSTALL_USER ]]; then
+    die "--user is required (see --help)"
+  fi
+
+  if ! id "$INSTALL_USER" &>/dev/null; then
+    die "User '$INSTALL_USER' does not exist; create it first with 'adduser $INSTALL_USER'"
+  fi
+
+  if [[ $(id -u "$INSTALL_USER") == "0" ]]; then
+    die "Refusing to seed root's home directory; pass a normal account to --user"
+  fi
+
+  # Adopt mode never repartitions, but it does write into /etc, so a mounted
+  # target is worth refusing rather than silently writing to it.
+  if mountpoint -q /etc && (( ! DRY_RUN )); then
+    die "/etc is a separate mount; refusing to adopt a system with /etc bind-mounted"
+  fi
+
+  if (( ! DRY_RUN )) && (( ! ASSUME_YES )); then
+    warn "This writes to $PLANTED, /etc/skel, /usr/local/bin, and selected /etc drop-ins."
+    ask_confirm "Continue?" || die "Aborted."
+  fi
+}
+
+# Running straight out of the planted tree (packaged checkout or a previous
+# adoption): rsync --delete onto ourselves would be destructive.
+plant_magikos() {
+  if [[ $(realpath "$ROOT") == "$PLANTED" ]]; then
+    log "Tree is already planted at $PLANTED"
+  else
+    log "Planting the Magikos tree at $PLANTED"
+    run mkdir -p "$PLANTED"
+    run rsync -a --delete --chown=root:root \
+      --exclude '.git/' --exclude 'test/' --exclude '*.log' \
+      "$ROOT/" "$PLANTED/"
+  fi
+}
+
+# Replicates the magikos-settings package assembly of /etc/skel, which does
+# not exist as a package yet: config/** maps under .config, default/bashrc
+# becomes the dotfile, and shipped desktop entries land in .local/share.
+assemble_skeleton() {
+  local skel="$1"
+  run mkdir -p "$skel/.config" "$skel/.local/share/applications" "$skel/Pictures/Wallpapers"
+  run cp -a "$ROOT/config/." "$skel/.config/"
+  run cp -a "$ROOT/default/bashrc" "$skel/.bashrc"
+  if [[ -d $ROOT/applications ]]; then
+    run cp -a "$ROOT/applications/." "$skel/.local/share/applications/"
+  fi
+  # Ship default wallpapers so the sway config
+  # (output * bg ~/Pictures/Wallpapers/Osaka.jpg) works immediately.
+  if [[ -d $ROOT/wallpapers ]]; then
+    run cp -a "$ROOT/wallpapers/." "$skel/Pictures/Wallpapers/"
+  fi
+  # Magikos always launches the shell with an explicit path, but a bare
+  # `quickshell` should still find it; point the default config at the tree.
+  run mkdir -p "$skel/.config/quickshell"
+  run ln -sfn "$PLANTED/shell" "$skel/.config/quickshell/default"
+}
+
+# Debian foot 1.21 only knows the [colors] section -- the Arch-side config
+# spells its dark palette [colors-dark] with the cursor colors as `cursor=`
+# inside it, which Debian foot rejects with "invalid section name" and
+# "not valid option" and then aborts. Retarget those keys for every foot
+# fragment we ship so fresh installs get a parseable config.
+fixup_debian_foot_file() {
+  local path="$1"
+  [[ -f $path ]] || return 0
+  python3 - "$path" <<'PYEOF'
+import re, sys
+path = sys.argv[1]
+text = open(path).read()
+text = text.replace('[colors-dark]', '[colors]')
+m = re.search(r'^cursor=(.+)$', text, re.M)
+if m:
+    text = re.sub(r'^cursor=.+\n', '', text, flags=re.M)
+    cursor_line = 'color=' + m.group(1).strip() + '\n'
+    if re.search(r'^\[cursor\]$', text, re.M):
+        text = re.sub(r'^\[cursor\]\n', '[cursor]\n' + cursor_line, text, count=1, flags=re.M)
+    else:
+        text = text.rstrip('\n') + '\n\n[cursor]\n' + cursor_line
+    open(path, 'w').write(text)
+PYEOF
+}
+
+fixup_debian_foot() {
+  log "Retargeting shipped foot configs for Debian"
+  fixup_debian_foot_file "$PLANTED/config/foot/foot.ini"
+  fixup_debian_foot_file "$PLANTED/default/foot/screensaver.ini"
+  fixup_debian_foot_file "$PLANTED/default/themed/foot.ini.tpl"
+  fixup_debian_foot_file "$1/.config/foot/foot.ini"
+}
+
+install_app_icons() {
+  # applications/icons are single-size PNGs; hicolor wants them under the
+  # standard size dirs so desktop lookups resolve.
+  if [[ ! -d $ROOT/applications/icons ]]; then
+    return 0
+  fi
+  local size
+  for size in 48x48 256x256; do
+    run mkdir -p "/usr/share/icons/hicolor/$size/apps"
+    run cp -a "$ROOT/applications/icons/." "/usr/share/icons/hicolor/$size/apps/"
+  done
+}
+
+# The planted tree is the only source of magikos-* commands on an
+# installer-built system. Expose every command through /usr/local/bin, which
+# precedes /usr/bin on Debian's default PATH and is visible to every session
+# context: terminals, systemd units, SSH, and the shell itself. Non-executable
+# sourced libraries (e.g. magikos-pkg-backend) live in bin/ too and must be
+# reachable on PATH just like the executables that source them.
+link_planted_binaries() {
+  local bindir="/usr/local/bin"
+  local exe name
+  run mkdir -p "$bindir"
+  # Enumerate from the checkout: it is exactly what plant_magikos rsyncs into
+  # $PLANTED, which may not exist yet under --dry-run.
+  for exe in "$ROOT/bin/"*; do
+    [[ -f $exe ]] || continue
+    name=${exe##*/}
+    run ln -sfn "$PLANTED/bin/$name" "$bindir/$name"
+  done
+}
+
+# systemd-environment-d-generator reads /usr/lib/environment.d/*.conf for the
+# user session. This is the only thing that makes $MAGIKOS_PATH resolve for
+# systemd user services and for a plain `sway` launched from a TTY, so it
+# matters more on Debian than on the ISO: uwsm is optional here, and most
+# Debian users start sway directly.
+install_session_env() {
+  log "Installing session environment"
+
+  run mkdir -p /usr/lib/environment.d
+  run cp -a "$ROOT/default/environment.d/." /usr/lib/environment.d/
+
+  if (( DRY_RUN )); then
+    return 0
+  fi
+
+  # uwsm sources /usr/share/uwsm/env.d/* for the graphical session. Only
+  # meaningful when uwsm is installed, and skip when the checkout already IS
+  # the planted tree (install -D refuses same-file).
+  if command -v uwsm >/dev/null 2>&1; then
+    if [[ ! "$ROOT/default/uwsm/env.d/10-magikos" -ef /usr/share/uwsm/env.d/10-magikos ]]; then
+      run install -Dm644 "$ROOT/default/uwsm/env.d/10-magikos" \
+        /usr/share/uwsm/env.d/10-magikos
+    fi
+  else
+    log "uwsm not installed; relying on /usr/lib/environment.d and /etc/profile.d"
+  fi
+}
+
+# Drop-ins we own outright. Every path here lands in a directory whose whole
+# purpose is additive merging (*.conf.d, sysctl.d, modprobe.d, tmpfiles.d,
+# sudoers.d, profile.d), so writing them cannot clobber a file dpkg ships under
+# the same name. Anything that replaces a whole dpkg-owned file belongs in
+# HOST_OVERRIDE_FILES instead.
+#
+# Limine's UKI entry tooling and mkinitcpio drop-ins are deliberately absent:
+# they are Arch boot-stack configuration with no Debian counterpart.
+ETC_DROPIN_FILES=(
+  modprobe.d/magikos-usb-autosuspend.conf
+  NetworkManager/conf.d/magikos-wifi-powersave.conf
+  profile.d/magikos.sh
+  sudoers.d/magikos-asdcontrol
+  sudoers.d/magikos-dns
+  sudoers.d/magikos-passwd-tries
+  sudoers.d/magikos-tzupdate
+  sysctl.d/90-magikos-file-watchers.conf
+  sysctl.d/99-magikos-sysctl.conf
+  systemd/logind.conf.d/10-ignore-power-button.conf
+  systemd/logind.conf.d/20-inhibit-delay.conf
+  systemd/oomd.conf.d/10-magikos.conf
+  systemd/system.conf.d/10-faster-shutdown.conf
+  systemd/system.conf.d/20-magikos-nofile.conf
+  systemd/user.conf.d/20-magikos-nofile.conf
+  systemd/system/docker.service.d/no-block-boot.conf
+  systemd/system/plocate-updatedb.service.d/ac-only.conf
+  systemd/system/user@.service.d/10-faster-shutdown.conf
+  tmpfiles.d/magikos-zswap.conf
+)
+
+# Whole-file host configuration. These replace a file the distribution owns
+# and manages with dpkg conffile prompts, and each one changes host behaviour
+# well beyond Magikos:
+#
+#   nsswitch.conf      resolver order; a wrong hosts: line breaks DNS and mDNS
+#   security/faillock  PAM login lockout; Magikos's relaxes it
+#   gnupg/dirmngr      keyserver and refresh policy for every GPG operation
+#   plymouth/plymouthd boot splash behaviour on a live console
+#
+# Never applied directly. --host-overrides writes them next to the original as
+# <name>.magikos-new so the administrator can diff and merge.
+HOST_OVERRIDE_FILES=(
+  nsswitch.conf
+  security/faillock.conf
+  gnupg/dirmngr.conf
+  plymouth/plymouthd.conf
+)
+
+sync_etc_dropins() {
+  if (( NO_ETC_DROPINS )); then
+    log "Skipping /etc drop-ins (--no-etc-dropins)"
+    return 0
+  fi
+
+  log "Installing /etc drop-ins"
+  local rel
+  for rel in "${ETC_DROPIN_FILES[@]}"; do
+    if [[ ! -f $ROOT/etc/$rel ]]; then
+      warn "Drop-in missing from the tree: etc/$rel"
+      continue
+    fi
+    run install -Dm644 "$ROOT/etc/$rel" "/etc/$rel"
+  done
+
+  # sudo refuses a sudoers.d entry that is not root-owned or is group/world
+  # writable, and the checkout carries the invoking user's umask bits.
+  if (( ! DRY_RUN )) && [[ -d /etc/sudoers.d ]]; then
+    local entry
+    for entry in /etc/sudoers.d/magikos-*; do
+      [[ -f $entry ]] || continue
+      run chown root:root "$entry"
+      run chmod 440 "$entry"
+    done
+  fi
+}
+
+offer_host_overrides() {
+  if (( ! HOST_OVERRIDES )); then
+    if ((${#HOST_OVERRIDE_FILES[@]} > 0)); then
+      log "Leaving whole-file host configuration untouched (--host-overrides to stage sidecars)"
+    fi
+    return 0
+  fi
+
+  log "Staging whole-file host configuration as .magikos-new sidecars"
+  local rel
+  for rel in "${HOST_OVERRIDE_FILES[@]}"; do
+    if [[ ! -f $ROOT/etc/$rel ]]; then
+      continue
+    fi
+    run install -Dm644 "$ROOT/etc/$rel" "/etc/$rel.magikos-new"
+  done
+  warn "Review each /etc/*.magikos-new and merge it yourself; nothing was applied."
+}
+
+# apt-get aborts an entire transaction when any one name is unknown, which a
+# 169-name list on a derivative distro makes likely. Install the batch, then
+# narrow to just the names apt reported as unavailable and retry those
+# individually, so a handful of missing packages costs those packages and not
+# the whole session. Mirrors the Arch installer's best-effort contract and its
+# per-package retry.
+#
+# --force-confdef/--force-confold keep dpkg on the host's existing conffiles.
+# Without them a conffile belonging to a package this run upgrades prompts on
+# stdin and hangs an unattended install; overwriting them is the adopting
+# system's business, not the installer's.
+APT_INSTALL_OPTS=(-y --no-install-recommends
+  -o Dpkg::Options::=--force-confdef
+  -o Dpkg::Options::=--force-confold)
+
+# Names apt reports as unavailable, one per line.
+apt_unavailable_names() {
+  grep -oP '^(E: )?Unable to locate package \K\S+' "$1" 2>/dev/null
+  grep -oP '^Package \K\S+(?= has no installation candidate)' "$1" 2>/dev/null
+}
+
+# Try to install one package, recording it as unavailable on failure. Silent
+# because apt's own complaint is either already on screen (batch case) or
+# irrelevant (a single name that cannot resolve).
+try_install() {
+  local pkg="$1"
+  if apt-get install "${APT_INSTALL_OPTS[@]}" "$pkg" >/dev/null 2>&1; then
+    return 0
+  fi
+  # quickshell, uwsm, and gamescope only reach a release via its backports
+  # pocket, so a package that misses the main archive may still resolve with
+  # an explicit -t <codename>-backports pin.
+  local codename
+  codename=$(grep -Po '^VERSION_CODENAME=\K\S+' /etc/os-release 2>/dev/null || true)
+  if [[ -n $codename ]] && apt-get install "${APT_INSTALL_OPTS[@]}" -t "${codename}-backports" "$pkg" >/dev/null 2>&1; then
+    return 0
+  fi
+  PKG_FAILURES+=("$pkg")
+  return 1
+}
+
+install_packages() {
+  if (( SKIP_PACKAGES )); then
+    log "Skipping package installation (--skip-packages)"
+    return 0
+  fi
+
+  log "Installing the Magikos package set with apt (best effort)"
+
+  local list="$ROOT/install/magikos-base-debian.packages"
+  local -a packages=() unavailable=() errors
+  local chunk_size=24
+  local installed=0 offset total
+
+  mapfile -t packages < <(grep -v '^#' "$list" | grep -v '^$')
+  total=${#packages[@]}
+  if (( total == 0 )); then
+    die "No packages found in $list"
+  fi
+
+  if (( DRY_RUN )); then
+    printf '[dry-run] apt-get update\n'
+    printf '[dry-run] apt-get install %s (%s packages, in chunks of %s)\n' \
+      "${APT_INSTALL_OPTS[*]}" "$total" "$chunk_size"
+    return 0
+  fi
+
+  log "Refreshing apt lists"
+  if ! apt-get update; then
+    warn "apt-get update failed; continuing with the cached lists"
+  fi
+
+# apt-get installs in one transaction or not at all, so a single unresolvable
+# name -- or one strict dependency tie, which apt reports as a solver failure
+# rather than a missing package -- would otherwise cost the entire set. Work in
+# chunks so a bad name is contained to its chunk, then retry that chunk one
+# package at a time: per-package is the only way to tell a genuinely broken
+# package from one that merely collided with its neighbours, and it keeps the
+# other names in the chunk installable.
+errors=$(mktemp)
+for (( offset = 0; offset < total; offset += chunk_size )); do
+  local -a chunk=("${packages[@]:offset:chunk_size}")
+  if apt-get install "${APT_INSTALL_OPTS[@]}" "${chunk[@]}" 2>"$errors"; then
+    installed=$(( installed + ${#chunk[@]} ))
+    continue
+  fi
+
+  mapfile -t unavailable < <(apt_unavailable_names "$errors" | sort -u)
+  if ((${#unavailable[@]} > 0)); then
+    log "Chunk at $offset: apt named ${#unavailable[@]} unavailable package(s); retrying the chunk individually"
+  else
+    # A solver failure, a download error, or a maintainer script. Per-package
+    # retries surface which name is actually at fault.
+    log "Chunk at $offset failed without naming an unavailable package; retrying the chunk individually"
+  fi
+
+  local pkg
+  for pkg in "${chunk[@]}"; do
+    try_install "$pkg" && installed=$(( installed + 1 ))
+  done
+done
+rm -f "$errors"
+
+  log "Installed $installed of $total packages"
+  if ((${#PKG_FAILURES[@]} > 0)); then
+    warn "$(( ${#PKG_FAILURES[@]} )) package(s) unavailable on this system; listed at the end."
+  fi
+}
+
+# Neither Debian nor Parrot ships quickshell under the `qs` name, but
+# bin/magikos-shell drives the shell through `qs ipc`. Debian's quickshell
+# package does ship it; this only covers a host where someone installed
+# quickshell by other means.
+ensure_quickshell_shims() {
+  log "Checking quickshell entry points"
+
+  if ! command -v quickshell >/dev/null 2>&1; then
+    warn "quickshell is not installed; the Magikos bar and panels will not start."
+    return 0
+  fi
+
+  if ! command -v qs >/dev/null 2>&1; then
+    run ln -sfn "$(command -v quickshell)" /usr/local/bin/qs
+  fi
+
+  if (( ! DRY_RUN )); then
+    local version
+    version=$(quickshell --version 2>/dev/null | head -1)
+    # bin/magikos-restart-shell notes that quickshell-git changed `kill` to
+    # block until the instance exits; 0.3.0 returns immediately. The restart
+    # loop tolerates that, but a slow-exiting shell can briefly overlap its
+    # replacement, so say so rather than leaving the user to notice.
+    if [[ $version == *"0.3.0"* ]]; then
+      warn "Debian's quickshell 0.3.0 returns from 'quickshell kill' before the instance exits."
+      warn "Shell restarts may briefly overlap; the MagikOS quickshell-git build fixes this."
+    fi
+  fi
+}
+
+run_apply_system() {
+  log "Running Magikos system setup"
+
+  # --first-install marks shipped migrations complete instead of replaying
+  # them over an adopted system; same thing the ISO does for its fresh user.
+  local cmd="env MAGIKOS_PATH=$PLANTED \
+    MAGIKOS_INSTALL=$PLANTED/install \
+    PATH=$PLANTED/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
+    bash $PLANTED/bin/magikos-apply-system --install-user $(printf '%q' "$INSTALL_USER") --first-install"
+
+  if (( DRY_RUN )); then
+    printf '[dry-run] %s\n' "$cmd"
+  elif ! bash -c "$cmd"; then
+    # One failing leaf aborts the whole chain (set -euo pipefail); that must
+    # not lose the rest of the install.
+    warn "magikos-apply-system reported errors; system setup may be incomplete."
+    warn "Per-step output is in /var/log/magikos-install.log - fix and re-run this installer (it is idempotent)."
+  fi
+}
+
+# useradd only replays /etc/skel for accounts it creates, and --user must be an
+# existing account, so the adopting user keeps their old $HOME until the skel
+# tree is replayed over it. Then per-user finalization runs as that user --
+# it refuses root.
+seed_user_home() {
+  log "Syncing shipped defaults into ~$INSTALL_USER and finalizing"
+
+  if (( DRY_RUN )); then
+    printf '[dry-run] cp -a --remove-destination /etc/skel/. ~%s/\n' "$INSTALL_USER"
+    printf '[dry-run] runuser -u %s -- magikos-provision-user --first-install\n' "$INSTALL_USER"
+    return 0
+  fi
+
+  local home_dir
+  home_dir=$(getent passwd "$INSTALL_USER" | cut -d: -f6)
+
+  # --remove-destination keeps a skel file from being written *through* an
+  # existing user symlink, which would truncate whatever the link targets.
+  if ! runuser -u "$INSTALL_USER" -- env HOME="$home_dir" bash -c 'cp -a --remove-destination /etc/skel/. "$HOME/"'; then
+    warn "Could not resync /etc/skel into ~$INSTALL_USER"
+  fi
+
+  if ! runuser -u "$INSTALL_USER" -- env \
+    HOME="$home_dir" \
+    MAGIKOS_PATH="$PLANTED" \
+    MAGIKOS_INSTALL="$PLANTED/install" \
+    PATH="$PLANTED/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" \
+    bash "$PLANTED/bin/magikos-provision-user" --first-install; then
+    warn "Per-user finalization reported errors; re-run 'magikos finalize user' after first login."
+  fi
+}
+
+# The Arch installer fetches these as pinned upstream binaries. Only
+# oh-my-posh is ported here: topgrade has no stable, documented release URL we
+# can pin, and inventing one would be worse than reporting the gap, since
+# magikos-update runs topgrade as its first step.
+install_oh_my_posh() {
+  if command -v oh-my-posh >/dev/null 2>&1; then
+    return 0
+  fi
+
+  local version="v30.6.5"
+  local url="https://github.com/JanDeDobbeleer/oh-my-posh/releases/download/$version/posh-linux-amd64"
+  log "Installing oh-my-posh $version"
+  if ! run curl -fsSL "$url" -o /usr/local/bin/oh-my-posh; then
+    warn "Could not download oh-my-posh; fish will use its stock prompt."
+    run rm -f /usr/local/bin/oh-my-posh
+    return 0
+  fi
+  run chmod 755 /usr/local/bin/oh-my-posh
+}
+
+report_pkg_failures() {
+  if ((${#PKG_FAILURES[@]} == 0)); then
+    return 0
+  fi
+  warn "The following packages could not be installed on this system:"
+  local pkg
+  for pkg in "${PKG_FAILURES[@]}"; do
+    printf '    %s\n' "$pkg"
+  done
+}
+
+finish() {
+  echo
+  report_pkg_failures
+  log "Magikos applied to $PLANTED; ~$INSTALL_USER resynced from shipped defaults."
+  warn "No bootloader, partitioning, or initramfs changes were made."
+  warn "Log in on a new TTY, or run 'uwsm start sway', to reach the session."
+  log "Install log: $LOG_FILE"
+}
+
+main() {
+  preflight
+
+  # apt is non-interactive only when told, and a debconf prompt would hang an
+  # install that is otherwise unattended.
+  export DEBIAN_FRONTEND=noninteractive
+
+  plant_magikos
+
+  log "Seeding /etc/skel and installing icons"
+  run mkdir -p /etc/skel
+  assemble_skeleton /etc/skel
+  install_app_icons
+  fixup_debian_foot /etc/skel
+
+  link_planted_binaries
+  install_session_env
+  sync_etc_dropins
+  offer_host_overrides
+
+  install_packages
+  install_oh_my_posh
+  ensure_quickshell_shims
+
+  run_apply_system
+  seed_user_home
+
+  finish
+}
+
+main "$@"

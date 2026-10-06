@@ -99,7 +99,10 @@ grep -Fx 'DefaultMemoryPressureDurationSec=20s' "$oomd_conf" >/dev/null ||
   fail "no pressure duration set for the tightened limit"
 pass "systemd-oomd acts on sustained memory stall"
 
-grep -Fx 'systemctl enable systemd-oomd.service' "$ROOT/install/config/enable-services.sh" >/dev/null ||
+# enable-services.sh routes each unit through enable_unit so a base set that
+# does not ship one (Debian carries no sddm) skips it instead of failing the
+# chain; assert the unit is still enabled, by whichever route.
+grep -Fx 'enable_unit systemd-oomd.service' "$ROOT/install/config/enable-services.sh" >/dev/null ||
   fail "new installs ship the oomd drop-ins with the daemon that reads them disabled"
 
 oomd_migration=$(grep -rl 'systemd-oomd.service' "$ROOT/migrations" | head -n 1 || true)

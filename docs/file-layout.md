@@ -314,6 +314,13 @@ The package lists the ISO pacstraps live at `install/magikos-base.packages`
 and `install/magikos-other.packages`; the ISO builder also reads them when
 constructing its offline mirror.
 
+`install/magikos-base-debian.packages` is the apt counterpart read by
+`installer/magikos-install-debian`, the Debian adoption installer. Debian has
+no ISO path, so that script is the only entry point for a non-Arch system and
+covers planting, the package set, `/etc` drop-ins, and per-user seeding;
+[`debian.md`](debian.md) has the full scope, the backend mapping, and the
+remaining gaps.
+
 ## Explicit resync (`magikos-reinstall-configs`)
 
 When an existing user wants to reset to shipped defaults:

@@ -145,11 +145,11 @@ Item {
   // screen; the distinction only decides whether a DND-silenced one is worth
   // recording at all.
   function isEphemeral(notification) {
-    var transient = false
+    var transientFlag = false
     try {
-      transient = !!(notification.hints && notification.hints["transient"])
-    } catch (e) { transient = false }
-    return transient || NotificationLogic.isEphemeralApp(String(notification.appName || ""))
+      transientFlag = !!(notification.hints && notification.hints["transient"])
+    } catch (e) { transientFlag = false }
+    return transientFlag || NotificationLogic.isEphemeralApp(String(notification.appName || ""))
   }
 
   function handleNotification(notification) {

@@ -23,4 +23,12 @@ done
 
 if (( ${#installed[@]} > 0 )); then
   sudo "${PKG_REMOVE_CMD[@]}" "${installed[@]}"
+
+  # pacman -Rns sweeps orphaned dependencies in the same transaction, so its
+  # backend leaves this array empty. Backends whose remove verb cannot also
+  # collect orphans (apt) fill it, and the sweep runs only once the removal
+  # itself succeeded.
+  if (( ${#PKG_AUTOREMOVE_CMD[@]} > 0 )); then
+    sudo "${PKG_AUTOREMOVE_CMD[@]}"
+  fi
 fi

@@ -1,0 +1,216 @@
+# Magikos package list the Debian installer installs with apt-get.
+# Debian counterpart of magikos-base.packages; the Arch list stays canonical
+# for the ISO. Names are apt names, so several differ from the Arch spelling
+# (mapping notes at the bottom).
+#
+# CachyOS-specific packages, the AUR helpers (yay/paru/reflector) and the Arch
+# kernel/initramfs stack are deliberately absent: Debian carries its own
+# xwayland, initramfs-tools and Limine packaging, and the hardware tier lives
+# in magikos-other-debian.packages rather than the base session.
+accountsservice
+alsa-firmware-loaders
+alsa-utils
+amd64-microcode
+autoconf-archive
+bash-completion
+bind9
+blueman
+bluez
+bluez-firmware
+bluez-obexd
+bolt
+breeze-icon-theme
+brightnessctl
+btop
+btrfs-progs
+cmatrix
+cryptsetup
+curl
+default-jre-headless
+dosfstools
+duf
+e2fsprogs
+efibootmgr
+ethtool
+exfatprogs
+f2fs-tools
+fastfetch
+feh
+ffmpegthumbnailer
+firefox-esr
+flameshot
+flatpak
+foot
+fonts-dejavu-core
+fonts-font-awesome
+fonts-inter
+fonts-jetbrains-mono
+fonts-liberation
+fonts-noto-color-emoji
+fonts-noto-core
+fonts-open-sans
+fuzzel
+fwupd
+gamemode
+gamescope
+gawk
+gcc
+gdb
+git
+glances
+grim
+gnome-icon-theme
+gnome-themes-extra
+gum
+gvfs-backends
+hicolor-icon-theme
+htop
+imv
+iwd
+inotify-tools
+jq
+less
+libadwaita-1-0
+libasound2-plugins
+libegl-mesa0
+libgl1-mesa-dri
+libglx-mesa0
+libgtk-3-0
+libgtk-4-1
+libxkbcommon-tools
+libnotify4
+libpam-gnome-keyring
+libsecret-1-0
+libspa-0.2-bluetooth
+libva2
+libvdpau1
+libvulkan1
+libwayland-client0
+lm-sensors
+lua5.4
+lsp-plugins-lv2
+mako-notifier
+man-db
+manpages
+mesa-utils
+mesa-vulkan-drivers
+micro
+mpv
+nano
+nautilus
+neovim
+network-manager
+network-manager-applet
+ninja-build
+nodejs
+libnss-mdns
+numactl
+p7zip-full
+papirus-icon-theme
+passt
+patch
+pciutils
+pipewire-audio
+pipewire-jack
+plocate
+plymouth
+plymouth-themes
+playerctl
+poppler-utils
+power-profiles-daemon
+powertop
+procps
+python-is-python3
+python3
+python3-packaging
+python3-requests
+python3-yaml
+qml6-module-qtquick
+qml6-module-qtquick-controls
+qml6-module-qtquick-dialogs
+qml6-module-qtquick-effects
+qml6-module-qtquick-layouts
+qml6-module-qtquick-localstorage
+qml6-module-qtquick-window
+qt6-base-dev
+qt6-declarative-dev
+qt6-wayland
+quickshell
+ripgrep
+rsync
+s-nail
+scdoc
+sed
+shellcheck
+smartmontools
+socat
+sway
+swaybg
+swayidle
+swaylock
+swappy
+switcheroo-control
+systemd-resolved
+systemd-timesyncd
+tar
+tealdeer
+thunar
+tinyproxy
+tuptime
+usbutils
+uwsm
+vim
+vulkan-tools
+wget
+which
+wireplumber
+wl-clipboard
+wlogout
+wmenu
+wpasupplicant
+xdg-desktop-portal
+xdg-desktop-portal-gtk
+xdg-desktop-portal-wlr
+xdg-terminal-exec
+xdg-user-dirs
+xwayland
+xterm
+yt-dlp
+zathura
+zenity
+zram-tools
+# Name mapping from magikos-base.packages, kept here so the next port does not
+# re-derive it:
+#   bind -> bind9              wpa_supplicant -> wpasupplicant
+#   libspa-0.2-jack -> pipewire-jack (the Arch name is frozen at libspa 1.4 and
+#     conflicts with the libspa-0.2-modules that current pipewire ships)
+#   awesome-terminal-fonts -> fonts-font-awesome
+#   alsa-firmware -> alsa-firmware-loaders
+#   alsa-plugins -> libasound2-plugins
+#   amd-ucode -> amd64-microcode
+#   mako -> mako-notifier       nss-mdns -> libnss-mdns       libva-dbus2 -> libva2
+#   xorg-xwayland -> xwayland   mkinitramfs -> initramfs-tools
+#   ttf-bitstream-vera -> fonts-dejavu-core
+#   ttf-liberation -> fonts-liberation
+#   ttf-jetbrains-mono-nerd -> fonts-jetbrains-mono
+#   poppler-glib -> poppler-utils
+#   imv, foot, fuzzel, wmenu, sway*, quickshell, uwsm keep the same names
+#
+# Dropped, no apt counterpart: every cachyos-* package (CachyOS repo only),
+# yay, yay-debug, paru, pacman-contrib, bluetui, pkgfile, reflector, topgrade,
+# os-prober, hwdetect, netctl (systemctl owns it), nano-syntax-highlighting,
+# mkusb, swaync, ttf-ms-fonts (ttf-mscorefonts-installer is non-free),
+# wl-clipboard-wayland (covered by wl-clipboard), base, base-devel, libvpl,
+# vpl-gpu-rt, egl-wayland, libpulse, qml6-module-plain-text-model (Qt-version
+# dependent).
+#
+# Also omitted: the openssh split (openssh-client/-server/-sftp-server). Debian
+# ties the server to an exact openssh-client version, so on a host whose client
+# came from backports the transaction is unsatisfiable and apt attempts a
+# downgrade it refuses -- it cost two failures out of every install. Nothing in
+# the session needs it. The Arch list keeps openssh; a Debian adopter who wants
+# a remote shell installs it themselves, or pulls openssh-server from
+# backports so it matches their client.
+#
+# Shipped as pinned upstream binaries by the installer instead, because neither
+# repository carries them: topgrade (magikos-update) and oh-my-posh.

@@ -2,6 +2,8 @@
 
 An in-repo installer for Magikos, built for Arch/CachyOS (pacman). One script handles a full-disk install from live media and adoption of an already-running system, then hands off to the same target-side setup the packaged ISO uses — `magikos-apply-system` runs in the target chroot, so both paths get identical hardware setup, config leaves, login assets, and post-install steps.
 
+Debian and derivatives have their own adoption-only installer, [`magikos-install-debian`](magikos-install-debian); see [`../docs/debian.md`](../docs/debian.md) for the port's scope and gaps.
+
 ## Usage
 
 Two modes: full-disk install from live media, and adoption of an already-running system.

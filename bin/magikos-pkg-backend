@@ -2,25 +2,143 @@
 
 # magikos:summary=Package backend detection shared by the magikos pkg commands. Source it; do not execute.
 
-# Magikos manages packages with pacman (Arch, CachyOS). A dnf/Fedora backend
-# used to live here but was forked into Magikos-Fedora; the only supported
-# backend is pacman. MAGIKOS_PKG_BACKEND may be preset by tests/callers to
-# avoid probing the system, otherwise it is resolved here and always pacman.
+# Magikos manages packages with pacman on Arch/CachyOS and with apt on
+# Debian. A dnf/Fedora backend used to live here but was forked into
+# Magikos-Fedora. MAGIKOS_PKG_BACKEND may be preset by tests/callers to avoid
+# probing the system; otherwise it is resolved from whichever manager is
+# installed, preferring pacman so an Arch host that also carries apt is
+# treated as Arch.
 
 if [[ -z ${MAGIKOS_PKG_BACKEND:-} ]]; then
-  if ! command -v pacman >/dev/null 2>&1; then
-    echo "Error: pacman not found; Magikos requires an Arch/CachyOS system" >&2
+  if command -v pacman >/dev/null 2>&1; then
+    MAGIKOS_PKG_BACKEND=pacman
+  elif command -v apt-get >/dev/null 2>&1; then
+    MAGIKOS_PKG_BACKEND=apt
+  else
+    echo "Error: neither pacman nor apt-get found; Magikos requires an Arch/CachyOS or Debian system" >&2
     return 1 2>/dev/null || exit 1
   fi
-  MAGIKOS_PKG_BACKEND=pacman
 fi
 
+case "$MAGIKOS_PKG_BACKEND" in
+  pacman) ;;
+  apt) ;;
+  *)
+    echo "Error: unknown MAGIKOS_PKG_BACKEND '$MAGIKOS_PKG_BACKEND' (expected pacman or apt)" >&2
+    return 1 2>/dev/null || exit 1
+    ;;
+esac
+
 backend_is_pacman() {
-  return 0
+  [[ $MAGIKOS_PKG_BACKEND == "pacman" ]]
+}
+
+backend_is_apt() {
+  [[ $MAGIKOS_PKG_BACKEND == "apt" ]]
+}
+
+# One dpkg-query pass yields name, Provides, and install state for every
+# package. ${db:Status-Status} is "installed" only for fully unpacked
+# packages, so config-files-only and not-installed entries drop out here
+# instead of needing a second filter.
+#
+# Deliberately not cached: magikos-pkg-add re-checks pkg_installed after the
+# transaction to confirm the install landed, so a snapshot taken before the
+# transaction would report the fresh package as missing.
+_apt_pkg_dump() {
+  dpkg-query -W -f='${Package}\t${Provides}\t${db:Status-Status}\n' 2>/dev/null
+}
+
+# dpkg exposes virtual packages through Provides, and callers rely on a
+# positive answer for those names exactly as they do under pacman, so a name
+# matches either the package itself or any of its Provides entries. Provides
+# entries carry version constraints ("foo (= 1.2)", "bar [arch]") that are
+# stripped before comparing. The whole wanted set is resolved in one pass so
+# a multi-name call stays a single dpkg-query.
+apt_pkg_installed() {
+  (( $# )) || return 0
+  local wanted=" $* "
+  _apt_pkg_dump | WANTED="$wanted" awk -F'\t' '
+    BEGIN {
+      count = split(ENVIRON["WANTED"], names, " ")
+      for (i = 1; i <= count; i++) {
+        if (names[i] != "") {
+          want[names[i]] = 1
+        }
+      }
+    }
+    function resolve(name) {
+      if (name in want) {
+        seen[name] = 1
+      }
+    }
+    $3 == "installed" {
+      resolve($1)
+      total = split($2, entries, ",")
+      for (i = 1; i <= total; i++) {
+        entry = entries[i]
+        gsub(/^[ \t]+|[ \t]+$/, "", entry)
+        sub(/[ \t]*\(.*/, "", entry)
+        sub(/[ \t]*\[.*/, "", entry)
+        sub(/[<>=].*/, "", entry)
+        gsub(/[ \t]/, "", entry)
+        if (entry != "") {
+          resolve(entry)
+        }
+      }
+    }
+    END {
+      for (name in want) {
+        if (!(name in seen)) {
+          missing = 1
+        }
+      }
+      exit(missing ? 1 : 0)
+    }
+  '
+}
+
+# Arch package names that Debian spells differently. Translated here rather
+# than in each hardware leaf, so one magikos-hw-* match against a name the
+# active backend cannot resolve does not turn into a failed install step.
+#
+# Only names with a real Debian counterpart belong here. A package Debian does
+# not carry at all (asusctl, qmk-hid, macbook12-spi-driver-dkms, the
+# linux-ptl kernel) is deliberately absent: mapping it to nothing would claim
+# success for work that never happened, so it stays unresolvable and the
+# best-effort hardware tier reports it as skipped.
+APT_PACKAGE_ALIASES=(
+  "sof-firmware=firmware-sof-signed"
+  "intel-media-driver=intel-media-va-driver-non-free"
+  "libva-intel-driver=intel-media-va-driver"
+  "broadcom-wl=broadcom-sta-dkms"
+)
+
+# Echo the name the active backend actually knows, or the original when there
+# is no alias for it.
+pkg_resolve_name() {
+  local name="$1" pair
+  if backend_is_apt; then
+    for pair in "${APT_PACKAGE_ALIASES[@]}"; do
+      if [[ $pair == "$name="* ]]; then
+        printf '%s\n' "${pair#*=}"
+        return 0
+      fi
+    done
+  fi
+  printf '%s\n' "$name"
 }
 
 # True when every named package is installed.
 pkg_installed() {
+  if backend_is_apt; then
+    local resolved=() pkg
+    for pkg in "$@"; do
+      resolved+=("$(pkg_resolve_name "$pkg")")
+    done
+    apt_pkg_installed "${resolved[@]}"
+    return
+  fi
   local pkg
   for pkg in "$@"; do
     pacman -Q "$pkg" &>/dev/null || return 1
@@ -29,32 +147,72 @@ pkg_installed() {
 
 # Every package available to install, one name per line.
 pkg_list_available() {
+  if backend_is_apt; then
+    apt-cache pkgnames | sort -u
+    return
+  fi
   pacman -Slq
 }
 
 # Every installed package, one name per line.
 pkg_list_installed() {
+  if backend_is_apt; then
+    dpkg-query -W -f='${Package}\t${db:Status-Status}\n' 2>/dev/null |
+      awk -F'\t' '$2 == "installed" { print $1 }'
+    return
+  fi
   pacman -Qq
 }
 
 # Explicitly installed packages (not pulled in as dependencies).
 pkg_list_explicit() {
+  if backend_is_apt; then
+    apt-mark showmanual
+    return
+  fi
   pacman -Qqe
 }
 
 # Details for a package that is available but not necessarily installed.
 pkg_info_new() {
+  if backend_is_apt; then
+    apt-cache show "$1"
+    return
+  fi
   pacman -Sii "$1"
 }
 
 # Details for an installed package.
 pkg_info_installed() {
+  if backend_is_apt; then
+    dpkg-query -s "$1"
+    return
+  fi
   pacman -Qi "$1"
 }
 
 # Privileged transactions stay as command arrays so callers keep control of
 # sudo and root handling exactly as they did against raw pacman.
+#
+# apt is non-interactive only when told, and a blocked debconf prompt would
+# hang an unattended install, so DEBIAN_FRONTEND travels with each array
+# rather than depending on the caller's environment.
+#
+# pacman's -Rns removes the package, its configuration, and dependencies
+# nothing else needs. apt has no single equivalent: purge covers the package
+# and its configuration, and autoremove is a separate verb. PKG_REMOVE_CMD
+# therefore stops at purge and PKG_AUTOREMOVE_CMD carries the dependency
+# sweep, which pacman does not need (left empty there).
 PKG_INSTALL_CMD=(pacman -S --noconfirm --needed)
 PKG_REMOVE_CMD=(pacman -Rns --noconfirm)
+PKG_AUTOREMOVE_CMD=()
 PKG_UPGRADE_CMD=(env MAGIKOS_UPDATE_PACMAN=1 pacman -Syu --noconfirm)
 PKG_SYNC_CMD=(env MAGIKOS_UPDATE_PACMAN=1 pacman -Syyuu --noconfirm)
+
+if backend_is_apt; then
+  PKG_INSTALL_CMD=(env DEBIAN_FRONTEND=noninteractive apt-get install -y)
+  PKG_REMOVE_CMD=(env DEBIAN_FRONTEND=noninteractive apt-get purge -y)
+  PKG_AUTOREMOVE_CMD=(env DEBIAN_FRONTEND=noninteractive apt-get autoremove -y)
+  PKG_UPGRADE_CMD=(env DEBIAN_FRONTEND=noninteractive apt-get upgrade -y)
+  PKG_SYNC_CMD=(env DEBIAN_FRONTEND=noninteractive apt-get update)
+fi

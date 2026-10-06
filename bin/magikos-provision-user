@@ -109,8 +109,26 @@ done
 source "$MAGIKOS_INSTALL/user/all.sh"
 
 magikos-refresh-applications
-env -u BROWSER xdg-settings set default-web-browser brave-origin.desktop
-xdg-mime default HEY.desktop x-scheme-handler/mailto
+
+# Desktop preferences are best-effort. xdg-settings dispatches to a
+# desktop-specific config writer -- kwriteconfig under KDE, dconf under GNOME
+# -- so on a session whose toolkit config tools are not installed this fails,
+# and under errexit that would skip the migration bookkeeping and the
+# finalize-user marker below, making every later run redo the whole leaf.
+if ! env -u BROWSER xdg-settings set default-web-browser brave-origin.desktop; then
+  echo "Warning: could not set the default browser; set it from your desktop settings." >&2
+fi
+
+# HEY.desktop only exists once mise has installed the hey mail client, so its
+# presence is checked rather than assumed; without it, leave the mailto
+# handler to whatever the desktop already chose.
+if [[ -f /usr/share/applications/HEY.desktop || -f $HOME/.local/share/applications/HEY.desktop ]]; then
+  if ! xdg-mime default HEY.desktop x-scheme-handler/mailto; then
+    echo "Warning: could not set the mailto handler." >&2
+  fi
+else
+  echo "HEY.desktop not installed; leaving the mailto handler alone." >&2
+fi
 
 if (( first_install )); then
   mkdir -p "$state_dir/migrations"

@@ -58,6 +58,19 @@ relock_session() {
 # Requires our quickshell-git build; 0.3.0's kill returns immediately.
 while timeout 5 quickshell kill -p "$CONFIG_DIR" --any-display >/dev/null 2>&1; do :; done
 
+# That guarantee only holds on the fork. Debian ships upstream 0.3.0, whose
+# kill returns as soon as the signal is delivered, so the loop above can run out
+# its retries with the old shell still shutting down and the replacement
+# overlapping it. Drain explicitly: re-ask the compositor which instances remain
+# and wait for that list to empty before launching anything.
+drain_deadline=$((SECONDS + 10))
+while (( SECONDS < drain_deadline )); do
+  if [[ -z $(quickshell list -p "$CONFIG_DIR" --any-display 2>/dev/null) ]]; then
+    break
+  fi
+  sleep 0.1
+done
+
 # Spawn from the compositor so the shell inherits the canonical session environment,
 # not transient variables from a terminal, SSH connection, or development tool.
 swaymsg exec magikos-launch-shell >/dev/null 2>&1

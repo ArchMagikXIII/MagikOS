@@ -7,11 +7,20 @@
 
 source magikos-pkg-backend
 
-if magikos-pkg-missing "$@"; then
+# Resolve through the backend first: a caller may name the package the way the
+# upstream project does (sof-firmware) while the active manager knows it by
+# another name (firmware-sof-signed). pkg_installed resolves too, so the
+# post-install check below still verifies what was asked for.
+resolved=()
+for pkg in "$@"; do
+  resolved+=("$(pkg_resolve_name "$pkg")")
+done
+
+if magikos-pkg-missing "${resolved[@]}"; then
   if (( EUID == 0 )); then
-    "${PKG_INSTALL_CMD[@]}" "$@" || exit 1
+    "${PKG_INSTALL_CMD[@]}" "${resolved[@]}" || exit 1
   else
-    sudo "${PKG_INSTALL_CMD[@]}" "$@" || exit 1
+    sudo "${PKG_INSTALL_CMD[@]}" "${resolved[@]}" || exit 1
   fi
 fi
 

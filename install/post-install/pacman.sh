@@ -1,6 +1,16 @@
 # Configure pacman after package installation completes. Offline target package
 # installs use the live ISO's offline pacman.conf until this final restore.
+#
+# Nothing to do on a non-pacman system: this leaf runs unconditionally in the
+# post-install chain, and a bare cp to a /etc/pacman.conf that does not exist
+# would abort every later leaf under run_logged's errexit. The MagikOS Debian
+# installer plants this same tree, so the guard has to live here rather than in
+# the caller's chain.
 source "$MAGIKOS_PATH/bin/magikos-pkg-backend"
+
+if ! backend_is_pacman; then
+  return 0
+fi
 
 cp -f "$MAGIKOS_PATH/default/pacman/pacman-${MAGIKOS_MIRROR:-stable}.conf" /etc/pacman.conf
 cp -f "$MAGIKOS_PATH/default/pacman/mirrorlist-${MAGIKOS_MIRROR:-stable}" /etc/pacman.d/mirrorlist
