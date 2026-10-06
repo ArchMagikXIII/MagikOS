@@ -176,3 +176,13 @@ now checks `liveKind` and `info.type` before falling back to `Networking.devices
 **Files changed**: `shell/plugins/panels/network/Panel.qml`
 
 **Commit**: Already on `main` branch
+
+### Debian Installer Testing & apt Backend (2026-10-06)
+
+This machine was found to be Parrot OS 7.4 (not CachyOS — the profile above is stale), adopted moments earlier by running `installer/magikos-install-debian` directly, which planted the tree, resynced `/etc/skel`, and overwrote `~/.config/sway` (adopted copy kept at `~/.config/sway.magikos-adopted.bak`, last good config restored from `~/.config/sway.bak.20261004-215338`).
+
+The Debian installer was then validated in a clean Debian 13 (trixie) debootstrap chroot (`/var/tmp/dxl-debian`, bind-mounted repo): final run installed 172/172 packages with zero failed setup steps, quickshell/uwsm/gamescope resolved via the codename-backports fallback.
+
+**Fixes committed**: root-without-`sudo` pass-through in `bin/magikos-apply-system` and `bin/magikos-apply-hardware` (exported into leaf scripts), no-sudo guards in `fix-powerprofilesctl-shebang.sh` and `fix-mic.sh`, installer's log-path hint corrected to `/var/log/magikos-install.log`, apt backports retry in `try_install`.
+
+**Commit**: `f34e192a` on `main`.
