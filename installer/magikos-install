@@ -1136,6 +1136,35 @@ install_app_icons() {
   done
 }
 
+# System files the magikos-settings package would own on a packaged install.
+# The installer plants the tree instead of installing that package, so it
+# must recreate these destinations itself — fonts, fontconfig rules, user
+# units, mimeapps, and the snapper template all live under default/.
+plant_package_owned_files() {
+  local prefix="$1"
+  run install -Dm644 "$ROOT/default/fonts/magikos/magikos.ttf" \
+    "$prefix/usr/share/fonts/magikos/magikos.ttf"
+  run install -Dm644 "$ROOT/default/fontconfig/conf.avail/50-magikos.conf" \
+    "$prefix/usr/share/fontconfig/conf.avail/50-magikos.conf"
+  run mkdir -p "$prefix/etc/fonts/conf.d"
+  run ln -sfn /usr/share/fontconfig/conf.avail/50-magikos.conf \
+    "$prefix/etc/fonts/conf.d/50-magikos.conf"
+  run install -Dm644 "$ROOT/default/applications/mimeapps.list" \
+    "$prefix/usr/share/applications/mimeapps.list"
+  if [[ -d $ROOT/default/systemd/user ]]; then
+    run mkdir -p "$prefix/usr/lib/systemd/user"
+    run cp -a "$ROOT/default/systemd/user/." "$prefix/usr/lib/systemd/user/"
+  fi
+  if [[ -d $ROOT/default/systemd/zram-generator.conf.d ]]; then
+    run mkdir -p "$prefix/usr/lib/systemd/zram-generator.conf.d"
+    run cp -a "$ROOT/default/systemd/zram-generator.conf.d/." \
+      "$prefix/usr/lib/systemd/zram-generator.conf.d/"
+  fi
+  run mkdir -p "$prefix/etc/snapper/config-templates"
+  run cp -a "$ROOT/default/snapper/root" \
+    "$prefix/etc/snapper/config-templates/magikos"
+}
+
 # System drop-ins we own outright.
 # pacstrap's pacman runs post-transaction hooks; limine-mkinitcpio's asks "run
 # limine-mkinitcpio now? [Y/n]" on /dev/tty even under --noconfirm, blocking an
@@ -1223,6 +1252,8 @@ plant_magikos() {
   # the user session; the magikos-settings package post_install copies these.
   run mkdir -p "$TARGET/usr/lib/environment.d"
   run cp -a "$ROOT/default/environment.d/." "$TARGET/usr/lib/environment.d/"
+
+  plant_package_owned_files "$TARGET"
 }
 
 configure_target() {
@@ -1699,7 +1730,6 @@ finish() {
 # --- live host; no chroot, no partitioning, no bootloader changes.
 
 PLANTED="/usr/share/magikos"
-NERD_FONTS_VERSION="v3.5.0"
 OH_MY_POSH_VERSION="v30.6.5"
 
 # A previous installer version copied default/ flat into /etc/skel; none of
@@ -1742,6 +1772,13 @@ plant_magikos_host() {
     run install -Dm644 "$ROOT/default/uwsm/env.d/10-magikos" \
       /usr/share/uwsm/env.d/10-magikos
   fi
+
+  # systemd-environment-d-generator reads /usr/lib/environment.d/*.conf for
+  # the user session; mirrors plant_magikos's full-disk path.
+  run mkdir -p /usr/lib/environment.d
+  run cp -a "$ROOT/default/environment.d/." /usr/lib/environment.d/
+
+  plant_package_owned_files ""
 
   sync_etc_dropins /etc
 
