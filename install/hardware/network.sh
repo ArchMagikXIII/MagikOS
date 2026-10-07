@@ -1,3 +1,10 @@
+source "${MAGIKOS_INSTALL_HELPERS:-${MAGIKOS_INSTALL:-/usr/share/magikos}/install/helpers}/systemd.sh"
+
+if ! magikos_has_systemd; then
+  magikos_skip_systemd "network.sh: not a systemd system"
+  return 0
+fi
+
 # NetworkManager enablement is centralized in enable-services.sh.
 systemctl disable iwd.service 2>/dev/null || true
 

@@ -18,4 +18,10 @@ ufw allow 53317/tcp
 # Installs are followed by reboot, so configure UFW to start on the installed
 # system instead of mutating the live install session's firewall.
 sed -i 's/^ENABLED=.*/ENABLED=yes/' /etc/ufw/ufw.conf
-systemctl enable ufw
+
+source "${MAGIKOS_INSTALL_HELPERS:-${MAGIKOS_INSTALL:-/usr/share/magikos}/install/helpers}/systemd.sh"
+if magikos_has_systemd; then
+  systemctl enable ufw
+else
+  magikos_skip_systemd "firewall.sh: not a systemd system"
+fi

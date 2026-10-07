@@ -6,6 +6,15 @@
 # the Debian port, and a distribution that does not carry one of these (sddm,
 # avahi, systemd-oomd) would otherwise fail the enable and abort every later
 # leaf under run_logged's errexit.
+#
+# On non-systemd systems (Artix, etc.), all systemctl operations are skipped.
+source "${MAGIKOS_INSTALL_HELPERS:-${MAGIKOS_INSTALL:-/usr/share/magikos}/install/helpers}/systemd.sh"
+
+if ! magikos_has_systemd; then
+  magikos_skip_systemd "enable-services.sh: not a systemd system"
+  return 0
+fi
+
 enable_unit() {
   local unit="$1"
   if systemctl list-unit-files "$unit" --no-legend 2>/dev/null | grep -q .; then

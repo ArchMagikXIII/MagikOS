@@ -10,8 +10,10 @@ if [[ $MACBOOK_MODEL =~ MacBook(8,1|9,1|10,1)|MacBookPro13,[123]|MacBookPro14,[1
   if [[ -f $NVME_DEVICE ]]; then
     echo "Applying NVMe suspend fix..."
 
-    sudo mkdir -p /etc/systemd/system
-    sudo tee /etc/systemd/system/magikos-nvme-suspend-fix.service >/dev/null <<'EOF'
+    source "${MAGIKOS_INSTALL_HELPERS:-${MAGIKOS_INSTALL:-/usr/share/magikos}/install/helpers}/systemd.sh"
+    if magikos_has_systemd; then
+      sudo mkdir -p /etc/systemd/system
+      sudo tee /etc/systemd/system/magikos-nvme-suspend-fix.service >/dev/null <<'EOF'
 [Unit]
 Description=Magikos NVMe Suspend Fix for MacBook
 
@@ -22,7 +24,10 @@ ExecStart=/bin/bash -c 'echo 0 > /sys/bus/pci/devices/0000\:01\:00.0/d3cold_allo
 WantedBy=multi-user.target
 EOF
 
-    sudo systemctl enable magikos-nvme-suspend-fix.service
+      sudo systemctl enable magikos-nvme-suspend-fix.service
+    else
+      magikos_skip_systemd "fix-suspend-nvme.sh: not a systemd system"
+    fi
   else
     echo "Warning: NVMe device not found at expected PCI address (0000:01:00.0)"
     echo "This fix may not be needed for this MacBook model"
