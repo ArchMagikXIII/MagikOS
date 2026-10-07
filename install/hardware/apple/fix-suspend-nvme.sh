@@ -23,10 +23,36 @@ ExecStart=/bin/bash -c 'echo 0 > /sys/bus/pci/devices/0000\:01\:00.0/d3cold_allo
 [Install]
 WantedBy=multi-user.target
 EOF
-
       sudo systemctl enable magikos-nvme-suspend-fix.service
+    elif magikos_has_openrc; then
+      sudo mkdir -p /etc/init.d
+      sudo tee /etc/init.d/magikos-nvme-suspend-fix >/dev/null <<'EOF'
+#!/sbin/openrc-run
+
+description="Magikos NVMe Suspend Fix for MacBook"
+
+depend() {
+  after bootmisc
+}
+
+start() {
+  echo "Applying NVMe suspend fix..."
+  echo 0 > /sys/bus/pci/devices/0000:01:00.0/d3cold_allowed
+}
+EOF
+      sudo chmod +x /etc/init.d/magikos-nvme-suspend-fix
+      sudo rc-update add magikos-nvme-suspend-fix default
+    elif magikos_has_runit; then
+      sudo mkdir -p /etc/sv/magikos-nvme-suspend-fix
+      sudo tee /etc/sv/magikos-nvme-suspend-fix/run >/dev/null <<'EOF'
+#!/bin/sh
+echo 0 > /sys/bus/pci/devices/0000:01:00.0/d3cold_allowed
+exec sleep infinity
+EOF
+      sudo chmod +x /etc/sv/magikos-nvme-suspend-fix/run
+      sudo ln -sf /etc/sv/magikos-nvme-suspend-fix /etc/service/magikos-nvme-suspend-fix
     else
-      magikos_skip_systemd "fix-suspend-nvme.sh: not a systemd system"
+      echo "No init system found; cannot install NVMe suspend fix"
     fi
   else
     echo "Warning: NVMe device not found at expected PCI address (0000:01:00.0)"

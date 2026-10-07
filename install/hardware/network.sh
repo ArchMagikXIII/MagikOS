@@ -1,28 +1,23 @@
 source "${MAGIKOS_INSTALL_HELPERS:-${MAGIKOS_INSTALL:-/usr/share/magikos}/install/helpers}/systemd.sh"
 
-if ! magikos_has_systemd; then
-  magikos_skip_systemd "network.sh: not a systemd system"
-  return 0
-fi
-
 # NetworkManager enablement is centralized in enable-services.sh.
-systemctl disable iwd.service 2>/dev/null || true
+magikos_service_disable iwd
 
 # Fresh Magikos uses NetworkManager. Archinstall's legacy "copy ISO network"
 # mode enabled systemd-networkd and dropped DHCP .network files that compete
 # with NetworkManager, so retire that state whenever hardware setup runs.
 for unit in \
-  systemd-networkd.service \
+  systemd-networkd \
   systemd-networkd.socket \
   systemd-networkd-varlink.socket \
   systemd-networkd-varlink-metrics.socket \
   systemd-networkd-resolve-hook.socket; do
-  systemctl disable "$unit" 2>/dev/null || true
+  magikos_service_disable "$unit"
 done
 
 # Prevent systemd-networkd-wait-online timeout on boot.
-systemctl disable systemd-networkd-wait-online.service 2>/dev/null || true
-systemctl mask systemd-networkd-wait-online.service 2>/dev/null || true
+magikos_service_disable systemd-networkd-wait-online
+magikos_service_mask systemd-networkd-wait-online
 
 stock_networkd_file() {
   local file="$1"
@@ -45,6 +40,6 @@ for file in /etc/systemd/network/20-ethernet.network /etc/systemd/network/20-wla
   fi
 done
 
-if systemctl is-active --quiet NetworkManager.service 2>/dev/null; then
-  systemctl stop systemd-networkd.service 2>/dev/null || true
+if magikos_service_is_active NetworkManager; then
+  magikos_service_stop systemd-networkd
 fi

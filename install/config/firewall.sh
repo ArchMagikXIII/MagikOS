@@ -20,8 +20,4 @@ ufw allow 53317/tcp
 sed -i 's/^ENABLED=.*/ENABLED=yes/' /etc/ufw/ufw.conf
 
 source "${MAGIKOS_INSTALL_HELPERS:-${MAGIKOS_INSTALL:-/usr/share/magikos}/install/helpers}/systemd.sh"
-if magikos_has_systemd; then
-  systemctl enable ufw
-else
-  magikos_skip_systemd "firewall.sh: not a systemd system"
-fi
+magikos_service_enable ufw

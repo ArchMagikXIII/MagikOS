@@ -8,10 +8,6 @@ if magikos-hw-intel; then
   if ((cpu_model >= 42)) && magikos-battery-present; then
     magikos-pkg-add thermald
     source "${MAGIKOS_INSTALL_HELPERS:-${MAGIKOS_INSTALL:-/usr/share/magikos}/install/helpers}/systemd.sh"
-    if magikos_has_systemd; then
-      sudo systemctl enable thermald.service
-    else
-      magikos_skip_systemd "thermald.sh: not a systemd system"
-    fi
+    magikos_service_enable thermald
   fi
 fi

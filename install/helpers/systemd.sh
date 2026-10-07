@@ -1,40 +1,135 @@
-# systemd detection helper for Magikos installer
+# Init system detection and service management for Magikos installer
 #
-# Provides magikos_has_systemd() so installer leaves can gate systemd-specific
-# operations (systemctl enable/disable/mask, writing unit files, etc.) on
-# whether the target system actually runs systemd. This allows the installer
-# to work on Artix Linux and other Arch-based distributions that use
-# alternative init systems (OpenRC, runit, s6, etc.).
+# Provides detection and service enable/disable/mask operations for systemd,
+# OpenRC, and runit. This allows the installer to work on Artix Linux and
+# other Arch-based distributions that use alternative init systems.
 #
-# Set MAGIKOS_NO_SYSTEMD=1 to force-disable systemd operations regardless
-# of detection (useful for testing or when detection fails).
+# Environment variables:
+#   MAGIKOS_NO_SYSTEMD=1  - Force-disable systemd operations
+#   MAGIKOS_NO_OPENRC=1   - Force-disable OpenRC operations
+#   MAGIKOS_NO_RUNIT=1   - Force-disable runit operations
+
+# --- Detection ---
 
 magikos_has_systemd() {
-  # Explicit override takes precedence
   if [[ "${MAGIKOS_NO_SYSTEMD:-0}" == "1" ]]; then
     return 1
   fi
-
-  # Check if systemd is the running init (PID 1)
   if [[ -d /run/systemd/system ]]; then
     return 0
   fi
-
-  # Check if systemctl exists and works
   if command -v systemctl >/dev/null 2>&1; then
-    # systemctl exists but systemd may not be PID 1 (e.g., in a chroot)
-    # Try a quick operation to verify it actually works
     if systemctl is-system-running &>/dev/null || \
        systemctl is-system-running 2>/dev/null | grep -qE "running|degraded"; then
       return 0
     fi
   fi
-
   return 1
 }
 
-# Convenience: log a message when systemd operations are skipped
+magikos_has_openrc() {
+  if [[ "${MAGIKOS_NO_OPENRC:-0}" == "1" ]]; then
+    return 1
+  fi
+  command -v rc-update >/dev/null 2>&1 && [[ -d /etc/init.d ]]
+}
+
+magikos_has_runit() {
+  if [[ "${MAGIKOS_NO_RUNIT:-0}" == "1" ]]; then
+    return 1
+  fi
+  command -v runsv >/dev/null 2>&1 && [[ -d /etc/sv || -d /etc/runit/sv ]]
+}
+
+# --- Service operations ---
+
+# Enable a service (start at boot)
+magikos_service_enable() {
+  local service="$1"
+
+  if magikos_has_systemd; then
+    systemctl enable "$service" 2>/dev/null || true
+  elif magikos_has_openrc; then
+    rc-update add "$service" default 2>/dev/null || true
+  elif magikos_has_runit; then
+    if [[ -d "/etc/sv/$service" ]]; then
+      mkdir -p /etc/service
+      ln -sf "/etc/sv/$service" "/etc/service/$service"
+    fi
+  else
+    echo "No init system found; cannot enable $service"
+  fi
+}
+
+# Disable a service (don't start at boot)
+magikos_service_disable() {
+  local service="$1"
+
+  if magikos_has_systemd; then
+    systemctl disable "$service" 2>/dev/null || true
+  elif magikos_has_openrc; then
+    rc-update del "$service" default 2>/dev/null || true
+  elif magikos_has_runit; then
+    rm -f "/etc/service/$service"
+  fi
+}
+
+# Mask a service (prevent from starting)
+magikos_service_mask() {
+  local service="$1"
+
+  if magikos_has_systemd; then
+    systemctl mask "$service" 2>/dev/null || true
+  elif magikos_has_openrc; then
+    # OpenRC doesn't have a direct mask equivalent; disable is the closest
+    rc-update del "$service" default 2>/dev/null || true
+  elif magikos_has_runit; then
+    rm -f "/etc/service/$service"
+  fi
+}
+
+# Check if a service is active
+magikos_service_is_active() {
+  local service="$1"
+
+  if magikos_has_systemd; then
+    systemctl is-active --quiet "$service" 2>/dev/null
+  elif magikos_has_openrc; then
+    rc-service "$service" status 2>/dev/null | grep -q "started"
+  elif magikos_has_runit; then
+    [[ -d "/etc/service/$service" ]] && sv status "$service" 2>/dev/null | grep -q "run"
+  fi
+}
+
+# Stop a service
+magikos_service_stop() {
+  local service="$1"
+
+  if magikos_has_systemd; then
+    systemctl stop "$service" 2>/dev/null || true
+  elif magikos_has_openrc; then
+    rc-service "$service" stop 2>/dev/null || true
+  elif magikos_has_runit; then
+    sv stop "$service" 2>/dev/null || true
+  fi
+}
+
+# --- Convenience ---
+
 magikos_skip_systemd() {
   local reason="${1:-systemd not available}"
   echo "Skipping systemd operation: $reason"
+}
+
+# Detect which init system is available and print it
+magikos_detect_init() {
+  if magikos_has_systemd; then
+    echo "systemd"
+  elif magikos_has_openrc; then
+    echo "openrc"
+  elif magikos_has_runit; then
+    echo "runit"
+  else
+    echo "unknown"
+  fi
 }

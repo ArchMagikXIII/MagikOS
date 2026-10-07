@@ -7,20 +7,44 @@
 # avahi, systemd-oomd) would otherwise fail the enable and abort every later
 # leaf under run_logged's errexit.
 #
-# On non-systemd systems (Artix, etc.), all systemctl operations are skipped.
+# Supports systemd, OpenRC, and runit via magikos_service_* helpers.
 source "${MAGIKOS_INSTALL_HELPERS:-${MAGIKOS_INSTALL:-/usr/share/magikos}/install/helpers}/systemd.sh"
 
-if ! magikos_has_systemd; then
-  magikos_skip_systemd "enable-services.sh: not a systemd system"
-  return 0
-fi
+# Map systemd unit names to OpenRC/runit service names where they differ
+service_name() {
+  local unit="$1"
+  case "$unit" in
+    *.service) echo "${unit%.service}" ;;
+    *) echo "$unit" ;;
+  esac
+}
 
 enable_unit() {
   local unit="$1"
-  if systemctl list-unit-files "$unit" --no-legend 2>/dev/null | grep -q .; then
-    systemctl enable "$unit"
+  local sname
+  sname=$(service_name "$unit")
+
+  if magikos_has_systemd; then
+    if systemctl list-unit-files "$unit" --no-legend 2>/dev/null | grep -q .; then
+      systemctl enable "$unit"
+    else
+      echo "$unit not installed; skipping"
+    fi
+  elif magikos_has_openrc; then
+    if [[ -f "/etc/init.d/$sname" ]]; then
+      rc-update add "$sname" default 2>/dev/null || true
+    else
+      echo "$sname not installed; skipping"
+    fi
+  elif magikos_has_runit; then
+    if [[ -d "/etc/sv/$sname" ]]; then
+      mkdir -p /etc/service
+      ln -sf "/etc/sv/$sname" "/etc/service/$sname"
+    else
+      echo "$sname not installed; skipping"
+    fi
   else
-    echo "$unit not installed; skipping"
+    echo "No init system found; cannot enable $unit"
   fi
 }
 
@@ -31,7 +55,7 @@ enable_unit NetworkManager.service
 # graphical.target waiting for DHCP/Wi-Fi association. Nothing in the session
 # needs to block on the network. Mirrors the systemd-networkd-wait-online mask
 # in install/hardware/network.sh.
-systemctl mask NetworkManager-wait-online.service
+magikos_service_mask NetworkManager-wait-online.service
 enable_unit power-profiles-daemon.service
 # Only SDDM may own the display-manager.service alias. A second enabled DM
 # (gdm/lightdm/lxdm/greetd/ly, whether left over from the live media or a prior
@@ -40,7 +64,7 @@ enable_unit power-profiles-daemon.service
 # starts. Absent units are harmless; we don't start/reload anything since
 # installs are followed by reboot.
 for dm in gdm lightdm lxdm greetd ly sddm; do
-  systemctl disable "$dm.service" 2>/dev/null || true
+  magikos_service_disable "$dm.service"
 done
 rm -f /etc/systemd/system/display-manager.service
 enable_unit sddm.service

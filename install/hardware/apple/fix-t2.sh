@@ -12,11 +12,7 @@ if lspci -nn | grep "106b:180[12]" >/dev/null; then
 
   # Enable T2 fan control
   source "${MAGIKOS_INSTALL_HELPERS:-${MAGIKOS_INSTALL:-/usr/share/magikos}/install/helpers}/systemd.sh"
-  if magikos_has_systemd; then
-    systemctl enable t2fanrd.service
-  else
-    magikos_skip_systemd "fix-t2.sh: not a systemd system"
-  fi
+  magikos_service_enable t2fanrd
 
   mkdir -p /etc/modules-load.d
   {
