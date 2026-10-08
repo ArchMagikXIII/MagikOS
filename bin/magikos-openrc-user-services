@@ -1,0 +1,12 @@
+#!/bin/bash
+# Start Artix's packaged OpenRC USER services, not untracked duplicate daemons.
+set -euo pipefail
+
+command -v rc-update >/dev/null 2>&1 || exit 0
+for service in pipewire wireplumber pipewire-pulse; do
+  [[ -f ${MAGIKOS_OPENRC_USER_INIT_DIR:-/etc/user/init.d}/$service ]] || continue
+  rc-update --user add "$service" default
+  if ! rc-service --user "$service" status >/dev/null 2>&1; then
+    rc-service --user "$service" start
+  fi
+done

@@ -6,10 +6,15 @@
 
 # Schedule the shutdown in the user manager so closing the terminal's systemd
 # scope cannot terminate it before it runs.
-systemd-run --user --collect --quiet --on-active="2s" --timer-property=AccuracySec=100ms systemctl poweroff --no-wall || exit 1
+if [[ -d /run/systemd/system ]]; then
+  systemd-run --user --collect --quiet --on-active="2s" --timer-property=AccuracySec=100ms systemctl poweroff --no-wall || exit 1
+fi
 
 magikos-osd -i shutdown -m "Shutting down" -d 5000
 
 magikos-state clear re*-required
 
 sleep 1 # Allow apps like Chrome to shutdown correctly
+if [[ ! -d /run/systemd/system ]]; then
+  exec loginctl poweroff
+fi

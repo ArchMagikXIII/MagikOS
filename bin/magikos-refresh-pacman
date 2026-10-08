@@ -6,6 +6,12 @@
 export MAGIKOS_PATH="${MAGIKOS_PATH:-/usr/share/magikos}"
 
 source magikos-pkg-backend
+source "$MAGIKOS_PATH/install/helpers/platform.sh"
+
+if magikos_is_artix; then
+  echo "Error: Magikos's pacman templates use Arch repositories, not Artix. Leaving Artix's pacman.conf and mirrorlist untouched." >&2
+  exit 1
+fi
 
 sudo cp -f /etc/pacman.conf /etc/pacman.conf.bak
 sudo cp -f /etc/pacman.d/mirrorlist /etc/pacman.d/mirrorlist.bak

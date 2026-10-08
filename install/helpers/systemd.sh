@@ -1,13 +1,14 @@
 # Init system detection and service management for Magikos installer
 #
 # Provides detection and service enable/disable/mask operations for systemd,
-# OpenRC, and runit. This allows the installer to work on Artix Linux and
-# other Arch-based distributions that use alternative init systems.
+# OpenRC, and runit. This helper alone does not make the installer or the
+# Arch/CachyOS package set compatible with Artix.
 #
 # Environment variables:
 #   MAGIKOS_NO_SYSTEMD=1  - Force-disable systemd operations
 #   MAGIKOS_NO_OPENRC=1   - Force-disable OpenRC operations
 #   MAGIKOS_NO_RUNIT=1   - Force-disable runit operations
+#   MAGIKOS_OPENRC_INIT_DIR - Override /etc/init.d (for isolated tests)
 
 # --- Detection ---
 
@@ -31,7 +32,29 @@ magikos_has_openrc() {
   if [[ "${MAGIKOS_NO_OPENRC:-0}" == "1" ]]; then
     return 1
   fi
-  command -v rc-update >/dev/null 2>&1 && [[ -d /etc/init.d ]]
+  command -v rc-update >/dev/null 2>&1 && [[ -d ${MAGIKOS_OPENRC_INIT_DIR:-/etc/init.d} ]]
+}
+
+# Unit names are not necessarily OpenRC init script names (Artix BlueZ ships
+# /etc/init.d/bluetoothd, not bluetooth). Leave systemd names untouched on the
+# systemd path; only use this translation when talking to OpenRC.
+magikos_openrc_service_name() {
+  local name="${1%.service}"
+  case "$name" in
+    bluetooth) name=bluetoothd ;;
+  esac
+  printf '%s\n' "$name"
+}
+
+magikos_openrc_runlevel() {
+  case "$1" in
+    elogind) printf 'boot\n' ;;
+    *) printf 'default\n' ;;
+  esac
+}
+
+magikos_openrc_has_service() {
+  [[ -f "${MAGIKOS_OPENRC_INIT_DIR:-/etc/init.d}/$1" ]]
 }
 
 magikos_has_runit() {
@@ -50,7 +73,19 @@ magikos_service_enable() {
   if magikos_has_systemd; then
     systemctl enable "$service" 2>/dev/null || true
   elif magikos_has_openrc; then
-    rc-update add "$service" default 2>/dev/null || true
+    local name runlevel
+    name=$(magikos_openrc_service_name "$service")
+    if magikos_openrc_has_service "$name"; then
+      runlevel=$(magikos_openrc_runlevel "$name")
+      rc-update add "$name" "$runlevel" || return
+      # Artix expects elogind in boot, not also in default. This only changes
+      # boot links; it does not touch a daemon running in the live environment.
+      if [[ $name == elogind ]]; then
+        rc-update del elogind default >/dev/null 2>&1 || true
+      fi
+    else
+      echo "$name not installed; skipping"
+    fi
   elif magikos_has_runit; then
     if [[ -d "/etc/sv/$service" ]]; then
       mkdir -p /etc/service
@@ -68,7 +103,11 @@ magikos_service_disable() {
   if magikos_has_systemd; then
     systemctl disable "$service" 2>/dev/null || true
   elif magikos_has_openrc; then
-    rc-update del "$service" default 2>/dev/null || true
+    local name
+    name=$(magikos_openrc_service_name "$service")
+    if magikos_openrc_has_service "$name"; then
+      rc-update del "$name" "$(magikos_openrc_runlevel "$name")" 2>/dev/null || true
+    fi
   elif magikos_has_runit; then
     rm -f "/etc/service/$service"
   fi
@@ -81,8 +120,12 @@ magikos_service_mask() {
   if magikos_has_systemd; then
     systemctl mask "$service" 2>/dev/null || true
   elif magikos_has_openrc; then
-    # OpenRC doesn't have a direct mask equivalent; disable is the closest
-    rc-update del "$service" default 2>/dev/null || true
+    # OpenRC has no mask equivalent; only disable real init scripts.
+    local name
+    name=$(magikos_openrc_service_name "$service")
+    if magikos_openrc_has_service "$name"; then
+      rc-update del "$name" "$(magikos_openrc_runlevel "$name")" 2>/dev/null || true
+    fi
   elif magikos_has_runit; then
     rm -f "/etc/service/$service"
   fi
@@ -95,9 +138,13 @@ magikos_service_is_active() {
   if magikos_has_systemd; then
     systemctl is-active --quiet "$service" 2>/dev/null
   elif magikos_has_openrc; then
-    rc-service "$service" status 2>/dev/null | grep -q "started"
+    local name
+    name=$(magikos_openrc_service_name "$service")
+    magikos_openrc_has_service "$name" && rc-service "$name" status 2>/dev/null | grep -q "started"
   elif magikos_has_runit; then
     [[ -d "/etc/service/$service" ]] && sv status "$service" 2>/dev/null | grep -q "run"
+  else
+    return 1
   fi
 }
 
@@ -108,7 +155,11 @@ magikos_service_stop() {
   if magikos_has_systemd; then
     systemctl stop "$service" 2>/dev/null || true
   elif magikos_has_openrc; then
-    rc-service "$service" stop 2>/dev/null || true
+    local name
+    name=$(magikos_openrc_service_name "$service")
+    if magikos_openrc_has_service "$name"; then
+      rc-service "$name" stop 2>/dev/null || true
+    fi
   elif magikos_has_runit; then
     sv stop "$service" 2>/dev/null || true
   fi

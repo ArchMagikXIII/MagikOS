@@ -32,6 +32,7 @@ ALLOW_BIOS=0
 ASSUME_YES=0
 DRY_RUN=0
 EXISTING_MODE=0
+ARTIX_OPENRC=0
 CONFIG_FILE=""
 CREDS_FILE=""
 # -1 = auto (enable when the CachyOS repo is not already present); 0 = off; 1 = on.
@@ -39,6 +40,7 @@ CACHYOS_REPOS=-1
 
 LOG_FILE="${MAGIKOS_INSTALL_LOG_FILE:-/tmp/magikos-install.log}"
 PKG_FAILURES=()
+INSTALL_ERRORS=()
 TARGET_HOOK_MASKS=()
 
 log() {
@@ -330,6 +332,8 @@ preflight() {
   # has already required it on the live media.
   BACKEND=pacman
 
+  source "$ROOT/install/helpers/platform.sh"
+
   require_tools rsync
 
   export MAGIKOS_INSTALL_LOG_FILE="$LOG_FILE"
@@ -342,12 +346,34 @@ preflight() {
     load_install_config
   fi
 
+  if magikos_is_artix; then
+    (( EXISTING_MODE )) || die "--disk builds an Arch target, not Artix. On Artix use --existing only."
+    source "$ROOT/install/helpers/systemd.sh"
+    [[ $(magikos_detect_init) == openrc ]] || die "Artix adoption currently requires OpenRC; no changes were made."
+    (( CACHYOS_REPOS != 1 )) || die "--cachyos-repos is incompatible with Artix OpenRC. Remove that flag."
+    CACHYOS_REPOS=0
+    ARTIX_OPENRC=1
+    require_tools pacman pacman-conf rc-update runuser getent
+    if grep -Eq '^[[:space:]]*\[cachyos\]' /etc/pacman.conf; then
+      die "Remove the [cachyos] repository from Artix's pacman.conf before adopting; no changes were made."
+    fi
+    check_artix_packages
+    if (( ! DRY_RUN )) && [[ ! -t 0 ]]; then
+      die "Artix adoption needs an interactive terminal to review package conflicts; no changes were made."
+    fi
+  fi
+
   if (( EXISTING_MODE )); then
     if [[ -z $INSTALL_USER ]]; then
       INSTALL_USER=${SUDO_USER:-}
     fi
     if [[ -z $INSTALL_USER || $INSTALL_USER == "root" ]]; then
       die "--existing needs --user NAME (or run under sudo so \$SUDO_USER resolves; got: ${INSTALL_USER:-nothing})."
+    fi
+    if (( ARTIX_OPENRC )); then
+      backend_is_pacman || die "Artix adoption requires pacman"
+      id "$INSTALL_USER" >/dev/null 2>&1 || die "Artix adoption requires an existing user: $INSTALL_USER"
+      log "Artix OpenRC detected: preserving pacman repositories, kernel, bootloader and login manager"
     fi
     log "Adopting the running system: backend $BACKEND, user $INSTALL_USER"
     if ! ask_confirm "Install Magikos onto the running system? Shipped defaults will overwrite matching files in ~$INSTALL_USER at next login."; then
@@ -1758,43 +1784,73 @@ plant_magikos_host() {
 
   # Shipped user defaults are seeded through /etc/skel, which useradd copies
   # at account creation and seed_user_home replays for existing users.
-  clean_stale_skel_flat_copy
-  run mkdir -p /etc/skel
-  assemble_skeleton /etc/skel
+  if (( ! ARTIX_OPENRC )); then
+    clean_stale_skel_flat_copy
+    run mkdir -p /etc/skel
+    assemble_skeleton /etc/skel
+  fi
   install_app_icons ""
 
   link_planted_binaries "$PLANTED" ""
 
-  # uwsm sources /usr/share/uwsm/env.d/* for the graphical session; the
-  # packaged install ships this file, so recreate it here. Skip when the
-  # checkout already IS the planted tree (install -D refuses same-file).
-  if [[ ! "$ROOT/default/uwsm/env.d/10-magikos" -ef /usr/share/uwsm/env.d/10-magikos ]]; then
-    run install -Dm644 "$ROOT/default/uwsm/env.d/10-magikos" \
-      /usr/share/uwsm/env.d/10-magikos
+  if (( ARTIX_OPENRC )); then
+    # Never copy Arch's boot, init, PAM, nsswitch, or systemd drop-ins onto an
+    # existing Artix installation. Offer a separate SDDM user session instead.
+    run install -Dm644 "$ROOT/install/artix-openrc/magikos-openrc.desktop" \
+      /usr/share/wayland-sessions/magikos-openrc.desktop
+  else
+    # UWSM and environment.d are only consumed by the systemd user manager.
+    if [[ ! "$ROOT/default/uwsm/env.d/10-magikos" -ef /usr/share/uwsm/env.d/10-magikos ]]; then
+      run install -Dm644 "$ROOT/default/uwsm/env.d/10-magikos" \
+        /usr/share/uwsm/env.d/10-magikos
+    fi
+    run mkdir -p /usr/lib/environment.d
+    run cp -a "$ROOT/default/environment.d/." /usr/lib/environment.d/
+    plant_package_owned_files ""
+    sync_etc_dropins /etc
   fi
-
-  # systemd-environment-d-generator reads /usr/lib/environment.d/*.conf for
-  # the user session; mirrors plant_magikos's full-disk path.
-  run mkdir -p /usr/lib/environment.d
-  run cp -a "$ROOT/default/environment.d/." /usr/lib/environment.d/
-
-  plant_package_owned_files ""
-
-  sync_etc_dropins /etc
 
   # Repair pacman configuration on systems this project installed earlier:
   # shipped channel confs once referenced package repos that are not live
   # yet, which broke every -Sy. Redeploying the current channel conf fixes
   # them.
-  if grep -q "https://pkgs.magikos.org/" /etc/pacman.conf 2>/dev/null; then
+  if (( ! ARTIX_OPENRC )) && grep -q "https://pkgs.magikos.org/" /etc/pacman.conf 2>/dev/null; then
     local channel=${MAGIKOS_MIRROR:-stable}
     write_file /etc/pacman.conf "$(cat "$ROOT/default/pacman/pacman-$channel.conf")"$'\n'
     write_file /etc/pacman.d/mirrorlist "$(cat "$ROOT/default/pacman/mirrorlist-$channel")"$'\n'
   fi
 
-  write_file /etc/sudoers.d/10-magikos-wheel '%wheel ALL=(ALL:ALL) ALL'$'\n'
-  if (( ! DRY_RUN )); then
-    chmod 440 /etc/sudoers.d/10-magikos-wheel
+  if (( ! ARTIX_OPENRC )); then
+    write_file /etc/sudoers.d/10-magikos-wheel '%wheel ALL=(ALL:ALL) ALL'$'\n'
+    if (( ! DRY_RUN )); then
+      chmod 440 /etc/sudoers.d/10-magikos-wheel
+    fi
+  fi
+}
+
+# Artix adoption is repo-only: never send unavailable names to the AUR or
+# pull in Arch/CachyOS packages through an automatically added repository.
+artix_package_names() {
+  grep -vE '^[[:space:]]*(#|$)' "$ROOT/install/magikos-base-artix-openrc.packages"
+}
+
+check_artix_packages() {
+  local pkg repo repo_list missing=() available
+  local -A in_artix_repo=()
+  [[ -r $ROOT/install/magikos-base-artix-openrc.packages ]] || die "Artix package manifest missing"
+  repo_list=$(pacman-conf --repo-list) || die "Could not read Artix pacman repositories"
+  for repo in system world galaxy; do
+    grep -Fxq "$repo" <<<"$repo_list" || die "Artix repository [$repo] is missing; no changes were made."
+  done
+  available=$(pacman -Slq system world galaxy) || die "Artix package databases are unavailable; no changes were made."
+  while IFS= read -r pkg; do
+    [[ -n $pkg ]] && in_artix_repo[$pkg]=1
+  done <<<"$available"
+  while IFS= read -r pkg; do
+    pacman -Q "$pkg" >/dev/null 2>&1 || [[ ${in_artix_repo[$pkg]+set} ]] || missing+=("$pkg")
+  done < <(artix_package_names)
+  if (( ${#missing[@]} )); then
+    die "Packages not installed or available from Artix [system]/[world]/[galaxy]: ${missing[*]}. No changes were made."
   fi
 }
 
@@ -1820,6 +1876,20 @@ split_repo_and_aur() {
 }
 
 install_packages_host() {
+  if (( ARTIX_OPENRC )); then
+    local artix_packages=()
+    mapfile -t artix_packages < <(artix_package_names)
+    (( ${#artix_packages[@]} )) || die "Artix package manifest is empty"
+    log "Installing Artix OpenRC session packages from existing repositories"
+    # No --ask=4, --overwrite '*' or AUR retry on an adopted init system: a
+    # conflict must stop the install, not remove an Artix service provider.
+    if ! run pacman -S --needed "${artix_packages[@]}"; then
+      die "Artix package transaction failed; no Magikos configuration was planted. Inspect pacman's output."
+      return 1
+    fi
+    return 0
+  fi
+
   log "Installing Magikos package set (best effort)"
 
   mapfile -t packages < <(grep -v '^#' "$ROOT/install/magikos-base.packages" | grep -v '^$')
@@ -1944,6 +2014,9 @@ install_aur_packages_host() {
   home_dir=$(getent passwd "$INSTALL_USER" | cut -d: -f6)
   PKG_FAILURES=()
 
+  # Remove the temporary privilege even if yay is interrupted or the script
+  # exits unexpectedly. Never leave a passwordless %wheel rule on the host.
+  trap 'sudoers_nopasswd_disable "/"' EXIT
   sudoers_nopasswd_enable "/"
   if ! runuser -u "$INSTALL_USER" -- env HOME="$home_dir" \
     yay -S --ask=4 --needed --noconfirm "${aur_failed[@]}" >>"$LOG_FILE" 2>&1; then
@@ -1954,6 +2027,7 @@ install_aur_packages_host() {
     done
   fi
   sudoers_nopasswd_disable "/"
+  trap - EXIT
 
   for pkg in "${aur_failed[@]}"; do
     pacman -Q "$pkg" >/dev/null 2>&1 || PKG_FAILURES+=("$pkg")
@@ -1979,6 +2053,19 @@ adopt_user() {
 }
 
 run_apply_system_host() {
+  if (( ARTIX_OPENRC )); then
+    log "Enabling Artix OpenRC session prerequisites (no Arch system drop-ins)"
+    local artix_cmd=(env MAGIKOS_PATH="$PLANTED" MAGIKOS_INSTALL="$PLANTED/install"
+      bash "$PLANTED/install/artix-openrc/apply.sh")
+    if (( DRY_RUN )); then
+      printf '[dry-run] %s\n' "${artix_cmd[*]}"
+    elif ! "${artix_cmd[@]}"; then
+      INSTALL_ERRORS+=("Artix OpenRC service setup")
+      warn "OpenRC service setup failed; adoption is incomplete."
+    fi
+    return 0
+  fi
+
   log "Running Magikos system setup"
 
   # --first-install marks shipped migrations complete instead of replaying
@@ -1993,8 +2080,9 @@ run_apply_system_host() {
   elif ! bash -c "$cmd"; then
     # One failing leaf aborts the whole chain (set -euo pipefail); that must
     # not lose the rest of the install.
-    warn "magikos-apply-system reported errors; system setup may be incomplete."
-    warn "Per-step output is in $LOG_FILE - fix and re-run this installer (it is idempotent)."
+    INSTALL_ERRORS+=("system setup (magikos-apply-system)")
+    warn "magikos-apply-system reported errors; system setup is incomplete."
+    warn "Per-step output is in $LOG_FILE - do not treat this installation as complete."
   fi
 }
 
@@ -2003,6 +2091,28 @@ run_apply_system_host() {
 # thing magikos-reinstall-configs does), then per-user finalization runs as
 # that user -- it refuses root.
 seed_user_home() {
+  if (( ARTIX_OPENRC )); then
+    log "Installing the Magikos Sway config for ~$INSTALL_USER (preserving existing Sway config)"
+    if (( DRY_RUN )); then
+      printf '[dry-run] back up ~/.config/sway and copy Magikos config with OpenRC autostart\n'
+      return 0
+    fi
+    local artix_home
+    artix_home=$(getent passwd "$INSTALL_USER" | cut -d: -f6)
+    if ! runuser -u "$INSTALL_USER" -- env HOME="$artix_home" MAGIKOS_PATH="$PLANTED" bash -e -c '
+      mkdir -p "$HOME/.config"
+      if [[ -e $HOME/.config/sway || -L $HOME/.config/sway ]]; then
+        cp -a "$HOME/.config/sway" "$HOME/.config/sway.magikos-bak.$(date +%s)"
+      fi
+      cp -R --remove-destination "$MAGIKOS_PATH/config/." "$HOME/.config/"
+      cp "$MAGIKOS_PATH/install/artix-openrc/autostart.conf" "$HOME/.config/sway/autostart.conf"
+    '; then
+      INSTALL_ERRORS+=("Artix OpenRC Sway configuration for $INSTALL_USER")
+      warn "Could not seed Artix OpenRC session config for $INSTALL_USER"
+    fi
+    return 0
+  fi
+
   log "Syncing shipped defaults into ~$INSTALL_USER and finalizing"
 
   if (( DRY_RUN )); then
@@ -2017,15 +2127,22 @@ seed_user_home() {
   # --remove-destination keeps a skel file from being written *through* an
   # existing user symlink, which would truncate whatever the link targets.
   if ! runuser -u "$INSTALL_USER" -- env HOME="$home_dir" bash -c 'cp -a --remove-destination /etc/skel/. "$HOME/"'; then
+    INSTALL_ERRORS+=("user defaults for $INSTALL_USER")
     warn "Could not resync /etc/skel into ~$INSTALL_USER"
   fi
 
+  # Adoption runs on the live host, not in the ISO chroot: provision-user
+  # maps a runtime context with --first-install to iso-chroot, which makes
+  # mise-work.sh demand the ISO-only /opt/packages Node tarball. A distinct
+  # adoption context keeps the network fallback instead.
   if ! runuser -u "$INSTALL_USER" -- env \
     HOME="$home_dir" \
     MAGIKOS_PATH="$PLANTED" \
     MAGIKOS_INSTALL="$PLANTED/install" \
+    MAGIKOS_SETUP_CONTEXT=adoption \
     PATH="$PLANTED/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" \
     bash "$PLANTED/bin/magikos-provision-user" --first-install; then
+    INSTALL_ERRORS+=("user finalization for $INSTALL_USER")
     warn "Per-user finalization reported errors; re-run 'magikos finalize user' after first login."
   fi
 }
@@ -2033,8 +2150,19 @@ seed_user_home() {
 finish_existing() {
   echo
   report_pkg_failures
+  if (( ${#PKG_FAILURES[@]} > 0 || ${#INSTALL_ERRORS[@]} > 0 )); then
+    if (( ${#INSTALL_ERRORS[@]} > 0 )); then
+      warn "Incomplete steps: ${INSTALL_ERRORS[*]}"
+    fi
+    warn "Magikos adoption is INCOMPLETE; inspect $LOG_FILE before rebooting or retrying."
+    return 1
+  fi
   log "Magikos applied to the running system; ~$INSTALL_USER resynced from shipped defaults."
-  warn "The bootloader was left untouched. Reboot into your current setup first, then adopt the UKI/Limine layout with 'magikos setup direct-boot' when ready."
+  if (( ARTIX_OPENRC )); then
+    warn "Keep the current bootloader. Select 'Magikos (OpenRC)' at the login screen; validate audio and lock-before-suspend in the VM. Do not use the Arch-only direct-boot setup."
+  else
+    warn "The bootloader was left untouched. Reboot into your current setup first, then adopt the UKI/Limine layout with 'magikos setup direct-boot' when ready."
+  fi
   if [[ ${MAGIKOS_INSTALL_LOG_FILE:-} ]]; then
     log "Install log: $MAGIKOS_INSTALL_LOG_FILE"
   fi
@@ -2062,17 +2190,24 @@ main() {
   preflight
 
   if (( EXISTING_MODE )); then
-    plant_magikos_host
-    enable_multilib ""
-    if cachyos_wanted /etc/pacman.conf; then
-      enable_cachyos_repos "" \
-        || warn "Continuing without the CachyOS repositories."
+    if (( ARTIX_OPENRC )); then
+      # Only one repo transaction; on failure leave the host's configuration
+      # alone. Do not install AUR packages or replace the user's login manager.
+      install_packages_host
+      plant_magikos_host
+    else
+      plant_magikos_host
+      enable_multilib ""
+      if cachyos_wanted /etc/pacman.conf; then
+        enable_cachyos_repos "" \
+          || warn "Continuing without the CachyOS repositories."
+      fi
+      install_packages_host
+      adopt_user
+      install_aur_packages_host
+      install_oh_my_posh_host
+      seed_autologin /etc "$INSTALL_USER"
     fi
-    install_packages_host
-    install_aur_packages_host
-    install_oh_my_posh_host
-    adopt_user
-    seed_autologin /etc "$INSTALL_USER"
     run_apply_system_host
     seed_user_home
     finish_existing

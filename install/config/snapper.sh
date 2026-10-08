@@ -29,9 +29,12 @@ mkdir -p "$(dirname "$SNAPPER_CONF_PATH")"
 printf '%s\n' 'SNAPPER_CONFIGS="root"' >"$SNAPPER_CONF_PATH"
 chmod 0644 "$SNAPPER_CONF_PATH"
 
-source "${MAGIKOS_INSTALL_HELPERS:-${MAGIKOS_INSTALL:-/usr/share/magikos}/install/helpers}/systemd.sh"
-magikos_service_disable snapper-timeline.timer
-magikos_service_enable snapper-cleanup.timer
-# limine-snapper-sync is a MagikOS/CachyOS package with no Debian counterpart,
-# so enable it only where the unit exists.
-magikos_service_enable limine-snapper-sync.service
+source "${MAGIKOS_INSTALL_HELPERS:-${MAGIKOS_INSTALL:-/usr/share/magikos/install}/helpers}/systemd.sh"
+if magikos_has_systemd; then
+  systemctl disable --now snapper-timeline.timer >/dev/null 2>&1 || true
+  systemctl enable --now snapper-cleanup.timer >/dev/null 2>&1 || true
+  # limine-snapper-sync is a Magikos/CachyOS package with no Debian counterpart.
+  systemctl enable --now limine-snapper-sync.service >/dev/null 2>&1 || true
+else
+  echo "Snapper cleanup needs a non-systemd scheduler; systemd timers were not enabled"
+fi

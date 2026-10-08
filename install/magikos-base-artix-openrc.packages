@@ -1,0 +1,62 @@
+# Magikos session packages for adoption of an existing Artix OpenRC system.
+# Curated from magikos-base.packages (plus the PipeWire packages normally in
+# magikos-other.packages). Use the host's configured Artix repos; do not add
+# Arch/CachyOS repositories or replace its bootloader, kernel, initramfs, GPU
+# drivers, microcode, display manager, or existing seat manager.
+#
+# Omitted: cachyos-*, cachy-update, chwd, linux-cachyos*, linux-omarchy*,
+# mkinitcpio, efibootmgr, os-prober, and AUR/vendor-only extras (e.g. yay,
+# bpftune-git, brave-origin-bin, topgrade-bin). uwsm requires systemd's user
+# manager; it cannot provide the OpenRC Sway session. Do not pull in unverified
+# screenshot editors such as swappy/satty: grim and slurp are available in
+# Artix world, and flameshot is available there for the legacy power menu.
+# sddm and other login manager, network manager, firewall, and power-profile service packages
+# are left to the host's existing setup; adopting a desktop must not change
+# the system's login, network, firewall, or power policy. Installing service scripts
+# does not enable them. PipeWire PulseAudio compatibility is opt-in because
+# it can conflict with an existing PulseAudio service on an adopted system.
+
+alsa-plugins
+alsa-utils
+bash-completion
+bluez
+bluez-openrc
+bluez-utils
+brightnessctl
+dbus-openrc
+elogind-openrc
+flameshot
+foot
+fuzzel
+git
+grim
+gum
+inotify-tools
+jq
+noto-fonts
+noto-fonts-emoji
+pavucontrol
+pipewire
+pipewire-openrc
+playerctl
+qt6-wayland
+quickshell
+ripgrep
+rsync
+slurp
+sway
+swaybg
+swayidle
+swaylock
+thunar
+upower
+wireplumber
+wireplumber-openrc
+wl-clipboard
+wlsunset
+wtype
+xdg-desktop-portal
+xdg-desktop-portal-gtk
+xdg-desktop-portal-wlr
+xdg-user-dirs
+xorg-xwayland

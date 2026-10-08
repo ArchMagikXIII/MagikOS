@@ -28,7 +28,7 @@ STUB
 chmod +x "$stub_dir"/*
 
 export TEST_LOG="$stub_dir/firewall.log"
-PATH="$stub_dir:$PATH" bash -eE -c 'source "$1"' bash "$ROOT/install/config/firewall.sh"
+MAGIKOS_INSTALL="$ROOT/install" PATH="$stub_dir:$PATH" bash -eE -c 'source "$1"' bash "$ROOT/install/config/firewall.sh"
 
 grep -q '^ufw default deny incoming$' "$TEST_LOG" || fail "incoming traffic is denied by default"
 grep -q '^ufw allow 53317/udp$' "$TEST_LOG" || fail "LocalSend UDP port is allowed"

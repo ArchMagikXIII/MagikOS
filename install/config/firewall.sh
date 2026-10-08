@@ -19,5 +19,5 @@ ufw allow 53317/tcp
 # system instead of mutating the live install session's firewall.
 sed -i 's/^ENABLED=.*/ENABLED=yes/' /etc/ufw/ufw.conf
 
-source "${MAGIKOS_INSTALL_HELPERS:-${MAGIKOS_INSTALL:-/usr/share/magikos}/install/helpers}/systemd.sh"
+source "${MAGIKOS_INSTALL_HELPERS:-${MAGIKOS_INSTALL:-/usr/share/magikos/install}/helpers}/systemd.sh"
 magikos_service_enable ufw

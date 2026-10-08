@@ -1,0 +1,9 @@
+#!/bin/bash
+# magikos:summary=Lock securely, then hibernate on OpenRC or systemd
+# magikos:group=system
+
+if [[ -d /run/systemd/system ]]; then
+  exec systemctl hibernate
+fi
+magikos-system-sleep-lock || exit 1
+exec loginctl hibernate

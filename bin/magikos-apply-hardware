@@ -92,7 +92,6 @@ source "$MAGIKOS_INSTALL/hardware/all.sh"
 if ((${#MAGIKOS_INSTALL_SKIPPED_LEAVES[@]} > 0)); then
   printf '\033[33m==> %s hardware step(s) did not apply on this machine:\033[0m\n' \
     "${#MAGIKOS_INSTALL_SKIPPED_LEAVES[@]}" >&2
-  local step
   for step in "${MAGIKOS_INSTALL_SKIPPED_LEAVES[@]}"; do
     printf '    %s\n' "${step##*/}" >&2
   done

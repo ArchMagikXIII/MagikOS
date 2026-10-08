@@ -8,6 +8,7 @@ if [[ -z $default_browser ]]; then
   default_browser=$(xdg-mime query default x-scheme-handler/https)
 fi
 browser_exec=$(sed -n 's/^Exec=\([^ ]*\).*/\1/p' {~/.local,~/.nix-profile,/usr}/share/applications/$default_browser 2>/dev/null | head -1)
+[[ -n $browser_exec ]] || { echo "No default browser desktop entry found" >&2; exit 1; }
 
 if $browser_exec --help 2>/dev/null | grep -q MOZ_LOG; then
   private_flag="--private-window"
@@ -17,6 +18,10 @@ else
   private_flag="--incognito"
 fi
 
-systemd-run --user --quiet --collect --unit="magikos-browser-$(date +%s%N)" \
-  --property=StandardOutput=null --property=StandardError=null \
-  uwsm-app -- "$browser_exec" "${@/--private/$private_flag}"
+if [[ -d /run/systemd/system ]]; then
+  systemd-run --user --quiet --collect --unit="magikos-browser-$(date +%s%N)" \
+    --property=StandardOutput=null --property=StandardError=null \
+    uwsm-app -- "$browser_exec" "${@/--private/$private_flag}"
+else
+  exec uwsm-app -- "$browser_exec" "${@/--private/$private_flag}"
+fi

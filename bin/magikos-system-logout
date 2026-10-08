@@ -4,7 +4,11 @@
 # magikos:examples=magikos logout | magikos system logout
 # magikos:aliases=magikos logout
 
-nohup bash -c "sleep 2 && uwsm stop" >/dev/null 2>&1 &
+if [[ -d /run/systemd/system ]]; then
+  nohup bash -c "sleep 2 && uwsm stop" >/dev/null 2>&1 &
+else
+  nohup bash -c "sleep 2 && swaymsg exit" >/dev/null 2>&1 &
+fi
 
 magikos-osd -i logout -m "Logging out" -d 5000
 

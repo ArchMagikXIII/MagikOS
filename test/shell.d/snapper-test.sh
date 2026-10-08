@@ -61,6 +61,7 @@ TEST_LOG="$test_tmp/calls.log" \
 PATH="$fake_bin:$PATH" \
 MAGIKOS_SNAPPER_CONFIGURE_TEST=1 \
 MAGIKOS_PATH="$ROOT" \
+MAGIKOS_INSTALL="$ROOT/install" \
 MAGIKOS_SNAPPER_CONFIG_PATH="$test_tmp/etc/snapper/configs/root" \
 MAGIKOS_SNAPPER_CONF_PATH="$test_tmp/etc/conf.d/snapper" \
   bash -euo pipefail "$ROOT/install/config/snapper.sh" >/dev/null

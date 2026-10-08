@@ -1,0 +1,11 @@
+#!/bin/bash
+# Keep the existing UWSM app scope on systemd; direct Sway has no user manager.
+if [[ ${MAGIKOS_FORCE_DIRECT_LAUNCH:-0} != 1 && -d /run/systemd/system && -x /usr/bin/uwsm-app ]]; then
+  exec /usr/bin/uwsm-app "$@"
+fi
+if [[ ${1:-} != -- || $# -lt 2 ]]; then
+  echo "Usage: uwsm-app -- COMMAND [ARG ...]" >&2
+  exit 2
+fi
+shift
+exec "$@"

@@ -1,0 +1,20 @@
+#!/bin/bash
+# Artix's repositories may not ship xdg-terminal-exec. Use Foot for the
+# supported Magikos options when the upstream implementation is absent.
+if [[ ${MAGIKOS_FORCE_FOOT_TERMINAL:-0} != 1 && -x /usr/bin/xdg-terminal-exec ]]; then
+  exec /usr/bin/xdg-terminal-exec "$@"
+fi
+args=()
+while (( $# )); do
+  case $1 in
+    --print-id) printf 'foot.desktop\n'; exit 0 ;;
+    --dir=*) args+=("--working-directory=${1#--dir=}") ;;
+    --app-id=*) args+=("--app-id=${1#--app-id=}") ;;
+    --title=*) args+=("--title=${1#--title=}") ;;
+    -e|--) shift; break ;;
+    -*) echo "Unsupported xdg-terminal-exec option: $1" >&2; exit 2 ;;
+    *) break ;;
+  esac
+  shift
+done
+exec foot "${args[@]}" "$@"

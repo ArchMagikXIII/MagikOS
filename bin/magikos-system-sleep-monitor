@@ -56,7 +56,15 @@ esac
 
 sleep_monitor="$MAGIKOS_PATH/bin/magikos-system-sleep-monitor"
 
-exec systemd-inhibit \
+# Artix's elogind provides its own inhibitor CLI. Prefer it outside a systemd
+# boot even when a compatibility package happens to ship systemd-inhibit.
+if [[ ! -d /run/systemd/system ]] && command -v elogind-inhibit >/dev/null 2>&1; then
+  inhibitor=elogind-inhibit
+else
+  inhibitor=systemd-inhibit
+fi
+
+exec "$inhibitor" \
   --what=sleep \
   --mode=delay \
   --who=Magikos \

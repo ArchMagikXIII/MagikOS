@@ -1,0 +1,10 @@
+#!/bin/bash
+# magikos:summary=Lock securely, then suspend on OpenRC or systemd
+# magikos:group=system
+
+if [[ -d /run/systemd/system ]]; then
+  exec systemctl suspend
+fi
+# A manual suspend must never proceed if the secure Quickshell lock failed.
+magikos-system-sleep-lock || exit 1
+exec loginctl suspend

@@ -1,0 +1,28 @@
+#!/bin/bash
+# SDDM user session for Artix/OpenRC. Keep the existing Sway session untouched.
+set -euo pipefail
+
+export MAGIKOS_PATH="${MAGIKOS_PATH:-/usr/share/magikos}"
+export PATH="$MAGIKOS_PATH/bin:$HOME/.local/bin:$PATH"
+export XDG_CURRENT_DESKTOP=sway XDG_SESSION_DESKTOP=sway XDG_SESSION_TYPE=wayland
+export TERMINAL="${TERMINAL:-foot}" EDITOR="${EDITOR:-vi}"
+export MAGIKOS_FORCE_DIRECT_LAUNCH=1 MAGIKOS_FORCE_FOOT_TERMINAL=1
+
+if [[ -z ${XDG_RUNTIME_DIR:-} || ! -d $XDG_RUNTIME_DIR ]]; then
+  echo "Missing XDG_RUNTIME_DIR (check elogind/PAM); refusing to start an untracked Sway session" >&2
+  exit 1
+fi
+
+if [[ -z ${DBUS_SESSION_BUS_ADDRESS:-} ]]; then
+  if [[ -S $XDG_RUNTIME_DIR/bus ]]; then
+    export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"
+  elif [[ ${MAGIKOS_DBUS_WRAPPED:-0} == 0 ]] && command -v dbus-run-session >/dev/null 2>&1; then
+    export MAGIKOS_DBUS_WRAPPED=1
+    exec dbus-run-session -- "$0"
+  else
+    echo "No session D-Bus available for Magikos; refusing to start the session" >&2
+    exit 1
+  fi
+fi
+
+exec sway

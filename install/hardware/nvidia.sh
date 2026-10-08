@@ -19,7 +19,8 @@ if lspci | grep -qi 'nvidia'; then
     # install, so enabling it here is safe across hardware. Desktop systems
     # with NVIDIA as the only GPU get no benefit and skip this.
     if magikos-hw-nvidia-powerd; then
-      sudo systemctl enable nvidia-powerd.service
+      source "${MAGIKOS_INSTALL_HELPERS:-${MAGIKOS_INSTALL:-/usr/share/magikos/install}/helpers}/systemd.sh"
+      magikos_service_enable nvidia-powerd
     fi
   elif magikos-hw-nvidia-without-gsp; then
     PACKAGES=(nvidia-580xx-dkms nvidia-580xx-utils lib32-nvidia-580xx-utils)

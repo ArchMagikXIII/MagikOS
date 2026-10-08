@@ -1,0 +1,7 @@
+[Desktop Entry]
+Name=Magikos (OpenRC)
+Comment=Magikos Sway session on Artix OpenRC
+Exec=/usr/local/bin/magikos-openrc-session
+TryExec=/usr/bin/sway
+Type=Application
+DesktopNames=sway;
