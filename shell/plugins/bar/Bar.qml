@@ -653,6 +653,7 @@ Item {
     }
 
     var candidates = []
+    var regionsPresent = {}
     for (var i = 0; i < moduleSlots.length; i++) {
       var slot = moduleSlots[i]
       if (!slot || slot === sourceSlot || !slot.visible || slot.width <= 0 || slot.height <= 0) continue
@@ -671,9 +672,76 @@ Item {
         width: slot.width,
         height: slot.height
       })
+      regionsPresent[slot.region] = true
     }
 
+    // A section that has been emptied has no widget slots, so it would offer no
+    // drop target at all and could never be repopulated by dragging. Give the
+    // empty outer edge of the bar a fixed-width drop lane that inserts into
+    // that section again (workspaces back on the far left, tray back on the
+    // right).
+    var emptyEdge = root.emptySectionDrop(scenePoint, sourceWindow, regionsPresent)
+    if (emptyEdge) return emptyEdge
+
     return BarModel.nearestDropTarget(candidates, scenePoint, root.vertical)
+  }
+
+  // Returns an insertion target for an emptied outer section when the pointer
+  // sits in its edge lane, or null. In a horizontal bar the left section lives
+  // at the left edge and the right section at the right edge; in a vertical
+  // bar the left section sits at the top edge and the right at the bottom.
+  function emptySectionDrop(scenePoint, window, regionsPresent) {
+    if (!window || !window.contentItem) return null
+    var content = window.contentItem
+    var width = content.width
+    var height = content.height
+    if (!width || !height) return null
+
+    var barPoint = content.mapFromItem(null, scenePoint.x, scenePoint.y)
+    var thickness = Style.spacing.xs
+    var strip = Math.max(Style.space(24), thickness * 2)
+    var origin = { x: 0, y: 0 }
+    try {
+      origin = content.mapToItem(null, 0, 0)
+    } catch (e) {
+    }
+
+    if (!root.vertical) {
+      if (barPoint.x < strip && !regionsPresent["left"]) {
+        var left = root.barDragScreenPoint({ x: origin.x, y: origin.y })
+        return {
+          emptyRegion: "left",
+          after: false,
+          geometry: { x: left.x, y: left.y, width: thickness, height: height }
+        }
+      }
+      if (barPoint.x > width - strip && !regionsPresent["right"]) {
+        var right = root.barDragScreenPoint({ x: origin.x + width - thickness, y: origin.y })
+        return {
+          emptyRegion: "right",
+          after: false,
+          geometry: { x: right.x, y: right.y, width: thickness, height: height }
+        }
+      }
+    } else {
+      if (barPoint.y < strip && !regionsPresent["left"]) {
+        var top = root.barDragScreenPoint({ x: origin.x, y: origin.y })
+        return {
+          emptyRegion: "left",
+          after: false,
+          geometry: { x: top.x, y: top.y, width: width, height: thickness }
+        }
+      }
+      if (barPoint.y > height - strip && !regionsPresent["right"]) {
+        var bottom = root.barDragScreenPoint({ x: origin.x, y: origin.y + height - thickness })
+        return {
+          emptyRegion: "right",
+          after: false,
+          geometry: { x: bottom.x, y: bottom.y, width: width, height: thickness }
+        }
+      }
+    }
+    return null
   }
 
   function visibleModuleSlot(region, name, sourceSlot) {
@@ -704,6 +772,8 @@ Item {
 
   function dropBarModuleAtTarget(sourceSlot, targetSlot, afterTarget) {
     if (!sourceSlot || !targetSlot) return false
+    if (targetSlot.emptyRegion)
+      return dropBarModule(sourceSlot, targetSlot.emptyRegion, "")
     var beforeName = afterTarget ? nextVisibleModuleName(targetSlot.region, targetSlot.moduleName, sourceSlot) : targetSlot.moduleName
     return dropBarModule(sourceSlot, targetSlot.region, beforeName)
   }
@@ -1616,9 +1686,9 @@ Item {
           root.barDragScreenY = screenPoint.y
 
           var drop = root.moduleDropAtScene(scenePoint, slot)
-          root.barDragTarget = drop ? drop.slot : null
+          root.barDragTarget = drop ? (drop.slot || drop) : null
           root.barDragAfter = drop ? drop.after : false
-          root.barDragTargetGeometry = drop ? root.dropMarkerRect(drop.slot, drop.after) : null
+          root.barDragTargetGeometry = drop ? (drop.geometry || root.dropMarkerRect(drop.slot, drop.after)) : null
         }
       }
 
