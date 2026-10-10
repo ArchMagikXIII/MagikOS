@@ -2,8 +2,6 @@
 
 An in-repo installer for Magikos. Full-disk installs build an Arch/CachyOS target. Existing-system adoption also has an experimental Artix OpenRC path that deliberately uses a smaller package set and separate session setup instead of the Arch system finalizer.
 
-Debian and derivatives have their own adoption-only installer, [`magikos-install-debian`](magikos-install-debian); see [`../docs/debian.md`](../docs/debian.md) for the port's scope and gaps.
-
 ## Usage
 
 Two modes: full-disk install from live media, and adoption of an already-running system.
