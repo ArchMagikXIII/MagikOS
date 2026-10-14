@@ -194,7 +194,8 @@ Runs once per user. It does **not** copy `~/.config/**`, `~/.bashrc`,
 or the nautilus extensions — `/etc/skel` already seeded those.
 It only does the things `/etc/skel` can't:
 
-- Skill symlinks `~/.{agents,claude,codex,pi/agent}/skills/<name>` →
+- Skill symlinks `~/.agents/skills/<name>` and
+  `~/.gemini/config/skills/<name>` →
   `$MAGIKOS_PATH/default/agents/skills/<name>`, looping over every skill
   directory there (currently `magikos` and `diagnose-crash`) so new skills
   need no edit. Symlinks (not copies) so `magikos dev link` against a dev

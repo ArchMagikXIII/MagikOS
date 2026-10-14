@@ -14,14 +14,6 @@ printf '%s\n' "$*" >>"$MAGIKOS_TEST_THEME_CALLS"
 SH
 chmod +x "$mock_bin/magikos-theme-set"
 
-for command in magikos-theme-set-pi; do
-  cat >"$mock_bin/$command" <<'SH'
-#!/bin/bash
-exit 0
-SH
-  chmod +x "$mock_bin/$command"
-done
-
 calls="$test_tmp/theme-calls"
 touch "$test_tmp/home/.config/chromium/SingletonLock"
 HOME="$test_tmp/home" PATH="$mock_bin:$PATH" MAGIKOS_TEST_THEME_CALLS="$calls" \

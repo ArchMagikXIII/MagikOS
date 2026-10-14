@@ -93,10 +93,14 @@ export MAGIKOS_TEST_AGENT_TERMINAL_LOG="$terminal_log"
 export MAGIKOS_TEST_AGENT_MENU_LOG="$menu_log"
 export MAGIKOS_PATH="$ROOT"
 
+agy_package="antigravity-cli"
+
+# Retired packages below only cover pre-retirement migrations, which still
+# install their shims on the way through history; the retirement migration
+# purges them afterwards.
 grok_package="npm:@xai-official/grok"
 omp_package="github:can1357/oh-my-pi"
 crush_package="crush"
-agy_package="antigravity-cli"
 
 assert_lazy_stub() {
   local package=$1
@@ -111,17 +115,16 @@ assert_lazy_stub() {
     fail "$command lazy stub preserves its mise package"
 }
 
-assert_lazy_stub "$grok_package" grok
-assert_lazy_stub "$omp_package" omp
-assert_lazy_stub "$crush_package" crush
+assert_lazy_stub "$agy_package" agy
 pass "custom agent lazy stubs preserve their mise packages"
 
 source "$ROOT/install/user/mise.sh"
 grep -Fx "$agy_package agy" "$stub_log" >/dev/null || fail "user setup creates the Antigravity lazy stub"
-grep -Fx "$grok_package grok" "$stub_log" >/dev/null || fail "user setup creates the Grok lazy stub"
-grep -Fx "$omp_package omp" "$stub_log" >/dev/null || fail "user setup creates the Oh My Pi lazy stub"
-grep -Fx "$crush_package" "$stub_log" >/dev/null || fail "user setup creates the Crush lazy stub"
-pass "user setup creates the custom agent lazy stubs"
+grep -Fx "opencode" "$stub_log" >/dev/null || fail "user setup creates the OpenCode lazy stub"
+for retired in "claude" "codex" "crush" "copilot" "pi" "github:can1357/oh-my-pi omp" "npm:@xai-official/grok grok"; do
+  grep -Fx "$retired" "$stub_log" >/dev/null && fail "user setup no longer creates the retired $retired stub"
+done
+pass "user setup creates only the supported agent lazy stubs"
 
 : >"$stub_log"
 source "$ROOT/migrations/1785617047.sh" >/dev/null
@@ -232,12 +235,12 @@ rm "$test_home/.local/state/magikos/preinstalls-removed"
 rm -f "$agent_file"
 pass "agent migrations install working wrappers without overriding the preinstall opt-out"
 
-touch "$test_home/.local/bin/agy"
+touch "$test_home/.local/bin/agy" "$test_home/.local/bin/opencode"
 magikos-remove-preinstalls >/dev/null
-for command in agy omp grok crush; do
+for command in agy opencode; do
   [[ ! -e $test_home/.local/bin/$command ]] || fail "Remove Preinstalls deletes the $command lazy stub"
 done
-pass "Remove Preinstalls deletes every optional agent lazy stub"
+pass "Remove Preinstalls deletes every supported agent lazy stub"
 
 [[ -z $(magikos-default-agent) ]] || fail "default agent is unset until one is chosen"
 pass "default agent is unset until one is chosen"
@@ -275,35 +278,18 @@ chmod +x "$mock_bin/magikos-agent"
 hash -r
 
 declare -A expected_agents=(
-  [pi]="pi"
-  [omp]="omp"
-  [oh-my-pi]="omp"
   [opencode]="opencode"
   [open-code]="opencode"
-  [claude]="claude"
-  [claude-code]="claude"
-  [codex]="codex"
-  [crush]="crush"
-  [grok]="grok"
   [agy]="agy"
   [antigravity]="agy"
   [antigravity-cli]="agy"
   [gemini]="agy"
   [gemini-cli]="agy"
-  [copilot]="copilot"
-  [github-copilot]="copilot"
 )
 
 declare -A expected_packages=(
-  [pi]="pi"
-  [omp]="$omp_package"
   [opencode]="opencode"
-  [claude]="claude"
-  [codex]="codex"
-  [crush]="$crush_package"
-  [grok]="$grok_package"
   [agy]="$agy_package"
-  [copilot]="copilot"
 )
 
 for selection in "${!expected_agents[@]}"; do
@@ -325,23 +311,23 @@ pass "default agent selects and opens every supported provider and alias"
   fail "default agent stores its selection in Magikos user config"
 pass "default agent stores its selection in Magikos user config"
 
-MAGIKOS_TEST_AGENT_INSTALLED=true magikos-default-agent pi
+MAGIKOS_TEST_AGENT_INSTALLED=true magikos-default-agent opencode
 : >"$notification_history"
 : >"$agent_open_log"
 : >"$terminal_log"
-magikos-default-agent github-copilot
+magikos-default-agent agy
 mapfile -d '' -t terminal_args <"$terminal_log"
-[[ ${terminal_args[0]} == "magikos-default-agent" && ${terminal_args[1]} == "--install" && ${terminal_args[2]} == "copilot" ]] ||
+[[ ${terminal_args[0]} == "magikos-default-agent" && ${terminal_args[1]} == "--install" && ${terminal_args[2]} == "agy" ]] ||
   fail "missing agent installation opens in a terminal"
 [[ ! -s $notification_history ]] || fail "missing agent installation skips notifications"
 [[ ! -s $agent_open_log ]] || fail "missing agent installation waits to open the agent"
-[[ $(magikos-default-agent) == "pi" ]] || fail "missing agent installation waits to change the selection"
+[[ $(magikos-default-agent) == "opencode" ]] || fail "missing agent installation waits to change the selection"
 
-magikos-default-agent --install github-copilot >"$test_tmp/install-output"
+magikos-default-agent --install agy >"$test_tmp/install-output"
 mapfile -d '' -t mise_args <"$mise_log"
-[[ ${mise_args[0]} == "use" && ${mise_args[1]} == "-g" && ${mise_args[2]} == "copilot" ]] ||
+[[ ${mise_args[0]} == "use" && ${mise_args[1]} == "-g" && ${mise_args[2]} == "antigravity-cli" ]] ||
   fail "visible agent installation activates the provider globally through mise"
-[[ $(magikos-default-agent) == "copilot" ]] || fail "visible agent installation changes the selection after mise succeeds"
+[[ $(magikos-default-agent) == "agy" ]] || fail "visible agent installation changes the selection after mise succeeds"
 [[ ! -s $notification_history ]] || fail "visible agent installation leaves progress to the terminal"
 [[ $(<"$test_tmp/install-output") == $'\033[2J\033[3J\033[H' ]] ||
   fail "visible agent installation clears its terminal before opening the agent"
@@ -353,11 +339,11 @@ pass "missing agents install visibly and open in the same terminal"
 : >"$notification_history"
 : >"$agent_open_log"
 : >"$terminal_log"
-MAGIKOS_TEST_AGENT_INSTALLED=true magikos-default-agent github-copilot
+MAGIKOS_TEST_AGENT_INSTALLED=true magikos-default-agent agy
 [[ ! -s $terminal_log ]] || fail "installed agent selection skips the terminal"
 [[ ! -s $notification_history ]] || fail "installed agent selection skips notifications"
 mapfile -d '' -t mise_args <"$mise_log"
-[[ ${mise_args[0]} == "use" && ${mise_args[1]} == "-g" && ${mise_args[2]} == "copilot" ]] ||
+[[ ${mise_args[0]} == "use" && ${mise_args[1]} == "-g" && ${mise_args[2]} == "antigravity-cli" ]] ||
   fail "default agent still activates an installed provider globally through mise"
 mapfile -d '' -t agent_open_args <"$agent_open_log"
 [[ ${#agent_open_args[@]} == 1 && ${agent_open_args[0]} == "magikos-agent" ]] ||
@@ -370,17 +356,17 @@ if magikos-default-agent unsupported >"$test_tmp/invalid-output" 2>&1; then
 fi
 grep -F "Usage: magikos-default-agent" "$test_tmp/invalid-output" >/dev/null ||
   fail "default agent explains supported providers"
-[[ $(magikos-default-agent) == "copilot" ]] || fail "invalid selection preserves the current default agent"
+[[ $(magikos-default-agent) == "agy" ]] || fail "invalid selection preserves the current default agent"
 [[ ! -s $agent_open_log ]] || fail "invalid selection does not open an agent"
 pass "default agent rejects unsupported providers without changing the selection"
 
 : >"$notification_history"
 : >"$agent_open_log"
-if MAGIKOS_TEST_MISE_FAIL=true magikos-default-agent --install codex >"$test_tmp/install-failure-output" 2>&1; then
+if MAGIKOS_TEST_MISE_FAIL=true magikos-default-agent --install opencode >"$test_tmp/install-failure-output" 2>&1; then
   fail "default agent rejects a failed mise installation"
 fi
-[[ $(magikos-default-agent) == "copilot" ]] || fail "failed installation preserves the current default agent"
-grep -F "Could not install Codex with mise" "$test_tmp/install-failure-output" >/dev/null ||
+[[ $(magikos-default-agent) == "agy" ]] || fail "failed installation preserves the current default agent"
+grep -F "Could not install OpenCode with mise" "$test_tmp/install-failure-output" >/dev/null ||
   fail "default agent reports a failed mise installation in the terminal"
 [[ ! -s $notification_history ]] || fail "failed visible agent installation skips notifications"
 [[ ! -s $agent_open_log ]] || fail "failed installation does not open an agent"
@@ -388,11 +374,11 @@ pass "default agent opens only after mise installs the provider"
 
 : >"$notification_history"
 : >"$agent_open_log"
-if MAGIKOS_TEST_AGENT_INSTALLED=true MAGIKOS_TEST_MISE_FAIL=true magikos-default-agent codex >"$test_tmp/setup-failure-output" 2>&1; then
+if MAGIKOS_TEST_AGENT_INSTALLED=true MAGIKOS_TEST_MISE_FAIL=true magikos-default-agent opencode >"$test_tmp/setup-failure-output" 2>&1; then
   fail "default agent rejects a failed mise activation"
 fi
-[[ $(magikos-default-agent) == "copilot" ]] || fail "failed activation preserves the current default agent"
-grep -F "Could not set Codex as the default coding agent" "$test_tmp/setup-failure-output" >/dev/null ||
+[[ $(magikos-default-agent) == "agy" ]] || fail "failed activation preserves the current default agent"
+grep -F "Could not set OpenCode as the default coding agent" "$test_tmp/setup-failure-output" >/dev/null ||
   fail "default agent reports a failed activation for an installed provider"
 [[ ! -s $notification_history ]] || fail "failed activation skips notifications"
 [[ ! -s $agent_open_log ]] || fail "failed activation does not open an agent"
@@ -438,26 +424,12 @@ assert_bypass() {
   assert_launched "$agent" "skips permission prompts" "$@"
 }
 
-assert_launch pi pi "Review this project"
-assert_launch omp omp --auto-approve -- "Review this project"
 assert_launch opencode opencode --auto --prompt "Review this project"
-assert_launch claude claude --permission-mode auto -- "Review this project"
-assert_launch codex codex --approve-for-me -- "Review this project"
-assert_launch crush crush run "Review this project"
-assert_launch grok grok --permission-mode bypassPermissions -- "Review this project"
 assert_launch agy agy --dangerously-skip-permissions --prompt-interactive "Review this project"
-assert_launch copilot copilot --allow-all --interactive "Review this project"
 pass "agent launcher adapts initial prompts for every supported agent"
 
-assert_bypass pi pi
-assert_bypass omp omp --auto-approve
 assert_bypass opencode opencode --auto
-assert_bypass claude claude --permission-mode auto
-assert_bypass codex codex --approve-for-me
-assert_bypass crush crush --yolo
-assert_bypass grok grok --permission-mode bypassPermissions
 assert_bypass agy agy --dangerously-skip-permissions
-assert_bypass copilot copilot --allow-all
 pass "agent launcher skips permission prompts for every supported agent"
 
 printf '%s\n' "opencode" >"$agent_file"

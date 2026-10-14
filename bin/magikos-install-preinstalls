@@ -7,7 +7,7 @@ if gum confirm "Are you sure you want to restore all preinstalled web apps, TUI 
   echo -e "Restoring preinstalled Magikos applications...\n"
 
   # Recreates the shipped .desktop launchers (web apps and TUIs) and the mise stubs
-  # that back claude, gh, opencode, and the rest of the agents
+  # that back agy, gh, opencode, and the rest of the tools
   magikos-refresh-applications
 
   # Mirrors the list in magikos-remove-preinstalls; both track magikos-base.packages

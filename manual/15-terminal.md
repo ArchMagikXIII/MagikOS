@@ -18,13 +18,13 @@ Magikos ships with an ergonomically-optimized Tmux configuration, which has a lo
 
 Because Tmux is programmable, we can use functions to create layouts. Magikos ships with four different functions for common developer layouts.
 
-`tdl [agent]` starts a three-way split IDE-like interface with the `$EDITOR` on the left, your chosen AI agent on the right (like `c` for opencode or `cx` for Claude or `codex` for OpenAI), and then a terminal at the bottom.
+`tdl [agent]` starts a three-way split IDE-like interface with the `$EDITOR` on the left, your chosen AI agent on the right (like `c` for opencode or `agy` for Antigravity), and then a terminal at the bottom.
 
 So `tdl c` would start this (or just `ic`):
 
  ![tmux-tdl](images/tmux-tdl.webp)
 
-You can also start a second agent with `tdl c cx` (opencode + claude) (or just `icx`):
+You can also start a second agent with `tdl c agy` (opencode + antigravity):
 
  ![tmux-tdl2](images/tmux-tdl2.webp)
 

@@ -461,51 +461,6 @@ awk '
 ' "$NEXT_THEME/shell.toml" || fail "theme shell section override is merged"
 pass "theme shell section override is merged"
 
-jq -e '.name == "magikos-system" and .vars.panel == "#0f0f0f" and .vars.border == "#4d4d4d" and .colors.accent == "accent"' "$NEXT_THEME/pi.json" >/dev/null
-pass "pi theme template is generated from standard themed templates"
-cp "$NEXT_THEME/pi.json" "$CURRENT_THEME/pi.json"
-
-echo '{"name":"magikos-system","vars":{"custom":"yes"}}' >"$NEXT_THEME/pi.json"
-MAGIKOS_PATH="$ROOT" HOME="$PI_TMPDIR" "$ROOT/bin/magikos-theme-set-templates"
-jq -e '.name == "magikos-system" and .vars.custom == "yes"' "$NEXT_THEME/pi.json" >/dev/null
-pass "theme-specific pi.json overrides the default template"
-
-HOME="$PI_TMPDIR" "$ROOT/bin/magikos-theme-set-pi"
-[[ ! -d $PI_TMPDIR/.pi ]] || fail "pi theme sync skips missing Pi agent when not activating"
-pass "pi theme sync skips missing Pi agent when not activating"
-
-HOME="$PI_TMPDIR" "$ROOT/bin/magikos-theme-set-pi" --activate
-[[ -f $PI_TMPDIR/.pi/agent/themes/magikos-system.json ]] || fail "pi theme file is synced"
-pass "pi theme file is synced"
-[[ -f $PI_TMPDIR/.pi/agent/settings.json ]] || fail "pi settings file is generated"
-pass "pi settings file is generated"
-jq -e '.name == "magikos-system" and .vars.panel == "#0f0f0f"' "$PI_TMPDIR/.pi/agent/themes/magikos-system.json" >/dev/null
-pass "pi synced theme JSON is valid"
-jq -e '.theme == "magikos-system"' "$PI_TMPDIR/.pi/agent/settings.json" >/dev/null
-pass "pi generated theme is activated"
-
-jq '.model = "keep-me"' "$PI_TMPDIR/.pi/agent/settings.json" >"$PI_TMPDIR/settings.json.tmp"
-mv "$PI_TMPDIR/settings.json.tmp" "$PI_TMPDIR/.pi/agent/settings.json"
-HOME="$PI_TMPDIR" "$ROOT/bin/magikos-theme-set-pi" --activate
-jq -e '.theme == "magikos-system" and .model == "keep-me"' "$PI_TMPDIR/.pi/agent/settings.json" >/dev/null
-pass "pi theme activation preserves existing settings"
-
-jq -e '.name == "Magikos" and .base == "light" and .overrides.text == "#ffffff"' "$NEXT_THEME/claude.json" >/dev/null
-pass "claude theme template is generated from standard themed templates"
-cp "$NEXT_THEME/claude.json" "$CURRENT_THEME/claude.json"
-
-CLAUDE_TEST_CONFIG="$PI_TMPDIR/.claude-work"
-mkdir -p "$CLAUDE_TEST_CONFIG"
-HOME="$PI_TMPDIR" CLAUDE_CONFIG_DIR="$CLAUDE_TEST_CONFIG" "$ROOT/bin/magikos-theme-set-claude"
-[[ -f $CLAUDE_TEST_CONFIG/themes/magikos.json ]] || fail "claude theme is synced to the configured directory"
-[[ ! -d $PI_TMPDIR/.claude ]] || fail "claude theme sync avoids the default directory when configured"
-pass "claude theme sync respects CLAUDE_CONFIG_DIR"
-
-echo '{"model":"keep-me"}' >"$CLAUDE_TEST_CONFIG/settings.json"
-HOME="$PI_TMPDIR" CLAUDE_CONFIG_DIR="$CLAUDE_TEST_CONFIG" "$ROOT/bin/magikos-theme-set-claude" --activate
-jq -e '.theme == "custom:magikos" and .model == "keep-me"' "$CLAUDE_TEST_CONFIG/settings.json" >/dev/null
-pass "claude theme activation preserves configured settings"
-
 make_tmpdir THEME_TMPDIR
 MAGIKOS_PATH="$ROOT" HOME="$THEME_TMPDIR" MAGIKOS_THEME_HEADLESS=1 "$ROOT/bin/magikos-theme-set" "Tokyo Night"
 background_path=$(readlink -f "$THEME_TMPDIR/.local/state/magikos/current/background" 2>/dev/null || true)

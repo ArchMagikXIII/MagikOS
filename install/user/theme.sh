@@ -10,7 +10,6 @@ if [[ ! -s $HOME/.local/state/magikos/current/theme.name ]]; then
     magikos-theme-set "Tokyo Night"
   fi
 fi
-magikos-theme-set-pi --activate
 
 # Seed the wallpaper set so sway's fallback bg path resolves.
 mkdir -p ~/Pictures/Wallpapers

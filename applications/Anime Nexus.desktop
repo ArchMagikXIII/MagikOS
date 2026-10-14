@@ -1,0 +1,9 @@
+[Desktop Entry]
+Version=1.0
+Name=Anime Nexus
+Comment=Anime Nexus
+Exec=magikos-launch-webapp https://anime.nexus
+Terminal=false
+Type=Application
+Icon=anime-nexus
+StartupNotify=true

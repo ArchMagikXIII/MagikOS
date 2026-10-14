@@ -27,7 +27,6 @@ User-installed plugins live alongside these conceptually but on disk under
 | Network       | `magikos.network`         | `bar-widget`            | `panels/network/Panel.qml`            |
 | Power         | `magikos.power`           | `bar-widget`            | `panels/power/Panel.qml`              |
 | Tailscale     | `magikos.tailscale`       | `bar-widget`            | `panels/tailscale/Panel.qml`          |
-| Agents   | `magikos.agents`     | `bar-widget`            | `agents/Panel.qml`               |
 | Weather       | `magikos.weather`         | `bar-widget`            | `panels/weather/BarWidget.qml`        |
 | Media         | `magikos.media`           | `service`, `bar-widget` | `services/media/Service.qml`, `services/media/BarWidget.qml` |
 | Battery       | `magikos.battery`         | `service`               | `services/battery/Service.qml`        |

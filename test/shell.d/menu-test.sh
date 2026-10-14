@@ -212,14 +212,7 @@ assertEqual(
 )
 const expectedAgents = {
   agy: { icon: '󰫢', label: 'Antigravity' },
-  pi: { icon: '\ue901', iconFont: 'magikos', label: 'Pi' },
-  omp: { icon: '\ue903', iconFont: 'magikos', label: 'omp' },
   opencode: { icon: '\ue902', iconFont: 'magikos', label: 'OpenCode' },
-  claude: { icon: '󰛄', label: 'Claude' },
-  codex: { icon: '\ue905', iconFont: 'magikos', label: 'Codex' },
-  grok: { icon: '\ue904', iconFont: 'magikos', label: 'Grok' },
-  copilot: { icon: '', label: 'Copilot' },
-  crush: { icon: '󰋑', label: 'Crush' },
 }
 assert(
   Object.entries(expectedAgents).every(([agent, expected]) => {
@@ -238,7 +231,7 @@ assertDeepEqual(
   defaultItems
     .filter(item => item.parent === 'setup.default.agent')
     .map(item => item.label),
-  ['Antigravity', 'Claude', 'Codex', 'Copilot', 'Crush', 'Grok', 'omp', 'OpenCode', 'Pi'],
+  ['Antigravity', 'OpenCode'],
   'menu sorts coding agents alphabetically'
 )
 const expectedDefaults = {
@@ -254,7 +247,13 @@ assert(
   }),
   'menu always exposes every supported browser, terminal, and editor under Defaults'
 )
-assert(!defaultById['install.ai.crush'], 'menu removes Crush from Install > AI')
+assert(!defaultById['install.ai.ollama'], 'menu removes Ollama from Install > AI')
+assert(!defaultById['install.ai.chatgpt'], 'menu removes ChatGPT Desktop from Install > AI')
+assert(!defaultById['install.ai.grok-bot'], 'menu removes Grok Bot from Install > AI')
+assert(!defaultById['install.ai.lm-studio'], 'menu removes LM Studio from Install > AI')
+assert(!defaultById['install.ai.t3-code'], 'menu removes T3 Code from Install > AI')
+assert(!defaultById['remove.ai.ollama'], 'menu removes Ollama from Remove > AI')
+assert(defaultById['install.ai.dictation'], 'menu keeps Dictation under Install > AI')
 // Software you already have keeps its place in Install, dimmed rather than
 // dropped, so the list reads as a catalog of what Magikos can install.
 // Chromium Account is the sole Install row with anything left to hide for, so

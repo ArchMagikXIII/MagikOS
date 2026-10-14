@@ -12,64 +12,36 @@ All the keyboard hotkeys for these web apps can be changed in `~/.config/sway/bi
 
 When you're in a web app, you can copy the current URL to the clipboard using `Shift + Alt + L`.
 
-By default, Magikos already ships with an assortment of default apps:
+By default, Magikos already ships with an assortment of default apps, all reachable through the application launcher (`Super + Space`):
 
-## HEY
+## Anime
 
-[HEY](https://www.hey.com/) is an email and calendar service that serves as a great alternative to people tired of Gmail, Outlook, or Apple Mail. It's made by [37signals](https://37signals.com/) where Magikos originated.
+[Anime](https://wcoflix.tv) for streaming anime.
 
-You can start HEY Email using `Super + Shift + E`, jump straight to composing a new email using `Super + Shift + Alt + E`, and start HEY Calendar using `Super + Shift + C`.
+## Anime Nexus
 
-## Basecamp
+[Anime Nexus](https://anime.nexus) for streaming anime.
 
-[Basecamp](https://basecamp.com/) is a project management service that helps small teams move faster and make more progress. Instead of patching together a mishmash of Trello, Slack, Asana, Notion, or whatever, you can have it all in one place with Basecamp. It's made by [37signals](https://37signals.com/) where Magikos originated.
+## Gemini
 
-You can start Basecamp using the application launcher (`Super + Space`)
+[Gemini](https://gemini.google.com) is Google's AI chat bot.
 
-## ChatGPT
+## Google Maps
 
-[ChatGPT](https://chatgpt.com) is the most popular AI chat bot in the world.
+[Google Maps](https://maps.google.com) for maps and navigation.
 
-You can start ChatGPT using `Super + Shift + A`.
+## Google Messages
 
-## Grok
+[Google Messages](https://messages.google.com/web/conversations) for texting from the desktop.
 
-[Grok](https://grok.com) is xAI's chat bot.
+## Movies
 
-You can start Grok using `Super + Shift + Alt + A`.
+[Movies](https://www.streamxtv.tech) for streaming movies and shows.
 
-## WhatsApp
+## Wallpaper
 
-[WhatsApp](https://www.whatsapp.com/) is one of the most popular messaging services in the world, and the web version is a great option for Linux.
-
-You can start WhatsApp using `Super + Shift + Alt + G`.
-
-## Google apps
-
-Google Messages, Google Photos, Google Maps, and Google Contacts are all included as web apps too.
-
-You can start Google Messages using `Super + Shift + Ctrl + G`, Google Photos using `Super + Shift + P`, and Google Maps using `Super + Shift + S`. Google Contacts is available through the app launcher (`Super + Space`).
-
-## X
-
-X is where news break.
-
-You can start X using `Super + Shift + X` and go straight to writing a new post with `Super + Shift + Alt + X`.
+[Wallhaven](https://wallhaven.cc) for wallpaper hunting.
 
 ## YouTube
 
 [YouTube](https://youtube.com/) is the most popular video platform in the world.
-
-You can start YouTube using `Super + Shift + Y`.
-
-## Zoom
-
-[Zoom](https://zoom.us/) is the most popular video chat system used in the US. Great connections across the world. And 40-minute meetings can be held without a paying account. Magikos wraps Zoom's web client, and zoom meeting links will open straight into it.
-
-You start Zoom using the application launcher (`Super + Space`).
-
-## Discord
-
-[Discord](https://discord.com/) is where most gaming and open source communities hang out, including [Magikos's own](https://discord.gg/tXFUdasqhY).
-
-You start Discord using the application launcher (`Super + Space`).

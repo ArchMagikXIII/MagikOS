@@ -8,7 +8,7 @@ the shell for its whole session.
 - `manifest.json` declares the plugin (`id: magikos.bar`, `kind: bar`) and points at `Bar.qml` as the entry point.
 - `Bar.qml` is Magikos-owned bar engine code, loaded by the magikos-shell host. Users should not edit it directly.
 - `widgets/` holds simple first-party bar widgets with sibling manifests.
-- Feature plugins such as `../panels/audio/`, `../panels/network/`, `../panels/power/`, and `../agents/` provide richer popup bar plugins.
+- Feature plugins such as `../panels/audio/`, `../panels/network/`, and `../panels/power/` provide richer popup bar plugins.
 - The bar receives its config from the host shell as a `barConfig` property; the host loads it from `~/.config/magikos/shell.json` (or `config/magikos/shell.json` when the user has no file).
 - `magikos bar position` updates only the user shell.json file.
 
@@ -67,7 +67,6 @@ Example `shell.json` (bar subtree only shown):
 | `magikos.audio` | Volume icon + popup with master slider, output-device picker, per-app mixer | left = popup · right = mute · middle = popup · scroll = volume |
 | `magikos.network` | Wi-Fi/Ethernet icon + popup with Wi-Fi scan, signal, connect, DNS provider selection | left = popup |
 | `magikos.tailscale` | Tailscale status, connection switcher, machine browser, and copy actions | left = popup · right = toggle · middle = refresh |
-| `magikos.agents` | AI coding agent limits with pace, today, last week, and all-time model breakdown | left = panel · right = launch agent · middle = next subscription |
 | `magikos.power` | Battery/AC icon + popup with battery stats, power profiles, and system info | left = popup · right = toggle percentage |
 | `magikos.bluetooth` | Bluetooth icon + popup with device list, connect/disconnect, battery | left = popup · right = toggle radio |
 | `magikos.monitor` | Brightness and laptop display controls | left = popup |
@@ -183,8 +182,8 @@ Widgets receive `bar` (the shell root), `moduleName` (string), and `settings` (o
 
 First-party bar widgets are manifest-backed just like third-party widgets.
 Simple widgets carry sibling manifests such as `widgets/Workspaces.manifest.json`;
-richer popup plugins live in feature directories such as `../panels/audio/`,
-`../panels/network/`, and `../agents/`; and feature plugins such as
+richer popup plugins live in feature directories such as `../panels/audio/`
+and `../panels/network/`; and feature plugins such as
 `magikos.menu` and `magikos.media` declare their bar-widget entry points in their own
 `manifest.json`. Bar layout ids are namespaced, e.g. `magikos.audio`,
 `magikos.network`, and `magikos.clock`.

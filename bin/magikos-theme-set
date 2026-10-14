@@ -198,8 +198,6 @@ post_theme_commands=(
   magikos-theme-set-foot
   magikos-theme-set-tmux
   magikos-theme-set-gnome
-  magikos-theme-set-pi
-  magikos-theme-set-claude
   magikos-theme-set-browser
   magikos-theme-set-vscode
   magikos-theme-set-obsidian

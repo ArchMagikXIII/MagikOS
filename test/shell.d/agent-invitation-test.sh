@@ -48,7 +48,7 @@ pass "agent invitation only runs once"
 # no invitation and no default.
 fresh_home=$(mktemp -d)
 mkdir -p "$fresh_home/.config/magikos/defaults"
-printf 'claude\n' >"$fresh_home/.config/magikos/defaults/agent"
+printf 'opencode\n' >"$fresh_home/.config/magikos/defaults/agent"
 : >"$log_file"
 cp "$ROOT/install/user/first-run/setup-agent.hook" "$hook_path"
 HOME="$fresh_home" PATH="$test_bin:$ROOT/bin:$PATH" TEST_LOG="$log_file" bash "$hook_path"
