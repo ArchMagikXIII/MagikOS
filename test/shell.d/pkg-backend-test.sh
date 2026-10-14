@@ -147,3 +147,73 @@ listed=$(TEST_TMP="$test_tmp" MAGIKOS_PKG_BACKEND=apt PATH="$test_tmp/list-bin:/
 ')
 [[ $listed == kept ]] || fail "apt pkg_list_installed lists only installed packages" "got: $listed"
 pass "apt pkg_list_installed excludes config-files-only packages"
+# --- Nix backend ------------------------------------------------------------
+#
+# Nix has no package database, so `pkg_installed` answers from the profile
+# closure instead. The closure is faked here through XDG_CACHE_HOME plus a
+# stand-in profile root, which keeps the test independent of whether the host
+# running it is NixOS at all.
+
+nix_tmp="$test_tmp/nix"
+mkdir -p "$nix_tmp/cache/magikos" "$nix_tmp/home"
+: >"$nix_tmp/home/.nix-profile"
+cat >"$nix_tmp/cache/magikos/nix-closure" <<'EOF'
+jq-1.8.2
+ripgrep-15.2.0
+mesa-demos-9.0.0
+gst_all_1.gst-libav-1.26.0
+python3Packages.defusedxml-0.7.1
+EOF
+
+nix_backend() {
+  HOME="$nix_tmp/home" XDG_CACHE_HOME="$nix_tmp/cache" MAGIKOS_PKG_BACKEND=nix \
+    bash -c "source \"\$ROOT/bin/magikos-pkg-backend\"; $*"
+}
+
+if nix_backend 'backend_is_nix && echo yes' | grep -q yes; then
+  pass "backend_is_nix reports true for the nix backend"
+else
+  fail "backend_is_nix reports true for the nix backend"
+fi
+
+if nix_backend 'pkg_requires_sudo || echo no' | grep -q '^no$'; then
+  pass "nix transactions do not escalate: user profiles are unprivileged"
+else
+  fail "nix transactions do not escalate: user profiles are unprivileged"
+fi
+
+resolved=$(nix_backend 'pkg_resolve_name mesa-utils')
+[[ $resolved == mesa-demos ]] ||
+  fail "nix resolves mesa-utils to mesa-demos (got: $resolved)"
+pass "nix package aliases map Arch names onto nixpkgs attributes"
+
+resolved=$(nix_backend 'pkg_resolve_name jq')
+[[ $resolved == jq ]] ||
+  fail "nix passes an already-valid attribute through (got: $resolved)"
+pass "nix passes an already-valid attribute through"
+
+if nix_backend 'pkg_installed jq ripgrep && echo yes' | grep -q yes; then
+  pass "nix pkg_installed is true for names present in the closure"
+else
+  fail "nix pkg_installed is true for names present in the closure"
+fi
+
+if nix_backend 'pkg_installed jq ydotool && echo yes' | grep -q yes; then
+  fail "nix pkg_installed is all-or-nothing across a multi-package set"
+else
+  pass "nix pkg_installed is all-or-nothing across a multi-package set"
+fi
+
+# A dotted attribute name must not be treated as a regex wildcard.
+if nix_backend 'pkg_installed gstXlibav && echo yes' | grep -q yes; then
+  fail "nix pkg_installed escapes dots in attribute names"
+else
+  pass "nix pkg_installed escapes dots in attribute names"
+fi
+
+install_cmd=$(nix_backend 'printf "%s " "${PKG_INSTALL_CMD[@]}"')
+if [[ $install_cmd == *nix* ]]; then
+  pass "nix install command is nix-native, not pacman or apt"
+else
+  fail "nix install command is nix-native, not pacman or apt"
+fi

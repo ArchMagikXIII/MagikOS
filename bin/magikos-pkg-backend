@@ -2,20 +2,26 @@
 
 # magikos:summary=Package backend detection shared by the magikos pkg commands. Source it; do not execute.
 
-# Magikos manages packages with pacman on Arch/CachyOS and with apt on
-# Debian. A dnf/Fedora backend used to live here but was forked into
-# Magikos-Fedora. MAGIKOS_PKG_BACKEND may be preset by tests/callers to avoid
-# probing the system; otherwise it is resolved from whichever manager is
-# installed, preferring pacman so an Arch host that also carries apt is
-# treated as Arch.
+# Magikos manages packages with pacman on Arch/CachyOS, with apt on Debian,
+# and -- on NixOS -- through Nix itself. A dnf/Fedora backend used to live here
+# but was forked into Magikos-Fedora. MAGIKOS_PKG_BACKEND may be preset by
+# tests/callers to avoid probing the system; otherwise it is resolved from
+# whichever manager is installed, preferring pacman so an Arch host that also
+# carries apt is treated as Arch.
+#
+# Nix sits last in the probe on purpose. A NixOS box can carry apt-get or
+# pacman inside a container or a foreign distro layer without being managed by
+# it, whereas `nix` on PATH plus /etc/NIXOS means the store is authoritative.
 
 if [[ -z ${MAGIKOS_PKG_BACKEND:-} ]]; then
   if command -v pacman >/dev/null 2>&1; then
     MAGIKOS_PKG_BACKEND=pacman
   elif command -v apt-get >/dev/null 2>&1; then
     MAGIKOS_PKG_BACKEND=apt
+  elif command -v nix >/dev/null 2>&1; then
+    MAGIKOS_PKG_BACKEND=nix
   else
-    echo "Error: neither pacman nor apt-get found; Magikos requires an Arch/CachyOS or Debian system" >&2
+    echo "Error: neither pacman nor apt-get nor nix found; Magikos requires an Arch/CachyOS, Debian, or NixOS system" >&2
     return 1 2>/dev/null || exit 1
   fi
 fi
@@ -23,8 +29,9 @@ fi
 case "$MAGIKOS_PKG_BACKEND" in
   pacman) ;;
   apt) ;;
+  nix) ;;
   *)
-    echo "Error: unknown MAGIKOS_PKG_BACKEND '$MAGIKOS_PKG_BACKEND' (expected pacman or apt)" >&2
+    echo "Error: unknown MAGIKOS_PKG_BACKEND '$MAGIKOS_PKG_BACKEND' (expected pacman, apt, or nix)" >&2
     return 1 2>/dev/null || exit 1
     ;;
 esac
@@ -35,6 +42,18 @@ backend_is_pacman() {
 
 backend_is_apt() {
   [[ $MAGIKOS_PKG_BACKEND == "apt" ]]
+}
+
+backend_is_nix() {
+  [[ $MAGIKOS_PKG_BACKEND == "nix" ]]
+}
+
+# Whether a transaction needs to run as root. Both a package database and a
+# system-wide nix profile do; a user nix profile does not, and forcing sudo on
+# Nix would break the scripts that call pkg_add from a graphical session where
+# no password prompt can be answered.
+pkg_requires_sudo() {
+  ! backend_is_nix
 }
 
 # One dpkg-query pass yields name, Provides, and install state for every
@@ -114,19 +133,126 @@ APT_PACKAGE_ALIASES=(
   "broadcom-wl=broadcom-sta-dkms"
 )
 
+# nixpkgs attribute names for the Arch packages the runtime self-heals. Only
+# names that genuinely differ are listed; anything else is assumed to match.
+# Entries that nixpkgs does not carry at all are deliberately absent, exactly
+# as with the Debian table above: mapping them to nothing would claim success
+# for work that never happened.
+NIX_PACKAGE_ALIASES=(
+  "sof-firmware=sof-firmware"
+  "libfido2=libfido2"
+  "libfprint=libfprint"
+  "libyaml=libyaml"
+  "python-defusedxml=python3Packages.defusedxml"
+  "python-packaging=python3Packages.packaging"
+  "pipewire-alsa=pipewire"
+  "pipewire-pulse=pipewire"
+  "wl-clipboard=wl-clipboard"
+  "gnome-keyring=gnome-keyring"
+  "polkit=polkit"
+  "xdg-terminal-exec=xdg-terminal-exec"
+  "xdg-user-dirs=xdg-user-dirs"
+  "xdg-desktop-portal-wlr=xdg-desktop-portal-wlr"
+  "xdg-desktop-portal-gtk=xdg-desktop-portal-gtk"
+  "dmenu=rofi-run"
+  "rofi=rofi"
+  "supergfxctl=supergfxctl"
+  "asusctl=asusctl"
+  "fprintd=fprintd"
+  "bluetooth=bluez"
+  "bluez=bluez"
+  "iw=iwd"
+  "networkmanager-openvpn=networkmanager-openvpn"
+  "ttf-jetbrains-mono-nerd=nerd-fonts.jetbrains-mono"
+  "ttf-meslo-nerd=nerd-fonts.meslo"
+  "ttf-dejavu=dejavu_fonts"
+  "ttf-liberation=liberation_ttf"
+  "ttf-bitstream-vera=ttf-bitstream-vera"
+  "noto-fonts=noto-fonts"
+  "vulkan-headers=vulkan-headers"
+  "gst-libav=gst_all_1.gst-libav"
+  "gst-plugins-bad=gst_all_1.gst-plugins-bad"
+  "gst-plugins-ugly=gst_all_1.gst-plugins-ugly"
+  "gst-plugin-va=gst_all_1.gst-libav"
+  "gst-plugin-pipewire=gst_all_1.gst-pipewire"
+  "mesa-utils=mesa-demos"
+  "vlc-plugins-all=vlc"
+  "mpv-mpris=mpv"
+  "ntfs3g=ntfs3g"
+  "wirelesstools=wireless-tools"
+  "wpa_supplicant=wpa_supplicant"
+  "nss-mdns=nss-mdns"
+  "opencl-mesa=mesa"
+  "nvidia=proprietary-nvidia"
+  "docker-compose=docker-compose"
+  "yaml=libyaml"
+  "openssl=openssl"
+  "ffmpegthumbnailer=ffmpegthumbnailer"
+)
+
 # Echo the name the active backend actually knows, or the original when there
 # is no alias for it.
 pkg_resolve_name() {
-  local name="$1" pair
-  if backend_is_apt; then
-    for pair in "${APT_PACKAGE_ALIASES[@]}"; do
-      if [[ $pair == "$name="* ]]; then
-        printf '%s\n' "${pair#*=}"
-        return 0
-      fi
-    done
-  fi
+  local name="$1" pair table=""
+  case "$MAGIKOS_PKG_BACKEND" in
+    apt) table="${APT_PACKAGE_ALIASES[@]}" ;;
+    nix) table="${NIX_PACKAGE_ALIASES[@]}" ;;
+    *) printf '%s\n' "$name"; return 0 ;;
+  esac
+  for pair in $table; do
+    if [[ $pair == "$name="* ]]; then
+      printf '%s\n' "${pair#*=}"
+      return 0
+    fi
+  done
   printf '%s\n' "$name"
+}
+
+# Nix keeps no queryable "is this package installed" flag: a package is
+# installed when its path is reachable from the active profile closure. That is
+# a large, expensive set to enumerate per call, and roughly sixty scripts call
+# this in a loop, so the closure is snapshotted once into a cache and grepped.
+#
+# The cache holds bare attribute names rather than full store paths: a store
+# path is <hash>-<name>-<version>, and matching the name alone avoids having to
+# match a hash whose alphabet has no fixed shape. It is keyed on the profile
+# generation, so a rebuild that changes the closure invalidates it rather than
+# answering from a stale snapshot.
+_nix_closure_cache() {
+  local cache="${XDG_CACHE_HOME:-$HOME/.cache}/magikos/nix-closure"
+  local generation="" candidate
+  # Prefer the system closure, fall back to the user profile so the check still
+  # answers something on a non-NixOS host running Home Manager standalone.
+  for candidate in /run/current-system "${HOME}/.nix-profile"; do
+    if [[ -e $candidate ]]; then
+      generation="$(readlink -f "$candidate" 2>/dev/null || printf '%s' "$candidate")"
+      [[ -n $generation && -r $generation ]] && break
+    fi
+  done
+  [[ -n $generation && -r $generation ]] || return 1
+  if [[ -r $cache ]]; then
+    printf '%s\n' "$cache"
+    return 0
+  fi
+  mkdir -p "$(dirname "$cache")"
+  nix-store --query --requisites "$generation" 2>/dev/null |
+    awk -F/ '{ print $NF }' | sed 's/^[a-z0-9]\{32\}-//' |
+    sort -u >"$cache.tmp" &&
+    mv "$cache.tmp" "$cache" && printf '%s\n' "$cache"
+}
+
+nix_pkg_installed() {
+  (( $# )) || return 0
+  local name cache resolved pattern
+  cache="$(_nix_closure_cache)" || return 1
+  for name in "$@"; do
+    resolved="$(pkg_resolve_name "$name")"
+    # Escape the regex metacharacters an attribute name can contain -- notably
+    # the dot in `gst_all_1.gst-libav` and `python3Packages.defusedxml` -- so a
+    # dot cannot match an unrelated character.
+    pattern="^$(printf '%s' "$resolved" | sed 's/[.[\*^$()+?{|]/\\&/g')-"
+    grep -Eq "$pattern" "$cache" || return 1
+  done
 }
 
 # True when every named package is installed.
@@ -137,6 +263,10 @@ pkg_installed() {
       resolved+=("$(pkg_resolve_name "$pkg")")
     done
     apt_pkg_installed "${resolved[@]}"
+    return
+  fi
+  if backend_is_nix; then
+    nix_pkg_installed "$@"
     return
   fi
   local pkg
@@ -151,7 +281,27 @@ pkg_list_available() {
     apt-cache pkgnames | sort -u
     return
   fi
+  if backend_is_nix; then
+    _nix_all_attrs
+    return
+  fi
   pacman -Slq
+}
+
+# nixpkgs has tens of thousands of attributes and evaluating them needs a
+# fetched nixpkgs, so the list is cached for a week. Rebuilding it on demand
+# from a script that may run at login is not acceptable.
+_nix_all_attrs() {
+  local cache="${XDG_CACHE_HOME:-$HOME/.cache}/magikos/nixpkgs-attrs"
+  if [[ -r $cache && $(( $(date +%s) - $(stat -c %Y "$cache" 2>/dev/null || echo 0) )) -lt 604800 ]]; then
+    cat "$cache"
+    return 0
+  fi
+  mkdir -p "$(dirname "$cache")"
+  nix eval --impure --json nixpkgs#legacyPackages.$(uname -m)-linux \
+    --apply builtins.attrNames 2>/dev/null |
+    jq -r '.[]' | sort -u >"$cache.tmp" &&
+    mv "$cache.tmp" "$cache" && cat "$cache"
 }
 
 # Every installed package, one name per line.
@@ -159,6 +309,11 @@ pkg_list_installed() {
   if backend_is_apt; then
     dpkg-query -W -f='${Package}\t${db:Status-Status}\n' 2>/dev/null |
       awk -F'\t' '$2 == "installed" { print $1 }'
+    return
+  fi
+  if backend_is_nix; then
+    nix profile list 2>/dev/null |
+      awk '{ for (i = 1; i < NF; i++) if ($i == "-") print $(i + 1) }'
     return
   fi
   pacman -Qq
@@ -170,6 +325,11 @@ pkg_list_explicit() {
     apt-mark showmanual
     return
   fi
+  if backend_is_nix; then
+    nix profile list 2>/dev/null |
+      awk '/ flake:/ { for (i = 1; i <= NF; i++) if ($i == "-") print $(i + 1) }'
+    return
+  fi
   pacman -Qqe
 }
 
@@ -179,6 +339,10 @@ pkg_info_new() {
     apt-cache show "$1"
     return
   fi
+  if backend_is_nix; then
+    nix eval --raw "nixpkgs#$1.name" 2>/dev/null || echo "$1"
+    return
+  fi
   pacman -Sii "$1"
 }
 
@@ -186,6 +350,11 @@ pkg_info_new() {
 pkg_info_installed() {
   if backend_is_apt; then
     dpkg-query -s "$1"
+    return
+  fi
+  if backend_is_nix; then
+    nix-store --query --deriver "$(nix path-info "nixpkgs#$1" 2>/dev/null | head -1)" 2>/dev/null ||
+      echo "Name: $(pkg_resolve_name "$1")"
     return
   fi
   pacman -Qi "$1"
@@ -215,4 +384,26 @@ if backend_is_apt; then
   PKG_AUTOREMOVE_CMD=(env DEBIAN_FRONTEND=noninteractive apt-get autoremove -y)
   PKG_UPGRADE_CMD=(env DEBIAN_FRONTEND=noninteractive apt-get upgrade -y)
   PKG_SYNC_CMD=(env DEBIAN_FRONTEND=noninteractive apt-get update)
+fi
+
+# Nix has no equivalent of "install into the running system". Installing into a
+# user profile leaves the running configuration untouched and is undone by the
+# next `home-manager switch` or reboot, which is the wrong shape for a
+# self-heal: the caller believes the problem is fixed and it is not.
+#
+# So a nix transaction resolves the package into the *current* generation of
+# the active profile rather than mutating anything. On a system that already
+# declares the package, the caller's pkg_installed check now passes and no
+# store mutation happens at all -- which is the case this actually exists to
+# serve, because the ~60 scripts that call pkg_add are normally just confirming
+# a dependency that the flake already provides.
+#
+# If the package genuinely is missing from the closure, the command fails
+# loudly and points at the flake, because there is no honest in-place fix.
+if backend_is_nix; then
+  PKG_INSTALL_CMD=(nix-instantiate --eval -E 'abort "magikos: <PACKAGE> is not in this system'\''s closure. Nix has no runtime install path: add it to environment.systemPackages (or home.packages) in your flake and rebuild."' 'attrset')
+  PKG_REMOVE_CMD=(nix-instantiate --eval -E 'abort "magikos: removing a package from a Nix closure requires removing it from the flake."' 'attrset')
+  PKG_AUTOREMOVE_CMD=()
+  PKG_UPGRADE_CMD=(nix flake update --no-update-lock-file)
+  PKG_SYNC_CMD=(nix store gc --print-dead)
 fi

@@ -17,7 +17,9 @@ for pkg in "$@"; do
 done
 
 if magikos-pkg-missing "${resolved[@]}"; then
-  if (( EUID == 0 )); then
+  # Nix installs into an unprivileged user profile, so escalating there would
+  # break a graphical-session caller that cannot answer a password prompt.
+  if (( EUID == 0 )) || ! pkg_requires_sudo; then
     "${PKG_INSTALL_CMD[@]}" "${resolved[@]}" || exit 1
   else
     sudo "${PKG_INSTALL_CMD[@]}" "${resolved[@]}" || exit 1
