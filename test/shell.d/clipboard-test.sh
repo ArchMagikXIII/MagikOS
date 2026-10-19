@@ -258,7 +258,14 @@ if [[ $1 == "--list-types" ]]; then
   printf '%b' "${WL_PASTE_TYPES:-text/plain\n}"
 elif [[ $1 == "--type" && $2 == "text" ]]; then
   printf '%s' "${WL_PASTE_TEXT:-terminal copy}"
+elif [[ $1 == "--type" && $2 == "image/png" ]]; then
+  printf '%s' "${WL_PASTE_IMAGE:-fake-png-bytes}"
 fi
+SH
+
+cat >"$TMPDIR/bin/magikos-notification-send" <<'SH'
+#!/bin/bash
+printf '%s\n' "$*" >>"$NOTIFICATION_OUT"
 SH
 
 cat >"$TMPDIR/bin/wtype" <<'SH'
@@ -282,7 +289,7 @@ cat >"$TMPDIR/bin/tensaku-edit" <<'SH'
 printf '%s\n' "$*" >"$TENSAKU_OUT"
 SH
 
-chmod +x "$TMPDIR/bin/wl-copy" "$TMPDIR/bin/wl-paste" "$TMPDIR/bin/wtype" "$TMPDIR/bin/magikos-launch-browser" "$TMPDIR/bin/magikos-launch-editor" "$TMPDIR/bin/tensaku-edit"
+chmod +x "$TMPDIR/bin/wl-copy" "$TMPDIR/bin/wl-paste" "$TMPDIR/bin/wtype" "$TMPDIR/bin/magikos-launch-browser" "$TMPDIR/bin/magikos-launch-editor" "$TMPDIR/bin/tensaku-edit" "$TMPDIR/bin/magikos-notification-send"
 
 capture_output=$(XDG_RUNTIME_DIR="$TMPDIR" XDG_STATE_HOME="$TMPDIR/state" PATH="$TMPDIR/bin:$PATH" "$ROOT/shell/plugins/clipboard/capture.sh")
 [[ $capture_output == '{"type":"text","text":"terminal copy"}' ]] || fail "clipboard capture records normal text events"
@@ -518,3 +525,58 @@ TENSAKU_OUT="$TMPDIR/tensaku" HOME="$TMPDIR/home" PATH="$TMPDIR/bin:$PATH" \
 
 [[ $(<"$TMPDIR/tensaku") == "$TMPDIR/image.png" ]] || fail "clipboard open helper opens image entries in Tensaku"
 pass "clipboard open helper opens image entries in Tensaku"
+
+rm -f "$TMPDIR/wtype"
+cat >"$TMPDIR/bin/wl-paste" <<'SH'
+#!/bin/bash
+if [[ $1 == "--list-types" ]]; then
+  printf '%b' "${WL_PASTE_TYPES:-text/plain\n}"
+elif [[ $1 == "--type" && $2 == "text" ]]; then
+  printf '%s' "${WL_PASTE_TEXT:-terminal copy}"
+elif [[ $1 == "--type" && $2 == "image/png" ]]; then
+  printf '%s' "${WL_PASTE_IMAGE:-fake-png-bytes}"
+elif [[ $1 == "--no-newline" ]]; then
+  printf '%s' "${WL_PASTE_TEXT:-terminal copy}"
+fi
+SH
+chmod +x "$TMPDIR/bin/wl-paste"
+WTYPE_OUT="$TMPDIR/wtype" WL_COPY_OUT="$TMPDIR/copied" NOTIFICATION_OUT="$TMPDIR/notifications" HOME="$TMPDIR/home" PATH="$TMPDIR/bin:$PATH" \
+  "$ROOT/bin/magikos-clipboard-paste"
+
+[[ $(<"$TMPDIR/wtype") == "-M shift -k Insert -m shift" ]] || fail "clipboard paste pastes text as a paste event, not keystrokes"
+[[ ! -e $TMPDIR/notifications ]] || fail "clipboard paste stays quiet for text"
+pass "clipboard paste pastes text as a paste event, not keystrokes"
+
+rm -f "$TMPDIR/wtype" "$TMPDIR/copied"
+WL_PASTE_TEXT=$(printf 'line one\nline two\n\n') WL_COPY_OUT="$TMPDIR/copied" WTYPE_OUT="$TMPDIR/wtype" \
+  NOTIFICATION_OUT="$TMPDIR/notifications" HOME="$TMPDIR/home" PATH="$TMPDIR/bin:$PATH" \
+  "$ROOT/bin/magikos-clipboard-paste"
+
+[[ $(<"$TMPDIR/copied") == "$(printf 'line one\nline two')" ]] || fail "clipboard paste keeps inner newlines while stripping trailing ones"
+pass "clipboard paste keeps inner newlines while stripping trailing ones"
+
+rm -f "$TMPDIR/wtype"
+WTYPE_OUT="$TMPDIR/wtype" WL_COPY_OUT="$TMPDIR/copied" NOTIFICATION_OUT="$TMPDIR/notifications" HOME="$TMPDIR/home" PATH="$TMPDIR/bin:$PATH" \
+  "$ROOT/bin/magikos-clipboard-paste" --type
+
+[[ $(<"$TMPDIR/wtype") == "-" ]] || fail "clipboard paste falls back to literal typing with --type"
+pass "clipboard paste falls back to literal typing with --type"
+
+rm -f "$TMPDIR/wtype"
+WL_PASTE_TYPES='image/png' WTYPE_OUT="$TMPDIR/wtype" WL_COPY_OUT="$TMPDIR/copied" NOTIFICATION_OUT="$TMPDIR/notifications" \
+  HOME="$TMPDIR/home" PATH="$TMPDIR/bin:$PATH" \
+  "$ROOT/bin/magikos-clipboard-paste"
+
+[[ ! -e "$TMPDIR/wtype" ]] || fail "clipboard paste types nothing for images"
+saved=("$TMPDIR"/home/Pictures/clipboard-*.png)
+[[ ${#saved[@]} -eq 1 && $(<"${saved[0]}") == "fake-png-bytes" ]] || fail "clipboard paste saves clipboard images to Pictures"
+grep -F "${saved[0]}" "$TMPDIR/notifications" >/dev/null || fail "clipboard paste notifies where the image was saved"
+pass "clipboard paste saves clipboard images instead of typing them"
+
+rm -f "$TMPDIR/wtype" "$TMPDIR/notifications"
+WL_PASTE_TYPES=$'\n' WTYPE_OUT="$TMPDIR/wtype" WL_COPY_OUT="$TMPDIR/copied" NOTIFICATION_OUT="$TMPDIR/notifications" \
+  HOME="$TMPDIR/home" PATH="$TMPDIR/bin:$PATH" \
+  "$ROOT/bin/magikos-clipboard-paste"
+
+[[ ! -e "$TMPDIR/wtype" && ! -e "$TMPDIR/notifications" ]] || fail "clipboard paste stays silent on an empty clipboard"
+pass "clipboard paste stays silent on an empty clipboard"

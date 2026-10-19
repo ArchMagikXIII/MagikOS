@@ -1,0 +1,51 @@
+#!/bin/bash
+
+# magikos:summary=Paste clipboard text, or save a clipboard image to Pictures
+# magikos:group=clipboard
+# magikos:args=[--type]
+# magikos:examples=magikos clipboard paste
+
+# Pasting goes through Shift+Insert as a real paste event rather than typing:
+# typed newlines would land as Enter keypresses, submitting chat messages and
+# executing terminal commands. --type falls back to literal typing for the
+# rare application with no Shift+Insert binding.
+type_text=false
+
+if [[ ${1:-} == "--type" ]]; then
+  type_text=true
+  shift
+fi
+
+types=$(wl-paste --list-types 2>/dev/null || true)
+
+if grep -Eqx 'text/plain|TEXT|STRING|UTF8_STRING' <<<"$types"; then
+  # Trailing newlines are stripped first: pasting a copied terminal line must
+  # never auto-submit it, however the text below reaches the window.
+  text=$(wl-paste --no-newline 2>/dev/null || true)
+  while [[ $text == *$'\n' ]]; do
+    text=${text%$'\n'}
+  done
+  printf '%s' "$text" | wl-copy
+  sleep 0.15
+  if [[ $type_text == "true" ]]; then
+    printf '%s' "$text" | wtype - 2>/dev/null || true
+  else
+    wtype -M shift -k Insert -m shift 2>/dev/null || true
+  fi
+  exit
+fi
+
+for mime in image/png image/jpeg image/webp image/gif image/bmp image/tiff; do
+  if grep -Eqx "$mime" <<<"$types"; then
+    ext=${mime#image/}
+    [[ $ext == "jpeg" ]] && ext="jpg"
+    mkdir -p "$HOME/Pictures"
+    dest="$HOME/Pictures/clipboard-$(date +%Y-%m-%d_%H-%M-%S).$ext"
+    if wl-paste --type "$mime" >"$dest" 2>/dev/null && [[ -s $dest ]]; then
+      magikos-notification-send "Clipboard image saved" "$dest" >/dev/null 2>&1 || true
+    else
+      rm -f "$dest"
+    fi
+    exit
+  fi
+done

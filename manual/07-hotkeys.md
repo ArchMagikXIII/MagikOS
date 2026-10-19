@@ -131,10 +131,10 @@ Change/add bindings in `~/.config/sway/bindings.conf`.
 | ----------------------- | --------------------- |
 | `Super + C`           | Copy    |
 | `Super + X`           | Cut (not in terminal)    |
-| `Super + V`           | Paste    |
+| `Super + V`           | Paste text, or save a clipboard image to `~/Pictures`    |
 | `Super + Ctrl + V`           | Clipboard manager    |
 
-Usually on Linux, you need `Ctrl + Shift + C/V` to copy'n'paste in the terminal and `Ctrl + C/V` to do it everywhere else. These Magikos unified clipboard hotkeys work everywhere.
+Usually on Linux, you need `Ctrl + Shift + C/V` to copy'n'paste in the terminal and `Ctrl + C/V` to do it everywhere else. These Magikos unified clipboard hotkeys work everywhere. Pasting sends a real paste event rather than typing, so multi-line text lands intact even where Enter would submit, and trailing newlines are stripped first so a copied terminal line never auto-executes. Screenshots and other clipboard images can't be pasted as keystrokes, so pasting one saves it to `~/Pictures` and tells you where it went.
 
 ## Capture
 
