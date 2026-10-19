@@ -20,8 +20,12 @@ announce_browser_installed() {
 }
 
 copy_chromium_flags() {
-  mkdir -p ~/.config
-  cp -f "$MAGIKOS_PATH/config/chromium-flags.conf" "$1"
+  local shipped_flags="$MAGIKOS_PATH/config/chromium-flags.conf"
+
+  if [[ -f $shipped_flags ]]; then
+    mkdir -p ~/.config
+    cp -f "$shipped_flags" "$1"
+  fi
   magikos-install-chromium-copy-url
   magikos-install-chromium-ytdlp
 }

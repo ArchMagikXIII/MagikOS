@@ -15,7 +15,7 @@ Here's a list of the key files in `~/.config` and what they control:
 | `~/.config/sway/appearance.conf` | Controls gaps, borders, and the rest of the look. |
 | `~/.config/sway/autostart.conf` | Controls extra processes started with the session. |
 | `~/.config/magikos/shell.json` | Controls the Magikos shell: bar position, layout, and widgets, plus screensaver, lock, and idle timings. |
-| `~/.config/foot/foot.ini` | Controls your terminal (foot is the default). |
+| `~/.config/foot/foot.ini` | Controls the foot terminal. |
 | `~/.XCompose` | Defines your quick-access emoji and name/email autocomplete. Make sure to run `magikos-restart-xcompose` after making changes. |
 
 If you end up making a lot of changes to tweak your own setup, it's a good idea to backup all these dotfiles. [Stow is a great way to do that](https://www.youtube.com/watch?v=NoFiYOqnC4o).

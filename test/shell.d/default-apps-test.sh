@@ -203,8 +203,8 @@ rm -f "$installed_dir/chromium"
 MAGIKOS_TEST_REAL_BROWSER_INSTALL=true magikos-default-browser --install chromium >/dev/null
 [[ $(<"$install_log") == "pkg:chromium" ]] || fail "Chromium browser installer installs the package"
 [[ $(magikos-default-browser) == "chromium" ]] || fail "Chromium becomes the default after its full installer succeeds"
-cmp -s "$ROOT/config/chromium-flags.conf" "$test_home/.config/chromium-flags.conf" ||
-  fail "Chromium browser installer copies the default flags"
+[[ ! -e $test_home/.config/chromium-flags.conf ]] ||
+  fail "Chromium browser installer invents no flags when none are shipped"
 grep -Fxq 'sudo:mkdir -p /etc/chromium/policies/managed' "$setup_log" ||
   fail "Chromium browser installer creates its policy directory"
 grep -Fxq 'sudo:chmod a+rw /etc/chromium/policies/managed' "$setup_log" ||

@@ -24,8 +24,14 @@ sed -i '/shift+enter/d' "$test_home/.config/kitty/kitty.conf"
 cp "$ROOT/config/ghostty/config" "$test_home/.config/ghostty/config"
 sed -i '/shift+enter/d' "$test_home/.config/ghostty/config"
 
-cp "$ROOT/config/foot/foot.ini" "$test_home/.config/foot/foot.ini"
-sed -i '/text-bindings/,$d' "$test_home/.config/foot/foot.ini"
+cat >"$test_home/.config/foot/foot.ini" <<'INI'
+font=monospace:size=9
+
+[main]
+pad=0x10 0x10 0x10 0x10
+
+[text-bindings]
+INI
 
 HOME="$test_home" bash "$migration" >/dev/null
 
