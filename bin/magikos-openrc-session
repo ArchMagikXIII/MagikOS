@@ -1,4 +1,10 @@
 #!/bin/bash
+
+# magikos:summary=Start the MagikOS Sway session on Artix/OpenRC
+# magikos:group=openrc
+# magikos:name=session
+# magikos:examples=magikos openrc session
+
 # SDDM user session for Artix/OpenRC. Keep the existing Sway session untouched.
 set -euo pipefail
 
@@ -16,7 +22,7 @@ fi
 if [[ -z ${DBUS_SESSION_BUS_ADDRESS:-} ]]; then
   if [[ -S $XDG_RUNTIME_DIR/bus ]]; then
     export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"
-  elif [[ ${MAGIKOS_DBUS_WRAPPED:-0} == 0 ]] && command -v dbus-run-session >/dev/null 2>&1; then
+  elif [[ ${MAGIKOS_DBUS_WRAPPED:-0} == 0 ]] && magikos-cmd-present dbus-run-session; then
     export MAGIKOS_DBUS_WRAPPED=1
     exec dbus-run-session -- "$0"
   else

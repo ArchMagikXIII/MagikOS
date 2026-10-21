@@ -6,6 +6,9 @@
 
 
 export MAGIKOS_PATH="${MAGIKOS_PATH:-/usr/share/magikos}"
+# magikos-cmd-present lives next to this script; put the install root on
+# PATH so the helper is found the same way the other bin commands find it.
+export PATH="$MAGIKOS_PATH/bin:$PATH"
 
 consume_sleep_events() {
   local line sleep_lock
@@ -58,7 +61,7 @@ sleep_monitor="$MAGIKOS_PATH/bin/magikos-system-sleep-monitor"
 
 # Artix's elogind provides its own inhibitor CLI. Prefer it outside a systemd
 # boot even when a compatibility package happens to ship systemd-inhibit.
-if [[ ! -d /run/systemd/system ]] && command -v elogind-inhibit >/dev/null 2>&1; then
+if [[ ! -d /run/systemd/system ]] && magikos-cmd-present elogind-inhibit; then
   inhibitor=elogind-inhibit
 else
   inhibitor=systemd-inhibit
