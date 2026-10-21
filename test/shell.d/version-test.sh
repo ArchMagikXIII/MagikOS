@@ -56,7 +56,7 @@ pass "version fails when no Magikos package is installed"
 snapshot_desc=$(
   set -e
   PATH="$stub_bin:$PATH" MAGIKOS_TEST_PACKAGES="" MAGIKOS_PATH=/usr/share/magikos \
-    bash -c 'DESC="$(magikos-version 2>/dev/null || echo unknown)"; echo "$DESC"' 2>/dev/null
+    bash -c 'DESC="$("$ROOT/bin/magikos-version" 2>/dev/null || echo unknown)"; echo "$DESC"' 2>/dev/null
 ) || fail "snapshot survives an unknown version"
 
 [[ $snapshot_desc == "unknown" ]] || fail "snapshot labels an unknown version" "actual: $snapshot_desc"

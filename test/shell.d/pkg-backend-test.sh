@@ -16,6 +16,9 @@ if command -v pacman >/dev/null 2>&1; then
 elif command -v apt-get >/dev/null 2>&1; then
   [[ $detected == apt ]] || fail "default backend resolves to apt (got: $detected)"
   pass "backend resolves to apt by default"
+elif command -v nix >/dev/null 2>&1; then
+  [[ $detected == nix ]] || fail "default backend resolves to nix (got: $detected)"
+  pass "backend resolves to nix by default"
 else
   fail "no supported package manager is installed"
 fi
@@ -28,12 +31,18 @@ fi
 pacman_predicate=$(bash -c 'source "$ROOT/bin/magikos-pkg-backend" && backend_is_pacman && echo yes' || true)
 apt_predicate=$(bash -c 'source "$ROOT/bin/magikos-pkg-backend" && backend_is_apt && echo yes' || true)
 
+nix_predicate=$(bash -c 'source "$ROOT/bin/magikos-pkg-backend" && backend_is_nix && echo yes' || true)
+
 if [[ $detected == pacman ]]; then
   [[ $pacman_predicate == yes ]] || fail "backend_is_pacman reports pacman when the backend is pacman"
   [[ -z $apt_predicate ]] || fail "backend_is_apt is false when the backend is pacman"
-else
+elif [[ $detected == apt ]]; then
   [[ -z $pacman_predicate ]] || fail "backend_is_pacman is false when the backend is apt"
   [[ $apt_predicate == yes ]] || fail "backend_is_apt reports apt when the backend is apt"
+else
+  [[ -z $pacman_predicate ]] || fail "backend_is_pacman is false when the backend is nix"
+  [[ -z $apt_predicate ]] || fail "backend_is_apt is false when the backend is nix"
+  [[ $nix_predicate == yes ]] || fail "backend_is_nix reports nix when the backend is nix"
 fi
 pass "backend_is_pacman and backend_is_apt agree with the resolved backend ($detected)"
 
@@ -52,7 +61,7 @@ chmod +x "$test_tmp/query-bin/pacman"
 # The backend is forced rather than left to detection: this asserts the pacman
 # shape on every host, including the Debian one that would otherwise resolve
 # to apt and never reach these functions.
-TEST_TMP="$test_tmp" MAGIKOS_PKG_BACKEND=pacman PATH="$test_tmp/query-bin:/usr/bin:/bin" bash -c '
+TEST_TMP="$test_tmp" MAGIKOS_PKG_BACKEND=pacman PATH="$test_tmp/query-bin:$PATH" bash -c '
   source "$ROOT/bin/magikos-pkg-backend"
   pkg_installed firefox >/dev/null
   pkg_list_installed >/dev/null
@@ -110,7 +119,7 @@ chmod +x "$test_tmp/dpkg-bin/dpkg-query"
 # pkg_installed returns 0 only when *every* named package resolves, so probe it
 # through a helper that reports rather than tripping set -e on the failures.
 apt_probe() {
-  TEST_TMP="$test_tmp" MAGIKOS_PKG_BACKEND=apt PATH="$test_tmp/dpkg-bin:/usr/bin:/bin" bash -c '
+  TEST_TMP="$test_tmp" MAGIKOS_PKG_BACKEND=apt PATH="$test_tmp/dpkg-bin:$PATH" bash -c '
     source "$ROOT/bin/magikos-pkg-backend"
     pkg_installed "$@" >/dev/null 2>&1
   ' _ "$@" && echo yes || echo no
@@ -141,7 +150,7 @@ printf 'kept\tinstalled\nleftover\tdeinstall\n'
 EOF
 chmod +x "$test_tmp/list-bin/dpkg-query"
 
-listed=$(TEST_TMP="$test_tmp" MAGIKOS_PKG_BACKEND=apt PATH="$test_tmp/list-bin:/usr/bin:/bin" bash -c '
+listed=$(TEST_TMP="$test_tmp" MAGIKOS_PKG_BACKEND=apt PATH="$test_tmp/list-bin:$PATH" bash -c '
   source "$ROOT/bin/magikos-pkg-backend"
   pkg_list_installed
 ')
