@@ -8,6 +8,7 @@ base-devel
 broadcom-wl
 btrfs-progs
 dkms
+edk2-ovmf
 egl-wayland
 gst-plugin-pipewire
 gtk4-layer-shell
